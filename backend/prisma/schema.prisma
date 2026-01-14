@@ -1,0 +1,124 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modello Utente (Studenti)
+model User {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String   @unique
+  password  String   // Hashed password
+  className String   // Es. "4B", "3A"
+  role      Role     @default(STUDENT)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relazioni
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  
+  // Planner personale (se non sincronizzato esternamente)
+  calendarEvents CalendarEvent[]
+
+  @@index([firstName, lastName])
+  @@index([className])
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+// Messaggi privati 1-to-1
+model Message {
+  id        String   @id @default(uuid())
+  content   String?  // Testo del messaggio
+  imageUrl  String?  // URL immagine opzionale
+  
+  senderId  String
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id])
+  
+  receiverId String
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+// Planner / Registro
+// In MVP questo è un archivio locale o sincronizzato manualmente.
+model CalendarEvent {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  type        EventType // COMPITO, VERIFICA, NOTA
+  date        DateTime
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
+
+enum EventType {
+  HOMEWORK
+  EXAM
+  NOTE
+  OTHER
+}
+
+// Feed "Twitter-Style"
+model Post {
+  id        String   @id @default(uuid())
+  content   String
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+  likes     Int      @default(0)
+  
+  @@index([authorId])
+}
+
+// Marketplace
+model MarketItem {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  price       Float
+  imageUrl    String?
+  category    ItemCategory
+  
+  sellerId    String
+  seller      User     @relation(fields: [sellerId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  status      ItemStatus @default(AVAILABLE)
+
+  @@index([sellerId])
+}
+
+enum ItemCategory {
+  BOOK
+  NOTES
+  ELECTRONICS
+  OTHER
+}
+
+enum ItemStatus {
+  AVAILABLE
+  SOLD
+  RESERVED
+}

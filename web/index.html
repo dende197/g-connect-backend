@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>G-Connect</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script>
+        // Emergency Error Handler for Mobile Debugging
+        window.onerror = function (msg, url, line) {
+            alert("Errore G-Connect:\n" + msg + "\nRiga: " + line);
+            return false;
+        };
+    </script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        :root {
+            --bg-color: #000000;
+            --surface-color: #1C1C1E;
+            --surface-highlight: #2C2C2E;
+            --blue: #0A84FF;
+            --purple: #BF5AF2;
+            --indigo: #5E5CE6;
+            --pink: #FF375F;
+            --red: #FF453A;
+            --orange: #FF9F0A;
+            --yellow: #FFD60A;
+            --green: #30D158;
+            --text-primary: #FFFFFF;
+            --text-secondary: #8E8E93;
+            --radius-L: 24px;
+            --radius-M: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+        }
+
+        body {
+            font-family: 'SF Pro Display', 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100dvh;
+        }
+
+        #app {
+            height: 100%;
+            overflow-y: scroll;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 120px;
+            scroll-behavior: smooth;
+        }
+
+        #app::-webkit-scrollbar {
+            display: none;
+        }
+
+        #app {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .view {
+            padding: 24px;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: 0.3px;
+        }
+
+        h2 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card {
+            background: rgba(28, 28, 30, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-L);
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        /* Navigation */
+        #bottom-nav {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: auto;
+            padding: 0 30px;
+            height: 72px;
+            background: rgba(25, 25, 25, 0.9);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-radius: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            gap: 32px;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            z-index: 999;
+        }
+
+        .nav-item {
+            background: none;
+            border: none;
+            padding: 0;
+            color: rgba(255, 255, 255, 0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-item i {
+            font-size: 28px;
+        }
+
+        .nav-item.active {
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .nav-item.active i {
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+
+        /* Chat */
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: 20px;
+            margin-bottom: 8px;
+            max-width: 80%;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .msg-me {
+            background: var(--blue);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg-other {
+            background: var(--surface-highlight);
+            color: white;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        /* Modals and Inputs */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.2s;
+        }
+
+        .modal-content {
+            background: var(--surface-color);
+            border-radius: 24px 24px 0 0;
+            padding: 24px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            background: var(--surface-highlight);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 14px;
+            font-size: 16px;
+            border-radius: 12px;
+            font-family: inherit;
+            resize: none;
+            margin-bottom: 10px;
+        }
+
+        .search-container {
+            position: sticky;
+            top: -1px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 10px 0;
+            margin: 0 -24px 20px -24px;
+            padding: 10px 24px;
+        }
+
+        .btn-primary {
+            background: var(--blue);
+            color: white;
+            width: 100%;
+            border: none;
+            padding: 16px;
+            border-radius: 14px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app"></div>
+    <div id="modals"></div>
+
+    <nav id="bottom-nav">
+        <button class="nav-item active" onclick="navigate('home')"><i class="ph-fill ph-house"></i></button>
+        <button class="nav-item" onclick="navigate('market')"><i class="ph-fill ph-bag"></i></button>
+        <button class="nav-item" onclick="navigate('feed')"><i class="ph-fill ph-chats-circle"></i></button>
+        <button class="nav-item" onclick="navigate('planner')"><i class="ph-fill ph-calendar-check"></i></button>
+        <button class="nav-item" onclick="navigate('profile')"><i class="ph-fill ph-user"></i></button>
+    </nav>
+
+    <script>
+        const DIRECTORY = [
+            { name: 'Alessandro Russo', class: '5B', status: 'online' },
+            { name: 'Sofia Bianchi', class: '3A', status: 'offline' },
+            { name: 'Luca Esposito', class: '4C', status: 'online' },
+            { name: 'Giulia Conti', class: '5B', status: 'offline' },
+            { name: 'Matteo Ferri', class: '2A', status: 'online' },
+            { name: 'Chiara Romano', class: '1B', status: 'offline' },
+            { name: 'Proff. Esposito', class: 'Docente', status: 'online' }
+        ];
+
+        const state = {
+            view: 'home',
+            user: { name: 'Andrea', class: '5B' },
+            didup: { connected: false }, // Added missing state
+            feed: { search: '', classFilter: 'Tutte' }, // Added missing state
+            tasks: [
+                { id: 1, text: 'Ripasso Storia Medievale', done: false },
+                { id: 2, text: 'Esercizi Matematica p.22', done: false },
+                { id: 3, text: 'Versioni Latino', done: true }
+            ],
+            posts: [
+                { id: 1, author: 'Marco Rossi', class: '4A', text: 'Ragazzi chi ha gli appunti di filosofia?', likes: 4, liked: false, comments: [], image: null, anon: false },
+                { id: 2, author: 'Rappresentanti', class: 'Istituto', text: '⚠️ Assemlea di Istituto confermata per Venerdì in Aula Magna.', likes: 89, liked: true, comments: [], image: null, anon: false }
+            ],
+            marketItems: [
+                { id: 1, title: 'Matematica Blu Vol.3', price: '15€', image: 'https://m.media-amazon.com/images/I/71s+3sDQPIL._AC_UF1000,1000_QL80_.jpg', seller: 'Luca E.' },
+                { id: 2, title: 'Divina Commedia', price: '10€', image: null, seller: 'Sofia B.' }
+            ],
+            messages: { 'Alessandro Russo': [{ text: 'Ciao Andrea!', me: false }] },
+            news: [
+                { id: 128, title: 'Circolare n. 128 - Assemblea d’Istituto 7 Febbraio', date: 'OGGI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' },
+                { id: 127, title: 'Circolare n. 127 - Variazione Calendario Scrutini', date: 'IERI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' },
+                { id: 126, title: 'Circolare n. 126 - Saldo viaggio d’istruzione', date: '2 GG FA', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' }
+            ]
+        };
+
+        const app = document.getElementById('app');
+        const modalContainer = document.getElementById('modals');
+
+        // INIT APP
+        document.addEventListener('DOMContentLoaded', async () => {
+            render();
+
+            // Check for saved session
+            const savedSession = localStorage.getItem('argo_session');
+            if (savedSession) {
+                console.log("Found Saved Session, syncing...");
+                try {
+                    const session = JSON.parse(savedSession);
+                    // Just visual feedback - we can check if we are on planner page
+                    // But for now just background sync
+
+                    // Call Sync Endpoint (Use Localhost for now, update when deployed)
+                    const response = await fetch('http://127.0.0.1:5002/sync', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(session)
+                    });
+
+                    const data = await response.json();
+                    if (data.success && data.tasks) {
+                        state.didup.connected = true;
+                        updateTasks(data.tasks);
+                        render();
+                        console.log("Auto-Sync Complete");
+                    } else {
+                        // Session invalid/expired
+                        console.warn("Session expired:", data.error);
+                        localStorage.removeItem('argo_session');
+                    }
+                } catch (e) {
+                    console.error("Sync failed:", e);
+                }
+            }
+        });
+
+        function updateTasks(newTasksRaw) {
+            const formatted = newTasksRaw.map(t => ({
+                id: t.id,
+                text: t.text,
+                done: false
+            }));
+
+            state.tasks = [
+                { id: 999, text: "✅ Sincronizzato con Argo", done: true },
+                ...formatted
+            ];
+        }
+
+        function render() {
+            // Nav Active State
+            document.querySelectorAll('.nav-item').forEach((el, idx) => {
+                const views = ['home', 'market', 'feed', 'planner', 'profile'];
+                if (views[idx] === state.view) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+
+            if (state.view === 'login') {
+                document.getElementById('bottom-nav').style.display = 'none';
+                app.innerHTML = renderLogin();
+            } else {
+                document.getElementById('bottom-nav').style.display = 'flex';
+                if (state.view === 'home') app.innerHTML = renderHome();
+                else if (state.view === 'search') app.innerHTML = renderSearch();
+                else if (state.view === 'market') app.innerHTML = renderMarket();
+                else if (state.view === 'feed') app.innerHTML = renderFeed();
+                else if (state.view === 'planner') app.innerHTML = renderPlanner();
+                else if (state.view === 'profile') app.innerHTML = renderProfile();
+                else if (state.view === 'chat') app.innerHTML = renderChat();
+            }
+        }
+
+        // --- VIEWS ---
+
+        function renderHome() {
+            return `
+                <div class="view">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                        <div>
+                            <div style="font-size: 14px; color: var(--text-secondary); font-weight: 600; letter-spacing: 1px;">BENTORNATO</div>
+                            <h1>${state.user.name}</h1>
+                        </div>
+                        <div style="display: flex; gap: 12px;">
+                             <!-- Navigate to Search/Community -->
+                            <div onclick="navigate('search')" style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                <i class="ph-fill ph-users" style="font-size: 20px;"></i>
+                            </div>
+                            <div onclick="alert('Nessuna nuova notifica')" style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                <i class="ph-fill ph-bell" style="font-size: 20px;"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CIRCULARS -->
+                    <div style="margin-bottom: 30px;">
+                        <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom: 16px;">
+                            <h2 style="margin:0;">Ultime Circolari</h2>
+                            <button onclick="window.open('https://www.liceogandhi.edu.it/categoria/storico-circolari/','_blank')" style="background:none; border:none; color:var(--blue); font-size:14px; font-weight:600;">Vedi tutte</button>
+                        </div>
+                        <div style="display: flex; gap: 16px; overflow-x: auto; padding-bottom: 10px; margin: 0 -24px; padding-left: 24px;">
+                            ${state.news.map(n => `
+                                <div onclick="window.open('${n.url}', '_blank')" style="min-width: 260px; height: 150px; background: linear-gradient(135deg, #1c1c1e 0%, #111 100%); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;">
+                                    <i class="ph-fill ph-file-pdf" style="position: absolute; right: -10px; bottom: -10px; font-size: 80px; color: rgba(255,255,255,0.03); transform: rotate(-15deg);"></i>
+                                    <div>
+                                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+                                            <i class="ph-fill ph-file-pdf" style="color: var(--red); font-size: 16px;"></i>
+                                            <span style="color: var(--text-secondary); font-size: 11px; font-weight: 700; text-transform: uppercase;">CIRCOLARE</span>
+                                        </div>
+                                        <h3 style="margin: 0; font-size: 17px; line-height: 1.3; font-weight: 600;">${n.title}</h3>
+                                    </div>
+                                    <span style="font-size: 12px; color: var(--blue);">Apri documento <i class="ph-bold ph-arrow-up-right" style="font-size:10px;"></i></span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- SMART STATUS SECTION -->
+                    <h2 style="margin-bottom: 16px;">La Tua Situazione</h2>
+                    <div style="display: flex; gap: 16px; margin-bottom: 30px;">
+                        
+                        <!-- GRADE AVERAGE WIDGET -->
+                        <div class="card" onclick="alert('Dettaglio Voti')" style="flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0;">
+                            <div style="position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+                                <svg width="80" height="80" viewBox="0 0 80 80">
+                                    <circle cx="40" cy="40" r="34" fill="none" stroke="#333" stroke-width="6" />
+                                    <circle cx="40" cy="40" r="34" fill="none" stroke="#28cd41" stroke-width="6" stroke-dasharray="213" stroke-dashoffset="40" transform="rotate(-90 40 40)" stroke-linecap="round" />
+                                </svg>
+                                <span style="position: absolute; font-size: 20px; font-weight: 700; color: white;">7.8</span>
+                            </div>
+                            <span style="font-size: 14px; color: var(--text-secondary); font-weight: 600;">Media Voti</span>
+                        </div>
+
+                        <!-- TASKS WIDGET -->
+                        <div class="card" onclick="navigate('planner')" style="flex: 1; padding: 16px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 0; cursor: pointer;">
+                            <div style="font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; text-transform:uppercase; letter-spacing:0.5px;">Da fare oggi</div>
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                ${state.tasks.slice(0, 2).map(t => `
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="width: 18px; height: 18px; border: 2px solid ${t.done ? 'var(--green)' : 'var(--orange)'}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                                            ${t.done ? '<i class="ph-bold ph-check" style="font-size: 10px; color: black;"></i>' : ''}
+                                        </div>
+                                        <span style="font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; opacity: ${t.done ? 0.5 : 1}; text-decoration: ${t.done ? 'line-through' : 'none'}">${t.text}</span>
+                                    </div>
+                                `).join('')}
+                                ${state.tasks.length > 2 ? `<div style="font-size: 11px; color: var(--blue); margin-top: 4px;">+ altri ${state.tasks.length - 2}</div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- INTERACTIVE POLL WIDGET -->
+                    <h2 style="margin-bottom: 16px;">Sondaggio Attivo</h2>
+                    <div class="card" style="background: linear-gradient(135deg, #1c1c1e, #2c2c2e); border: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 40px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
+                            <span style="color: var(--purple); font-size: 12px; font-weight: 700; text-transform: uppercase;">RAPPRESENTANTI</span>
+                            <span style="font-size: 12px; color: var(--text-secondary);">Scade tra 5h</span>
+                        </div>
+                        <h3 style="margin-bottom: 20px; font-size: 18px; line-height: 1.4;">Data prossima Assemblea? 🗓️</h3>
+                        
+                        <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between;">
+                            <span>Venerdì 7 Feb</span>
+                            <span>60%</span>
+                        </div>
+                         <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between;">
+                            <span>Lunedì 10 Feb</span>
+                            <span>15%</span>
+                        </div>
+                         <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; font-weight: 600; display: flex; justify-content: space-between;">
+                            <span>Sabato 15 Feb</span>
+                            <span>25%</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMarket() {
+            return `
+                <div class="view">
+                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                        <h1>Market Libri</h1>
+                        <button onclick="openNewItemModal()" style="background:var(--green); color:black; padding:8px 16px; border-radius:20px; border:none; font-weight:700;">+ Vendi</button>
+                    </div> 
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        ${state.marketItems.map(item => `
+                            <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin:0; height: 100%;">
+                                <div style="height:140px; background:#333; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                                    ${item.image ? `<img src="${item.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-book-open" style="font-size:40px; color:rgba(255,255,255,0.2);"></i>`}
+                                </div>
+                                <div style="padding:12px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+                                    <div>
+                                        <div style="font-weight:600; font-size:15px; margin-bottom:4px; line-height:1.2;">${item.title}</div>
+                                        <div style="font-size:12px; color:var(--text-secondary);">Venduto da ${item.seller}</div>
+                                    </div>
+                                    <div style="margin-top:8px; font-weight:700; color:var(--green); font-size:16px;">${item.price}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSearch() {
+            return `
+                <div class="view" style="padding-top: 0;">
+                    <div class="search-container">
+                         <div style="display:flex; align-items:center; gap:10px; margin: 10px 0;">
+                             <button onclick="navigate('home')" style="background:none; border:none; color:white; font-size:24px;"><i class="ph ph-arrow-left"></i></button>
+                             <h1 style="margin:0;">Community</h1>
+                         </div>
+                        <div style="position: relative;">
+                            <i class="ph ph-magnifying-glass" style="position: absolute; left: 14px; top: 12px; color: var(--text-secondary); font-size: 20px;"></i>
+                            <input id="search-input" type="text" placeholder="Cerca studente..." oninput="filterStudents(this.value)" style="padding-left: 44px; margin-bottom: 0;">
+                        </div>
+                    </div>
+                    
+                    <div id="student-list" style="padding-top: 10px;"></div>
+                </div>
+            `;
+        }
+
+        function filterStudents(q) {
+            const list = document.getElementById('student-list');
+            const filtered = DIRECTORY.filter(u => u.name.toLowerCase().includes(q.toLowerCase()));
+
+            if (filtered.length === 0) {
+                list.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--text-secondary);">Nessun utente trovato</div>`;
+                return;
+            }
+
+            list.innerHTML = `
+                ${q === '' ? `<h3 style="margin-bottom: 12px;">Suggeriti</h3>` : ''}
+                ${filtered.map(u => `
+                    <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <div style="position: relative; margin-right: 16px;">
+                            <div style="width: 50px; height: 50px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;">${u.name[0]}</div>
+                            ${u.status === 'online' ? `<div style="position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; background: var(--green); border: 2px solid black; border-radius: 50%;"></div>` : ''}
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 17px; margin-bottom: 2px;">${u.name}</div>
+                            <div style="color: var(--text-secondary); font-size: 13px;">Classe ${u.class}</div>
+                        </div>
+                        <button style="background: rgba(10, 132, 255, 0.15); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; color: var(--blue);">
+                            <i class="ph-fill ph-chat-circle-dots" style="font-size: 20px;"></i>
+                        </button>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        function renderFeed() {
+            // Filter Posts
+            let displayPosts = state.posts;
+
+            // 1. Class Filter
+            if (state.feed.classFilter !== 'Tutte') {
+                displayPosts = displayPosts.filter(p => p.class === state.feed.classFilter);
+            }
+
+            // 2. Search Filter (Search in Author or Text)
+            if (state.feed.search) {
+                const q = state.feed.search.toLowerCase();
+                displayPosts = displayPosts.filter(p =>
+                    p.author.toLowerCase().includes(q) ||
+                    p.text.toLowerCase().includes(q)
+                );
+            }
+
+            // Find Users (if searching)
+            let foundUsers = [];
+            if (state.feed.search) {
+                foundUsers = DIRECTORY.filter(u => u.name.toLowerCase().includes(state.feed.search.toLowerCase()));
+            }
+
+            // Get unique classes for filter
+            const allClasses = ['Tutte', ...new Set(DIRECTORY.map(u => u.class))];
+
+            return `
+            <div class="view">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h1>Feed</h1>
+                    <button onclick="openNewPostModal()" style="background:var(--blue); padding:8px 16px; border-radius:20px; border:none; color:white; font-weight:600;">+ Post</button>
+                </div>
+
+                <!-- Search Bar -->
+                <div style="position:relative; margin-bottom: 16px;">
+                     <i class="ph ph-magnifying-glass" style="position: absolute; left: 14px; top: 12px; color: var(--text-secondary); font-size: 20px;"></i>
+                     <input type="text" placeholder="Cerca persone o post..." value="${state.feed.search}" oninput="updateFeedSearch(this.value)" style="padding-left: 44px; margin-bottom: 0;">
+                </div>
+
+                <!-- Class Filters -->
+                <div style="display:flex; gap:10px; overflow-x:auto; padding-bottom:10px; margin: 0 -24px 16px -24px; padding-left: 24px; scrollbar-width: none;">
+                    ${allClasses.map(c => `
+                        <button onclick="setFeedClass('${c}')" style="
+                            padding: 6px 16px; 
+                            border-radius: 16px; 
+                            border: 1px solid ${state.feed.classFilter === c ? 'var(--blue)' : 'rgba(255,255,255,0.2)'}; 
+                            background: ${state.feed.classFilter === c ? 'var(--blue)' : 'transparent'}; 
+                            color: white; 
+                            font-weight: 600; 
+                            white-space: nowrap;
+                            font-size: 13px;
+                            transition: all 0.2s;
+                        ">${c}</button>
+                    `).join('')}
+                </div>
+
+                <!-- Found Users Section -->
+                ${foundUsers.length > 0 ? `
+                    <div style="margin-bottom: 24px;">
+                        <h3 style="margin-bottom: 10px;">Utenti Trovati</h3>
+                        ${foundUsers.map(u => `
+                             <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 8px;">
+                                <div style="width: 32px; height: 32px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 10px;">${u.name[0]}</div>
+                                <div style="flex:1;">
+                                    <div style="font-weight: 600; font-size: 15px;">${u.name}</div>
+                                    <div style="color: var(--text-secondary); font-size: 11px;">Classe ${u.class}</div>
+                                </div>
+                                <i class="ph-fill ph-chat-circle-dots" style="color:var(--blue);"></i>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+
+                <!-- Posts List -->
+                ${displayPosts.length > 0 ? displayPosts.map(post => `
+                    <div class="card">
+                        <div style="display:flex; gap:12px; margin-bottom:12px;">
+                            <div style="width:40px; height:40px; background:${post.anon ? '#333' : 'var(--blue)'}; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700;">${post.anon ? '?' : post.author[0]}</div>
+                            <div>
+                                <div style="font-weight:700;">${post.anon ? 'Anonimo' : post.author}</div>
+                                <div style="font-size:12px; opacity:0.6;">${post.anon ? 'Studente' : post.class}</div>
+                            </div>
+                        </div>
+                        <p>${post.text}</p>
+                        ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:12px; margin-bottom:12px;">` : ''}
+                        <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; gap:20px;">
+                            <button onclick="toggleLike(${post.id})" style="background:none; border:none; color:${post.liked ? 'var(--red)' : 'var(--text-secondary)'};"><i class="${post.liked ? 'ph-fill' : 'ph'} ph-heart"></i> ${post.likes}</button>
+                            <button style="background:none; border:none; color:var(--text-secondary);"><i class="ph ph-chat-circle"></i> Commenta</button>
+                        </div>
+                    </div>
+                `).join('') : `<div style="text-align:center; padding:40px; opacity:0.5;">Nessun post trovato</div>`}
+            </div>`;
+        }
+
+        function renderChat() {
+            const msgs = state.messages[state.currentChatUser] || [];
+            return `<div class="view" style="display:flex; flex-direction:column; height:100vh; padding:0;"><div style="padding:20px; padding-top:60px; background:rgba(28,28,30,0.9); display:flex; align-items:center; gap:16px; border-bottom:1px solid rgba(255,255,255,0.1);"><button onclick="navigate('search')" style="background:none; border:none; color:white; font-size:24px;"><i class="ph ph-arrow-left"></i></button><h2>${state.currentChatUser}</h2></div><div id="chat-history" style="flex:1; overflow-y:auto; padding:20px;">${msgs.map(m => `<div class="message-bubble ${m.me ? 'msg-me' : 'msg-other'}">${m.text}</div>`).join('')}</div><div style="padding:20px; padding-bottom: 40px; background:black; display:flex; gap:10px; border-top:1px solid rgba(255,255,255,0.1);"><input id="msg-input" placeholder="Messaggio..." style="margin-bottom:0;"><button onclick="sendMessage()" style="background:var(--blue); width:50px; border-radius:50%; border:none; color:white;"><i class="ph-fill ph-paper-plane-right"></i></button></div></div>`;
+        }
+
+        function renderPlanner() {
+            return `
+            <div class="view">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h1>Planner</h1>
+                    ${!state.didup.connected ?
+                    `<button onclick="openArgoLogin()" style="background:linear-gradient(135deg, #106690 0%, #0c4b6e 100%); color:white; padding:8px 16px; border-radius:20px; border:none; font-weight:600; font-size:13px; display:flex; align-items:center; gap:6px;">
+                            <i class="ph-fill ph-plugs-connected"></i> Collega Registro
+                        </button>` :
+                    `<div style="color:var(--green); font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px;">
+                            <i class="ph-fill ph-check-circle"></i> Argo Sincronizzato
+                        </div>`
+                }
+                </div>
+                <div style="margin-top:20px;">
+                    ${state.tasks.map(t => `
+                        <div onclick="toggleTask(${t.id})" style="background: ${t.done ? 'rgba(255,255,255,0.05)' : 'rgba(28,28,30,0.6)'}; padding: 16px; border-radius: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 16px; transition: all 0.2s;">
+                            <div style="width: 24px; height: 24px; border: 2px solid ${t.done ? 'var(--green)' : 'rgba(255,255,255,0.3)'}; background:${t.done ? 'var(--green)' : 'transparent'}; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                ${t.done ? '<i class="ph-bold ph-check" style="font-size: 14px; color: black;"></i>' : ''}
+                            </div>
+                            <span style="font-size: 16px; text-decoration: ${t.done ? 'line-through' : 'none'}; opacity: ${t.done ? 0.5 : 1};">${t.text}</span>
+                        </div>
+                    `).join('')}
+                    <button onclick="alert('Aggiungi Task Manuale')" style="margin-top: 10px; width: 100%; padding: 16px; border: 1px dashed rgba(255,255,255,0.2); border-radius: 16px; color: var(--text-secondary); background: none;">+ Aggiungi Attività</button>
+                </div>
+            </div>`;
+        }
+        function toggleTask(id) { const t = state.tasks.find(x => x.id === id); t.done = !t.done; render(); }
+        function renderProfile() { return `<div class="view"><h1>Profilo</h1><div style="margin-top:20px;"><button class="btn-primary" onclick="state.view='login'; render();" style="background:var(--red);">Esci</button></div></div>`; }
+        function renderLogin() { return `<div class="view flex-center" style="height:100vh; display:flex; flex-direction:column; justify-content:center;"><h1 style="margin-bottom:40px;">G-Connect</h1><button class="btn-primary" onclick="state.view='home'; render();">Entra</button></div>`; }
+
+        // Core Functions
+        function navigate(v) { state.view = v; render(); }
+
+        function openNewPostModal() {
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" onclick="closeModal(event)">
+                <div class="modal-content">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue);">Annulla</button>
+                        <b>Nuovo Post</b>
+                        <button onclick="publishPost()" style="background:none; border:none; color:var(--blue); font-weight:700;">Pubblica</button>
+                    </div>
+                    <textarea id="new-post-text" rows="5" placeholder="Scrivi qualcosa..."></textarea>
+                    
+                    <div style="margin-bottom: 20px;">
+                         <label style="display:flex; align-items:center; gap:10px; margin-bottom: 10px; cursor:pointer;">
+                            <input type="checkbox" id="post-anon-toggle" style="width:20px; height:20px;">
+                            <span>Pubblica in Anonimo</span>
+                        </label>
+                         <label style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.1); padding:10px; border-radius:12px; cursor:pointer;">
+                            <i class="ph ph-camera" style="font-size:20px;"></i>
+                            <span>Aggiungi Foto</span>
+                            <input type="file" id="post-image-input" accept="image/*" style="display:none;" onchange="handleImagePreview(this)">
+                        </label>
+                        <div id="image-preview" style="margin-top:10px;"></div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function openArgoLogin() {
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" onclick="closeModal(event)">
+                <div class="modal-content" style="text-align:center;">
+                    <div style="width:60px; height:60px; background:#106690; border-radius:16px; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;">
+                         <i class="ph-fill ph-book-bookmark" style="font-size:30px;"></i>
+                    </div>
+                    <h2 style="margin-bottom:8px;">Collega DidUP</h2>
+                    <p style="color:var(--text-secondary); font-size:13px; margin-bottom:20px;">Inserisci le credenziali del registro ufficiale.</p>
+                    
+                    <input id="argo-school" placeholder="Codice Scuola (es. SG12345)">
+                    <input id="argo-user" placeholder="Nome Utente">
+                    <input type="password" id="argo-pass" placeholder="Password">
+                    
+                    <button onclick="performArgoSync()" style="background:var(--blue); width:100%; padding: 14px; border-radius:12px; font-weight:700; margin-top:10px; border:none; color:white;">Accedi e Sincronizza</button>
+                    <button onclick="closeModal()" style="background:none; width:100%; padding: 10px; margin-top:5px; border:none; color:var(--text-secondary);">Annulla</button>
+                </div>
+            </div>`;
+        }
+
+        async function performArgoSync() {
+            const btn = document.querySelector('.modal-content button');
+            const school = document.getElementById('argo-school').value;
+            const user = document.getElementById('argo-user').value;
+            const pass = document.getElementById('argo-pass').value;
+
+            if (!school || !user || !pass) {
+                alert("Inserisci tutti i dati!");
+                return;
+            }
+
+            if (btn) {
+                btn.innerText = "Connessione ad Argo...";
+                btn.style.opacity = 0.7;
+            }
+
+            try {
+                // Call Local Python Backend (Localhost explicit)
+                const response = await fetch('http://127.0.0.1:5002/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ schoolCode: school, username: user, password: pass })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || `Errore Server: ${response.status}`);
+                }
+
+                if (data.success) {
+                    state.didup.connected = true;
+
+                    // SAVE SESSION PERSISTENTLY
+                    if (data.session) {
+                        localStorage.setItem('argo_session', JSON.stringify(data.session));
+                    }
+
+                    // UPDATE REAL USER INFO
+                    if (data.student) {
+                        state.user.name = data.student.name;
+                        state.user.class = data.student.class;
+                    }
+
+                    // UPDATE REAL TASKS (from argofamiglia)
+                    let newTasks = [];
+                    if (data.tasks && data.tasks.length > 0) {
+                        newTasks = data.tasks.map(t => ({
+                            id: t.id || Math.random(),
+                            text: t.text,
+                            done: false
+                        }));
+                    } else {
+                        newTasks.push({ id: 997, text: "Nessun compito trovato su Argo", done: true });
+                    }
+
+                    // Add connection confirmation
+                    state.tasks = [
+                        { id: 999, text: `✅ Connesso: ${data.student.name}`, done: true },
+                        ...newTasks
+                    ];
+
+                    closeModal();
+                    alert(`Benvenuto ${data.student.name}!\nSessione salvata. Non dovrai più fare login.`);
+                    render();
+                } else {
+                    alert("Errore Argo: " + (data.error || "Credenziali Errate"));
+                    if (btn) btn.innerText = "Accedi e Sincronizza";
+                }
+            } catch (e) {
+                console.error("Connection Failed:", e);
+                alert("Errore di Connessione:\n" + e.message + "\n\nAssicurati che 'server.py' sia avviato!");
+                if (btn) btn.innerText = "Accedi e Sincronizza";
+            }
+        }
+
+        function openNewItemModal() {
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" onclick="closeModal(event)">
+                <div class="modal-content">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue);">Annulla</button>
+                        <b>Vendi Libro</b>
+                        <button onclick="publishItem()" style="background:none; border:none; color:var(--green); font-weight:700;">Metti in vendita</button>
+                    </div>
+                    <input id="item-title" placeholder="Titolo Libro">
+                    <input id="item-price" placeholder="Prezzo (es. 15€)">
+                    
+                    <label style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.1); padding:16px; border-radius:12px; cursor:pointer; margin-bottom:20px;">
+                        <i class="ph ph-camera" style="font-size:24px;"></i>
+                        <span>Scatta/Carica Foto</span>
+                        <input type="file" id="item-image-input" accept="image/*" capture="environment" style="display:none;" onchange="handleImagePreview(this)">
+                    </label>
+                    <div id="image-preview" style="margin-top:10px;"></div>
+                </div>
+            </div>`;
+        }
+
+        function handleImagePreview(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    document.getElementById('image-preview').innerHTML = `<img src="${e.target.result}" style="max-height:100px; border-radius:8px;">`;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function publishPost() {
+            const text = document.getElementById('new-post-text').value;
+            const anon = document.getElementById('post-anon-toggle').checked;
+            const imgPreview = document.querySelector('#image-preview img');
+            if (text) {
+                state.posts.unshift({
+                    id: Date.now(),
+                    author: state.user.name,
+                    class: state.user.class,
+                    text: text, likes: 0, liked: false,
+                    anon: anon,
+                    image: imgPreview ? imgPreview.src : null,
+                    comments: []
+                });
+                closeModal();
+                render();
+            }
+        }
+
+        function publishItem() {
+            const title = document.getElementById('item-title').value;
+            const price = document.getElementById('item-price').value;
+            const imgPreview = document.querySelector('#image-preview img');
+            if (title && price) {
+                state.marketItems.unshift({
+                    id: Date.now(),
+                    title: title,
+                    price: price,
+                    image: imgPreview ? imgPreview.src : null,
+                    seller: state.user.name
+                });
+                closeModal();
+                render();
+            }
+        }
+
+        function toggleLike(id) { const p = state.posts.find(x => x.id === id); p.liked = !p.liked; p.likes += p.liked ? 1 : -1; render(); }
+        function closeModal(e) { if (!e || e.target.classList.contains('modal-overlay') || e.target.tagName === 'BUTTON') modalContainer.innerHTML = ''; }
+
+        // Chat & Search Logic
+        function openChat(u) { state.currentChatUser = u; if (!state.messages[u]) state.messages[u] = []; navigate('chat'); }
+        function sendMessage() {
+            const input = document.getElementById('msg-input');
+            const txt = input.value;
+            if (txt) {
+                state.messages[state.currentChatUser].push({ text: txt, me: true });
+                input.value = ''; // clear input
+                render();
+                setTimeout(() => document.getElementById('chat-history').scrollTop = 10000, 10);
+            }
+        }
+
+        // Init
+        render();
+        filterStudents('');
+    </script>
+</body>
+
+</html>

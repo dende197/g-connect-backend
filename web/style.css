@@ -1,0 +1,222 @@
+:root {
+    /* Colors */
+    --bg-color: #000000;
+    --card-bg: #1c1c1e;
+    --card-bg-gradient: linear-gradient(135deg, #1c1c1e 0%, #141416 100%);
+    --text-primary: #ffffff;
+    --text-secondary: #8e8e93;
+    --border-color: rgba(255, 255, 255, 0.1);
+
+    /* Accents */
+    --accent-color: #6366f1;
+    --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+
+    /* Functional Colors */
+    --success: #34d399;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --info: #60a5fa;
+
+    /* Layout */
+    --nav-height: 80px;
+    --header-height: 60px;
+    --border-radius: 24px;
+    --padding: 20px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    overflow-x: hidden;
+    height: 100vh;
+}
+
+#app {
+    height: 100%;
+    overflow-y: auto;
+    padding-bottom: var(--nav-height);
+    /* Space for bottom nav */
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.view {
+    animation: fadeIn 0.3s ease-out;
+    padding: var(--padding);
+}
+
+/* Components */
+.card {
+    background: var(--card-bg-gradient);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    padding: var(--padding);
+    margin-bottom: 16px;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+}
+
+.btn-primary {
+    width: 100%;
+    background: var(--accent-gradient);
+    color: white;
+    border: none;
+    padding: 16px;
+    border-radius: 18px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    transition: transform 0.1s;
+}
+
+.btn-primary:active {
+    transform: scale(0.98);
+}
+
+input {
+    width: 100%;
+    padding: 16px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    color: white;
+    font-size: 16px;
+    margin-bottom: 16px;
+    outline: none;
+}
+
+input:focus {
+    border-color: var(--accent-color);
+}
+
+/* Apple Style Scrollbar */
+::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+    /* Optional: just make scrollbar invisible */
+}
+
+/* For browsers that support it, hide scrollbar but keep functionality */
+* {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+/* Bottom Navigation - Apple Style */
+#bottom-nav {
+    position: fixed;
+    bottom: 20px;
+    /* Floating slightly above bottom for "Home Indicator" space */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    /* Floating island style */
+    max-width: 400px;
+    height: 65px;
+    background: rgba(28, 28, 30, 0.6);
+    /* More translucent */
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 35px;
+    /* Rounded pill shape */
+    display: flex;
+    justify-content: space-evenly;
+    align-items: center;
+    z-index: 1000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.nav-item {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 50px;
+}
+
+.nav-item i {
+    font-size: 24px;
+    transition: all 0.2s ease;
+    margin-bottom: 0;
+}
+
+.nav-item span {
+    font-size: 0;
+    /* Hide text for cleaner look, show only on active? or keep hidden for pure minimalist */
+    opacity: 0;
+    height: 0;
+}
+
+.nav-item.active {
+    color: white;
+}
+
+.nav-item.active i {
+    color: var(--text-primary);
+    transform: translateY(-2px);
+    text-shadow: 0 0 15px var(--accent-color);
+    /* Glow effect */
+}
+
+/* Active indicator dot */
+.nav-item.active::after {
+    content: '';
+    display: block;
+    width: 4px;
+    height: 4px;
+    background: var(--accent-color);
+    border-radius: 50%;
+    margin-top: 4px;
+}
+
+/* Typography Helpers */
+.title {
+    font-size: 34px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    letter-spacing: -0.5px;
+}
+
+.subtitle {
+    font-size: 17px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+
+.header {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.caption {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
