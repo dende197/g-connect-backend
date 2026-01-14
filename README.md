@@ -1,57 +1,42 @@
-# G-Connect Project Setup
+# G-Connect 🎓
 
-Benvenuto in G-Connect. Questo progetto contiene il backend (Node.js) e il codice frontend (iOS SwiftUI) per l'applicazione scolastica.
+**G-Connect** è una Progressive Web App (PWA) moderna per studenti, progettata per integrarsi con il registro elettronico **Argo DidUP**.
 
-## Prerequisiti
-- **Node.js**: v16 o superiore.
-- **PostgreSQL**: Installato e funzionante localmente (o usa un servizio cloud come ElephantSQL / Supabase).
-- **Xcode**: 15.0 o superiore per compilare l'app iOS.
+## ✨ Caratteristiche
+- **Design Premium**: Interfaccia stile iOS/Glassmorphism.
+- **Argo Integration**: Login sicuro e sincronizzazione Compiti.
+- **Planner**: Gestione attività scolastiche.
+- **Social Feed**: Bacheca per la classe/istituto (simulata).
+- **Market**: Mercatino libri usati (simulato).
 
-## 1. Backend Setup
+## 🚀 Installazione Locale
 
-Poiché l'ambiente automatico non disponeva di npm, è necessario installare le dipendenze manualmente.
+### 1. Backend (Python Server)
+Il server fa da ponte tra l'App e Argo.
+```bash
+# Crea un virtual environment (opzionale ma consigliato)
+python3 -m venv venv
+source venv/bin/activate
 
-1. Spostati nella cartella backend:
-   ```bash
-   cd backend
-   ```
-2. Installa le dipendenze:
-   ```bash
-   npm install
-   ```
-3. Configura le variabili d'ambiente:
-   Crea un file `.env` in `backend/` con il seguente contenuto:
-   ```env
-   DATABASE_URL="postgresql://utente:password@localhost:5432/gconnect_db?schema=public"
-   JWT_SECRET="tua_chiave_segreta_super_sicura"
-   PORT=3000
-   ```
-4. Inizializza il Database (Esegui dopo aver avviato Postgres):
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
-5. Avvia il server:
-   ```bash
-   npm run dev
-   ```
+# Installa le dipendenze
+pip install -r requirements.txt
 
-## 2. iOS Setup
+# Avvia il server
+python3 server.py
+# Il server girerà su: http://127.0.0.1:5002
+```
 
-1. Apri Xcode.
-2. Crea un nuovo progetto "App".
-3. Trascina i file dalla cartella `iOS/` che abbiamo generato nel tuo progetto Xcode, mantenendo la struttura delle cartelle o creando "Groups" corrispondenti.
-   - `GConnectApp.swift` sostituisce il punto di ingresso dell'app.
-   - Copia `Core`, `Features` nel progetto.
-4. Assicurati che il *Target* minimo sia iOS 16.0 o 17.0.
+### 2. Frontend (App)
+Apri semplicemente il file `web/index.html` nel tuo browser (Chrome/Safari).
 
-## Estensioni Future (Roadmap)
+## ☁️ Deploy (Render/Heroku)
+Il progetto è pronto per il deploy cloud.
+1. Carica questa cartella su **GitHub**.
+2. Collega la repository a **Render.com** (o Railway/Heroku).
+3. Il server verrà rilevato automaticamente grazie a `Procfile` e `requirements.txt`.
+4. Una volta online, aggiorna la variabile `API_BASE_URL` in `web/index.html` con il tuo nuovo indirizzo HTTPS.
 
-### Backend
-- **Real-time Chat**: Migrare da HTTP polling a **Socket.io** per la messaggistica istantanea.
-- **File Upload**: Configurare AWS S3 o Firebase Storage per inviare immagini in chat.
-- **Scraper Registro**: Creare un microservizio Python o Puppeteer per scaricare voti/assenza da DidUP/Argo usando le credenziali dell'utente (salvate criptate).
-
-### iOS
-- **Networking**: Collegare le Views reali alle API usando `URLSession`. Attualmente `LoginView` usa un mock.
-- **Push Notifications**: Integrare APNs per avvisi in tempo reale.
+## 🛠 Tecnologie
+- **Frontend**: HTML5, Vanilla JS, CSS3 (No Frameworks).
+- **Backend**: Python, Flask.
+- **Argo API**: Libreria `argofamiglia`.

@@ -108,6 +108,10 @@ def parse_tasks(raw_response):
                  })
     return tasks_data
 
+import os
+
 if __name__ == '__main__':
-    print("🚀 G-Connect Server (Token Auth Ready) running on http://0.0.0.0:5002")
-    app.run(host='0.0.0.0', port=5002, debug=True)
+    # Use PORT provided by Cloud, or fallback to 5002 for local
+    port = int(os.environ.get("PORT", 5002))
+    print(f"🚀 G-Connect Server running on http://0.0.0.0:{port}")
+    app.run(host='0.0.0.0', port=port, debug=True)

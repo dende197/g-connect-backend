@@ -281,8 +281,7 @@
         // ⚙️ CONFIGURATION
         // Cambia questo URL quando carichi il server online!
         // Es. const API_BASE_URL = "https://g-connect.onrender.com";
-        const API_BASE_URL = "https://g-connect-backend.onrender.com";
-        // ---------------------------------------------
+        const API_BASE_URL = "http://127.0.0.1:5002";
         // ---------------------------------------------
 
         const state = {
@@ -734,65 +733,20 @@
                          <i class="ph-fill ph-book-bookmark" style="font-size:30px;"></i>
                     </div>
                     <h2 style="margin-bottom:8px;">Collega DidUP</h2>
+                    <p style="color:var(--text-secondary); font-size:13px; margin-bottom:20px;">Inserisci le credenziali del registro ufficiale.</p>
                     
-                    <!-- SERVER STATUS WIDGET -->
-                    <div id="server-status" style="margin-bottom: 20px; font-size: 12px; color: var(--orange); display: flex; align-items: center; justify-content: center; gap: 6px;">
-                        <span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span>
-                        Sto cercando il server...
-                    </div>
-
                     <input id="argo-school" placeholder="Codice Scuola (es. SG12345)">
                     <input id="argo-user" placeholder="Nome Utente">
                     <input type="password" id="argo-pass" placeholder="Password">
                     
-                    <button id="login-btn" onclick="performArgoSync()" style="background:var(--blue); width:100%; padding: 14px; border-radius:12px; font-weight:700; margin-top:10px; border:none; color:white;">Accedi e Sincronizza</button>
+                    <button onclick="performArgoSync()" style="background:var(--blue); width:100%; padding: 14px; border-radius:12px; font-weight:700; margin-top:10px; border:none; color:white;">Accedi e Sincronizza</button>
                     <button onclick="closeModal()" style="background:none; width:100%; padding: 10px; margin-top:5px; border:none; color:var(--text-secondary);">Annulla</button>
                 </div>
             </div>`;
-
-            // AUTO-CHECK SERVER HEALTH
-            checkServerHealth();
-        }
-
-        async function checkServerHealth(attempt = 1) {
-            const statusEl = document.getElementById('server-status');
-            if (!statusEl) return;
-
-            // Update Status Text
-            if (attempt === 1) statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span> Cerco il Server...`;
-            else statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span> Sveglio il Server (${attempt})...`; // Visual feedback
-
-            try {
-                // Timeout logic: race against a 5s timeout
-                const controller = new AbortController();
-                const id = setTimeout(() => controller.abort(), 5000);
-
-                const res = await fetch(`${API_BASE_URL}/health`, {
-                    method: 'GET',
-                    signal: controller.signal
-                });
-                clearTimeout(id);
-
-                if (res.ok) {
-                    statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></span> Server Online`;
-                    statusEl.style.color = "var(--green)";
-                } else {
-                    throw new Error("Status: " + res.status);
-                }
-            } catch (e) {
-                console.warn(`Health Check Failed (${attempt}):`, e);
-                // Retry up to 20 times (approx 1-2 mins for boot)
-                if (attempt < 20) {
-                    setTimeout(() => checkServerHealth(attempt + 1), 3000);
-                } else {
-                    statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--red); border-radius: 50%;"></span> Server Irraggiungibile`;
-                    statusEl.style.color = "var(--red)";
-                }
-            }
         }
 
         async function performArgoSync() {
-            const btn = document.getElementById('login-btn');
+            const btn = document.querySelector('.modal-content button');
             const school = document.getElementById('argo-school').value;
             const user = document.getElementById('argo-user').value;
             const pass = document.getElementById('argo-pass').value;
@@ -802,27 +756,18 @@
                 return;
             }
 
-            // DEBUG ALERT
-            // alert(`DEBUG: Inizio Login per ${user} @ ${school}`);
-
             if (btn) {
-                btn.innerText = "Connessione in corso (fino a 60s)...";
+                btn.innerText = "Connessione ad Argo...";
                 btn.style.opacity = 0.7;
-                btn.disabled = true;
             }
 
             try {
-                // DEBUG ALERT
-                // alert(`DEBUG: Contatto il server: ${API_BASE_URL}/login`);
-
                 // Call Backend
                 const response = await fetch(`${API_BASE_URL}/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ schoolCode: school, username: user, password: pass })
                 });
-
-                // alert(`DEBUG: Ricevuta risposta: ${response.status}`);
 
                 const data = await response.json();
 
@@ -867,18 +812,12 @@
                     render();
                 } else {
                     alert("Errore Argo: " + (data.error || "Credenziali Errate"));
-                    if (btn) {
-                        btn.innerText = "Accedi e Sincronizza";
-                        btn.disabled = false;
-                    }
+                    if (btn) btn.innerText = "Accedi e Sincronizza";
                 }
             } catch (e) {
                 console.error("Connection Failed:", e);
-                alert("Errore di Connessione:\n" + e.message);
-                if (btn) {
-                    btn.innerText = "Accedi e Sincronizza";
-                    btn.disabled = false;
-                }
+                alert("Errore di Connessione:\n" + e.message + "\n\nAssicurati che 'server.py' sia avviato!");
+                if (btn) btn.innerText = "Accedi e Sincronizza";
             }
         }
 
@@ -951,12 +890,7 @@
         }
 
         function toggleLike(id) { const p = state.posts.find(x => x.id === id); p.liked = !p.liked; p.likes += p.liked ? 1 : -1; render(); }
-        function closeModal(e) {
-            // Only close if clicking the overlay (background) or if called without event (explicit call)
-            if (!e || e.target.classList.contains('modal-overlay')) {
-                modalContainer.innerHTML = '';
-            }
-        }
+        function closeModal(e) { if (!e || e.target.classList.contains('modal-overlay') || e.target.tagName === 'BUTTON') modalContainer.innerHTML = ''; }
 
         // Chat & Search Logic
         function openChat(u) { state.currentChatUser = u; if (!state.messages[u]) state.messages[u] = []; navigate('chat'); }
