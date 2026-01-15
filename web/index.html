@@ -8,17 +8,11 @@
     <title>G-Connect</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <script>
-        // Emergency Error Handler for Mobile Debugging
-        window.onerror = function (msg, url, line) {
-            alert("Errore G-Connect:\n" + msg + "\nRiga: " + line);
-            return false;
-        };
-    </script>
     <link
         href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 
     <style>
         :root {
@@ -72,6 +66,45 @@
             scrollbar-width: none;
         }
 
+        /* FullCalendar Customization */
+        .fc {
+            --fc-button-bg-color: transparent;
+            --fc-button-border-color: rgba(255, 255, 255, 0.1);
+            --fc-button-active-bg-color: var(--blue);
+            --fc-border-color: rgba(255, 255, 255, 0.05);
+            --fc-page-bg-color: transparent;
+            --fc-today-bg-color: rgba(10, 132, 255, 0.1);
+        }
+
+        .fc .fc-toolbar-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .fc .fc-button-primary:not(:disabled):active,
+        .fc .fc-button-primary:not(:disabled).fc-button-active {
+            background-color: var(--blue);
+        }
+
+        .fc-theme-standard td,
+        .fc-theme-standard th {
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .fc-daygrid-day-number {
+            font-size: 14px;
+            font-weight: 500;
+            padding: 10px !important;
+        }
+
+        .fc-event {
+            border-radius: 4px;
+            padding: 2px 4px;
+            border: none;
+            font-size: 10px;
+            cursor: pointer;
+        }
+
         .view {
             padding: 24px;
             animation: fadeIn 0.3s ease-out;
@@ -84,6 +117,15 @@
 
             to {
                 opacity: 1;
+            }
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
             }
         }
 
@@ -250,6 +292,26 @@
             border-radius: 14px;
             font-weight: 600;
             font-size: 16px;
+            cursor: pointer;
+        }
+
+        .offline-badge {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 159, 10, 0.1);
+            border: 1px solid var(--orange);
+            color: var(--orange);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            z-index: 1000;
+            display: none;
+        }
+
+        .offline-badge.show {
+            display: block;
         }
     </style>
 </head>
@@ -257,6 +319,7 @@
 <body>
     <div id="app"></div>
     <div id="modals"></div>
+    <div id="offline-badge" class="offline-badge">📡 Offline Mode</div>
 
     <nav id="bottom-nav">
         <button class="nav-item active" onclick="navigate('home')"><i class="ph-fill ph-house"></i></button>
@@ -267,6 +330,43 @@
     </nav>
 
     <script>
+        // ⭐ Funzione universale per leggere le date di Argo
+        function parseArgoDate(dateString) {
+            if (!dateString) return new Date(0); // Fallback per date invalide
+
+            // Try parsing as YYYY-MM-DD (e.g., from API or ISO)
+            if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                return new Date(dateString + 'T00:00:00');
+            }
+
+            // Try parsing as DD/MM/YYYY (e.g., from Argo HTML)
+            if (typeof dateString === 'string' && dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                const [day, month, year] = dateString.split('/');
+                return new Date(`${year}-${month}-${day}T00:00:00`);
+            }
+
+            // Fallback for other formats or if it's already a Date object
+            try {
+                const date = new Date(dateString);
+                if (!isNaN(date.getTime())) return date;
+            } catch (e) { }
+
+            return new Date();
+        }
+
+        // ⭐ Calcola la media matematica dai voti di Argo
+        function calcolaMedia(voti) {
+            if (!voti || voti.length === 0) return null;
+            const validi = voti.map(v => {
+                let s = (v.valore || v.value || "").toString().replace(',', '.');
+                return parseFloat(s);
+            }).filter(n => !isNaN(n));
+
+            if (validi.length === 0) return null;
+            const somma = validi.reduce((a, b) => a + b, 0);
+            return (somma / validi.length).toFixed(2);
+        }
+
         const DIRECTORY = [
             { name: 'Alessandro Russo', class: '5B', status: 'online' },
             { name: 'Sofia Bianchi', class: '3A', status: 'offline' },
@@ -279,100 +379,437 @@
 
         // ---------------------------------------------
         // ⚙️ CONFIGURATION
-        // Cambia questo URL quando carichi il server online!
-        // Es. const API_BASE_URL = "https://g-connect.onrender.com";
+        // Lascia vuoto ("") se il server è locale o se index.html è servito da Flask.
+        // Inserisci l'URL di Render (es: "https://g-connect-backend.onrender.com") se deploy su Netlify.
         const API_BASE_URL = "https://g-connect-backend.onrender.com";
         // ---------------------------------------------
-        // ---------------------------------------------
+        // 🆕 PERSISTENT SESSION MANAGER
+        const sessionManager = {
+            save(sessionData) {
+                try {
+                    localStorage.setItem('argo_session', JSON.stringify(sessionData));
+                    localStorage.setItem('argo_is_logged_in', 'true');
+                    console.log("✅ Sessione salvata");
+                } catch (e) {
+                    console.error("❌ Errore salvataggio sessione:", e);
+                    alert("Errore salvataggio dati locali. Prova a disabilitare modalità incognito.");
+                }
+            },
+            load() {
+                try {
+                    const saved = localStorage.getItem('argo_session');
+                    return saved ? JSON.parse(saved) : null;
+                } catch (e) {
+                    console.error("❌ Errore caricamento sessione:", e);
+                    return null;
+                }
+            },
+            isLoggedIn() {
+                return localStorage.getItem('argo_is_logged_in') === 'true';
+            },
+            clear() {
+                localStorage.removeItem('argo_session');
+                localStorage.removeItem('argo_tasks');
+                localStorage.removeItem('argo_is_logged_in');
+                localStorage.removeItem('argo_user'); // ⭐ Per persistere user
+                console.log("🗑️ Sessione cancellata");
+            }
+        };
 
+        // STATE MANAGEMENT
         const state = {
-            view: 'home',
-            user: { name: 'Andrea', class: '5B' },
-            didup: { connected: false }, // Added missing state
-            feed: { search: '', classFilter: 'Tutte' }, // Added missing state
-            tasks: [
-                { id: 1, text: 'Ripasso Storia Medievale', done: false },
-                { id: 2, text: 'Esercizi Matematica p.22', done: false },
-                { id: 3, text: 'Versioni Latino', done: true }
-            ],
+            view: 'login',
+            user: { name: 'Andrea', class: '5B' }, // ⭐ Verrà sovrascritto da localStorage
+            isLoggedIn: false,
+            isOffline: false,
+            didup: { connected: false },
+            feed: { search: '', classFilter: 'Tutte' },
+            tasks: [], // ⭐ Inizializza vuoto, carica da localStorage
             posts: [
                 { id: 1, author: 'Marco Rossi', class: '4A', text: 'Ragazzi chi ha gli appunti di filosofia?', likes: 4, liked: false, comments: [], image: null, anon: false },
-                { id: 2, author: 'Rappresentanti', class: 'Istituto', text: '⚠️ Assemlea di Istituto confermata per Venerdì in Aula Magna.', likes: 89, liked: true, comments: [], image: null, anon: false }
+                { id: 2, author: 'Rappresentanti', class: 'Istituto', text: '⚠️ Assemlea di Istituto confermata per Venerdì in Aula Magna. ', likes: 89, liked: true, comments: [], image: null, anon: false }
             ],
             marketItems: [
-                { id: 1, title: 'Matematica Blu Vol.3', price: '15€', image: 'https://m.media-amazon.com/images/I/71s+3sDQPIL._AC_UF1000,1000_QL80_.jpg', seller: 'Luca E.' },
+                { id: 1, title: 'Matematica Blu Vol.3', price: '15€', image: 'https://m.media-amazon.com/images/I/71s+3sDQPIL._AC_UF1000,1000_QL80_. jpg', seller: 'Luca E.' },
                 { id: 2, title: 'Divina Commedia', price: '10€', image: null, seller: 'Sofia B.' }
             ],
-            messages: { 'Alessandro Russo': [{ text: 'Ciao Andrea!', me: false }] },
+            messages: { 'Alessandro Russo': [{ text: 'Ciao Andrea! ', me: false }] },
             news: [
-                { id: 128, title: 'Circolare n. 128 - Assemblea d’Istituto 7 Febbraio', date: 'OGGI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' },
+                { id: 128, title: 'Circolare n.  128 - Assemblea d\'Istituto 7 Febbraio', date: 'OGGI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' },
                 { id: 127, title: 'Circolare n. 127 - Variazione Calendario Scrutini', date: 'IERI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' },
-                { id: 126, title: 'Circolare n. 126 - Saldo viaggio d’istruzione', date: '2 GG FA', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' }
-            ]
+                { id: 126, title: 'Circolare n. 126 - Saldo viaggio d\'istruzione', date: '2 GG FA', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' }
+            ],
+            grades: [],
+            announcements: [],
+            voti: [],        // ⭐ Added based on user request
+            promemoria: [],
+            reminders: [],
+            syncing: false,
+            selectedDay: new Date().getDate()
         };
 
         const app = document.getElementById('app');
         const modalContainer = document.getElementById('modals');
+        const offlineBadge = document.getElementById('offline-badge');
 
-        // INIT APP
+        // ⭐ INITIALIZE APP ON LOAD - Versione che funzionava
         document.addEventListener('DOMContentLoaded', async () => {
-            render();
+            console.log("🚀 App Loading...");
+            const isLoggedIn = sessionManager.isLoggedIn();
+            const savedSession = sessionManager.load();
 
-            // Check for saved session
-            const savedSession = localStorage.getItem('argo_session');
-            if (savedSession) {
-                console.log("Found Saved Session, syncing...");
-                try {
-                    const session = JSON.parse(savedSession);
-                    // Just visual feedback - we can check if we are on planner page
-                    // But for now just background sync
-
-                    // Call Sync Endpoint
-                    const response = await fetch(`${API_BASE_URL}/sync`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(session)
-                    });
-
-                    const data = await response.json();
-                    if (data.success && data.tasks) {
-                        state.didup.connected = true;
-                        updateTasks(data.tasks);
-                        render();
-                        console.log("Auto-Sync Complete");
-                    } else {
-                        // Session invalid/expired
-                        console.warn("Session expired:", data.error);
-                        localStorage.removeItem('argo_session');
+            if (isLoggedIn && savedSession) {
+                console.log("✅ Sessione valida trovata!");
+                
+                // ⭐ Carica tasks con done persistito e ricostruisci dateObj
+                const cachedTasks = localStorage.getItem('argo_tasks');
+                if (cachedTasks) {
+                    try {
+                        const parsed = JSON.parse(cachedTasks);
+                        // ⭐ Ricostruisci dateObj da due_date quando viene caricato da localStorage
+                        state.tasks = parsed.map(t => {
+                            if (t.due_date) {
+                                t.dateObj = new Date(t.due_date);
+                                t.hasValidDate = !isNaN(t.dateObj.getTime());
+                            }
+                            return t;
+                        });
+                        console.log("📦 Compiti caricati:", state.tasks.length);
+                    } catch (e) {
+                        console.error("Errore cache tasks:", e);
+                        state.tasks = [];
                     }
-                } catch (e) {
-                    console.error("Sync failed:", e);
                 }
+                
+                // ⭐ Carica user da localStorage
+                const cachedUser = localStorage.getItem('argo_user');
+                if (cachedUser) {
+                    try {
+                        state.user = JSON.parse(cachedUser);
+                        console.log("👤 Utente caricato:", state.user.name);
+                    } catch (e) {
+                        console.error("Errore caricamento user:", e);
+                    }
+                } else if (savedSession.student) {
+                    state.user = savedSession.student;
+                    localStorage.setItem('argo_user', JSON.stringify(state.user));
+                }
+                
+                // ⭐ Carica voti e promemoria da localStorage
+                const cachedVoti = localStorage.getItem('argo_voti');
+                if (cachedVoti) {
+                    try {
+                        state.voti = JSON.parse(cachedVoti);
+                        console.log("📊 Voti caricati da cache:", state.voti.length);
+                    } catch (e) {
+                        console.error("Errore caricamento voti:", e);
+                        state.voti = [];
+                    }
+                }
+                
+                const cachedProm = localStorage.getItem('argo_promemoria');
+                if (cachedProm) {
+                    try {
+                        state.promemoria = JSON.parse(cachedProm);
+                        console.log("📢 Promemoria caricati da cache:", state.promemoria.length);
+                    } catch (e) {
+                        console.error("Errore caricamento promemoria:", e);
+                        state.promemoria = [];
+                    }
+                }
+                
+                state.isLoggedIn = true;
+                state.didup.connected = true;
+                state.view = 'home';
+                render();
+
+                // ⭐ Sync in background passando la sessione salvata
+                console.log("🔄 Sincronizzazione in background...");
+                await performSync(savedSession);
+            } else {
+                console.log("❌ No session - showing login");
+                state.isLoggedIn = false;
+                state.view = 'login';
+                render();
             }
         });
 
-        function updateTasks(newTasksRaw) {
-            const formatted = newTasksRaw.map(t => ({
-                id: t.id,
-                text: t.text,
-                done: false
-            }));
-
-            state.tasks = [
-                { id: 999, text: "✅ Sincronizzato con Argo", done: true },
-                ...formatted
-            ];
+        function updateOfflineBadge() {
+            if (state.isOffline) {
+                offlineBadge.classList.add('show');
+            } else {
+                offlineBadge.classList.remove('show');
+            }
         }
 
+        async function performSync(sessionData) {
+            if (state.syncing) return;
+            state.syncing = true;
+            render();
+            
+            // ⭐ Usa la sessione passata o carica quella salvata (come nel codice vecchio)
+            if (!sessionData) sessionData = sessionManager.load();
+            if (!sessionData) {
+                console.warn("⚠️ Nessuna sessione disponibile per sync");
+                state.syncing = false;
+                return;
+            }
+
+            try {
+                console.log("📤 Invio richiesta sync con sessione salvata");
+                
+                const response = await fetch(`${API_BASE_URL}/sync`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(sessionData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log("📥 Dati ricevuti dal server:", {
+                    success: data.success,
+                    tasksCount: data.tasks?.length || 0,
+                    votiCount: data.voti?.length || 0,
+                    promemoriaCount: data.promemoria?.length || data.announcements?.length || 0,
+                    error: data.error
+                });
+                
+                // ⭐ DEBUG: Mostra dettagli completi in console
+                if (data.tasks && data.tasks.length > 0) console.log("📋 Tasks ricevuti:", data.tasks);
+                
+                // ⭐ DEBUG CRITICO per voti
+                console.log("🎓 DEBUG VOTI - data.voti:", data.voti);
+                console.log("🎓 DEBUG VOTI - tipo:", typeof data.voti, "è array?", Array.isArray(data.voti));
+                if (data.voti) {
+                    console.log("🎓 DEBUG VOTI - lunghezza:", data.voti.length);
+                    console.log("🎓 DEBUG VOTI - primo elemento:", data.voti[0]);
+                }
+                
+                if (data.promemoria && data.promemoria.length > 0) console.log("📋 Promemoria ricevuti:", data.promemoria);
+                if (data.announcements && data.announcements.length > 0) console.log("📋 Announcements ricevuti:", data.announcements);
+
+                if (data.success && data.tasks) {
+                    // ⭐ Gestione compiti (come nel codice vecchio)
+                    if (data.tasks.length === 0 && state.tasks.length > 0) {
+                        console.warn("⚠️ Il server ha mandato 0 compiti. Mantengo quelli locali per sicurezza.");
+                        state.isOffline = false;
+                        updateOfflineBadge();
+                        render();
+                        state.syncing = false;
+                        return;
+                    }
+                    updateTasks(data.tasks, true);
+                    
+                    // ⭐ CRITICO: Aggiorna voti e salva SEMPRE
+                    if (data.voti !== undefined) {
+                        state.voti = Array.isArray(data.voti) ? data.voti : [];
+                        localStorage.setItem('argo_voti', JSON.stringify(state.voti));
+                        console.log("💾 Voti salvati:", state.voti.length);
+                        if (state.voti.length === 0) {
+                            console.warn("⚠️ Array voti vuoto - il backend potrebbe non recuperare i voti da DidUP");
+                        }
+                    }
+                    
+                    // ⭐ CRITICO: Aggiorna promemoria e salva SEMPRE
+                    const promemoriaData = data.promemoria || data.announcements;
+                    if (promemoriaData !== undefined) {
+                        state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
+                        localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
+                        console.log("💾 Promemoria salvati:", state.promemoria.length);
+                        if (state.promemoria.length === 0) {
+                            console.warn("⚠️ Array promemoria vuoto - il backend potrebbe non recuperare i promemoria da DidUP");
+                        }
+                    }
+                    
+                    state.lastSync = new Date().toLocaleTimeString();
+                    state.isOffline = false;
+                    state.didup.connected = true;
+                    console.log("✅ Sync completato:", {
+                        tasks: state.tasks.length,
+                        voti: state.voti.length,
+                        promemoria: state.promemoria.length
+                    });
+                    updateOfflineBadge();
+                    render();
+                } else {
+                    throw new Error("Sessione non valida");
+                }
+            } catch (e) {
+                console.error("⚠️ Errore Sync:", e);
+                if (e.message.includes("Sessione non valida")) {
+                    // ⭐ Prova silent login se abbiamo le credenziali (come nel codice vecchio)
+                    if (sessionData && sessionData.storedUser && sessionData.storedPass) {
+                        await performSilentLogin(sessionData.schoolCode, sessionData.storedUser, sessionData.storedPass);
+                    } else {
+                        sessionManager.clear();
+                        state.isLoggedIn = false;
+                        state.view = 'login';
+                        alert("❌ Sessione scaduta. Effettua di nuovo il login.");
+                        render();
+                    }
+                } else {
+                    state.isOffline = true;
+                    updateOfflineBadge();
+                    render();
+                }
+            } finally {
+                state.syncing = false;
+            }
+        }
+
+        async function performSilentLogin(school, encodedUser, encodedPass) {
+            try {
+                const user = decodeURIComponent(escape(atob(encodedUser)));
+                const pass = decodeURIComponent(escape(atob(encodedPass)));
+
+                console.log("🔐 Silent Login in corso...");
+
+                const response = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ schoolCode: school, username: user, password: pass })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    console.log("✅ Silent Login riuscito!");
+                    console.log("📥 Dati ricevuti:", {
+                        tasks: data.tasks?.length || 0,
+                        voti: data.voti?.length || 0,
+                        promemoria: data.promemoria?.length || 0
+                    });
+
+                    const newSession = {
+                        ...data.session,
+                        storedUser: encodedUser,
+                        storedPass: encodedPass,
+                        schoolCode: school
+                    };
+                    sessionManager.save(newSession);
+
+                    // ⭐ Carica TUTTI i dati
+                    if (data.tasks) updateTasks(data.tasks, true);
+                    
+                    // ⭐ CRITICO: Carica voti
+                    if (data.voti !== undefined) {
+                        state.voti = Array.isArray(data.voti) ? data.voti : [];
+                        localStorage.setItem('argo_voti', JSON.stringify(state.voti));
+                        console.log("✅ Voti caricati nel silent login:", state.voti.length);
+                    }
+                    
+                    // ⭐ CRITICO: Carica promemoria
+                    const promemoriaData = data.promemoria || data.announcements;
+                    if (promemoriaData !== undefined) {
+                        state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
+                        localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
+                        console.log("✅ Promemoria caricati nel silent login:", state.promemoria.length);
+                    }
+                    
+                    if (data.student) {
+                        state.user = data.student;
+                        localStorage.setItem('argo_user', JSON.stringify(state.user));
+                    }
+
+                    state.isOffline = false;
+                    state.didup.connected = true;
+                    state.lastSync = new Date().toLocaleTimeString();
+                    updateOfflineBadge();
+                    render();
+                } else {
+                    throw new Error(data.error || "Silent login fallito");
+                }
+            } catch (e) {
+                console.error("❌ Silent login errore:", e);
+                state.isOffline = true;
+                updateOfflineBadge();
+            }
+        }
+
+        function saveTasks() {
+            try {
+                // ⭐ Salva solo i dati serializzabili (non dateObj che è un oggetto Date)
+                const tasksToSave = state.tasks.map(t => ({
+                    id: t.id,
+                    text: t.text,
+                    subject: t.subject,
+                    due_date: t.due_date,
+                    display_date: t.display_date,
+                    hasValidDate: t.hasValidDate,
+                    done: t.done
+                }));
+                localStorage.setItem('argo_tasks', JSON.stringify(tasksToSave));
+                console.log("💾 Compiti salvati con stato done");
+            } catch (e) {
+                console.error("❌ Errore salvataggio tasks:", e);
+                alert("Errore salvataggio locale - controlla se il browser blocca storage o se sei in incognito.");
+            }
+        }
+
+
+        function updateTasks(newTasks, shouldRender = false) {
+            if (!newTasks) return;
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // ⭐ Recupera stato 'done' persistito
+            const localTasks = JSON.parse(localStorage.getItem('argo_tasks') || '[]');
+
+            const formatted = newTasks.map(t => {
+                // ⭐ Gerarchia Affidabilità Date: Consegna > Prova > Pubblicazione
+                let rawDate = t.datCompito || t.due_date || t.dataProva || t.datGiorno || t.date;
+                let dateObj = parseArgoDate(rawDate);
+                let isoDate = dateObj.toISOString().split('T')[0];
+
+                // ⭐ Cerca match per preservare done
+                const match = localTasks.find(l => 
+                    (l.id === t.id) || 
+                    (l.text === (t.text || t.desCompito) && l.subject === (t.subject || t.materia))
+                );
+
+                return {
+                    id: t.id || Math.random().toString(36).substr(2, 9),
+                    text: t.text || t.desCompito || "Nessuna descrizione",
+                    subject: t.subject || t.materia || 'Generico',
+                    due_date: isoDate,
+                    display_date: rawDate,
+                    dateObj: dateObj,
+                    hasValidDate: !isNaN(dateObj.getTime()) && dateObj.getTime() > 0,
+                    done: match ? match.done : (t.done || false)
+                };
+            });
+
+            // ⭐ Filtra e Ordina - SOLO quelli con data valida e non scaduti
+            state.tasks = formatted
+                .filter(t => t.hasValidDate && t.dateObj >= today)
+                .sort((a, b) => a.dateObj - b.dateObj);
+
+            saveTasks();
+            if (shouldRender) render();
+        }
         function render() {
-            // Nav Active State
+            // Update nav
             document.querySelectorAll('.nav-item').forEach((el, idx) => {
                 const views = ['home', 'market', 'feed', 'planner', 'profile'];
                 if (views[idx] === state.view) el.classList.add('active');
                 else el.classList.remove('active');
             });
 
-            if (state.view === 'login') {
+            if (!state.isLoggedIn) {
                 document.getElementById('bottom-nav').style.display = 'none';
                 app.innerHTML = renderLogin();
             } else {
@@ -387,7 +824,46 @@
             }
         }
 
-        // --- VIEWS ---
+        function navigate(v) { state.view = v; render(); }
+
+        function logout() {
+            if (confirm('Sei sicuro di voler disconnettere? Dovrai effettuare nuovamente il login.')) {
+            sessionManager.clear();
+            state.isLoggedIn = false;
+                state.didup.connected = false;
+            state.user = { name: 'Andrea', class: '5B' };
+            state.tasks = [];
+                state.voti = [];
+                state.promemoria = [];
+                state.isOffline = false;
+                state.lastSync = null;
+            state.view = 'login';
+            render();
+                console.log('✅ Logout completato');
+            }
+        }
+
+        function renderLogin() {
+            // Se c'è una sessione salvata ma l'utente vuole rifare login, mostra il form
+            const savedSession = sessionManager.load();
+            const hasSession = savedSession && sessionManager.isLoggedIn();
+            
+            return `
+            <div class="view" style="height: 100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding: 24px;">
+                <h1 style="margin-bottom:40px;">📚 G-Connect</h1>
+                <p style="color:var(--text-secondary); margin-bottom:30px; text-align:center;">Accedi con le tue credenziali DidUP</p>
+                <button class="btn-primary" onclick="openArgoLogin()" style="max-width:300px; cursor:pointer;">Accedi</button>
+                ${hasSession ? `
+                    <div style="margin-top:30px; padding:16px; background:rgba(255,255,255,0.05); border-radius:12px; text-align:center; max-width:300px;">
+                        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">Sessione attiva trovata</div>
+                        <div style="font-size:14px; font-weight:600; margin-bottom:12px;">${state.user?.name || 'Utente'}</div>
+                        <button onclick="logout()" style="background:none; border:1px solid rgba(255,255,255,0.2); color:var(--text-secondary); padding:8px 16px; border-radius:8px; cursor:pointer; font-size:12px; width:100%;">
+                            Disconnetti e accedi con altro account
+                        </button>
+                    </div>
+                ` : ''}
+            </div>`;
+        }
 
         function renderHome() {
             return `
@@ -395,28 +871,40 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
                         <div>
                             <div style="font-size: 14px; color: var(--text-secondary); font-weight: 600; letter-spacing: 1px;">BENTORNATO</div>
-                            <h1>${state.user.name}</h1>
+                            <h1>${state.user.name || 'Utente'}</h1>
                         </div>
                         <div style="display: flex; gap: 12px;">
-                             <!-- Navigate to Search/Community -->
-                            <div onclick="navigate('search')" style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <div onclick="navigate('search')" style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor:pointer;">
                                 <i class="ph-fill ph-users" style="font-size: 20px;"></i>
                             </div>
-                            <div onclick="alert('Nessuna nuova notifica')" style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                                <i class="ph-fill ph-bell" style="font-size: 20px;"></i>
+                            <div onclick="openArgoLogin()" style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor:pointer;" title="Riconnetti DidUP">
+                                <i class="ph-fill ph-arrow-clockwise" style="font-size: 20px;"></i>
                             </div>
                         </div>
                     </div>
+                    
+                    ${!state.didup.connected ? `
+                        <div class="card" style="background: rgba(255, 159, 10, 0.1); border: 1px solid var(--orange); margin-bottom: 20px; padding: 16px; display: flex; align-items: center; gap: 12px;">
+                            <i class="ph ph-warning" style="color: var(--orange); font-size: 24px;"></i>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; margin-bottom: 4px;">DidUP Non Connesso</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Collega il tuo account DidUP per vedere voti, compiti e promemoria</div>
+                            </div>
+                            <button onclick="openArgoLogin()" style="background: var(--orange); color: black; padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; font-size: 12px; cursor: pointer;">
+                                Connetti
+                            </button>
+                        </div>
+                    ` : ''}
 
                     <!-- CIRCULARS -->
                     <div style="margin-bottom: 30px;">
                         <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom: 16px;">
                             <h2 style="margin:0;">Ultime Circolari</h2>
-                            <button onclick="window.open('https://www.liceogandhi.edu.it/categoria/storico-circolari/','_blank')" style="background:none; border:none; color:var(--blue); font-size:14px; font-weight:600;">Vedi tutte</button>
+                            <button onclick="window.open('https://www.liceogandhi.edu.it/categoria/storico-circolari/','_blank')" style="background:none; border:none; color:var(--blue); font-size:14px; font-weight:600; cursor:pointer;">Vedi tutte</button>
                         </div>
                         <div style="display: flex; gap: 16px; overflow-x: auto; padding-bottom: 10px; margin: 0 -24px; padding-left: 24px;">
                             ${state.news.map(n => `
-                                <div onclick="window.open('${n.url}', '_blank')" style="min-width: 260px; height: 150px; background: linear-gradient(135deg, #1c1c1e 0%, #111 100%); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;">
+                                <div onclick="window.open('${n.url}', '_blank')" style="min-width: 260px; height: 150px; background: linear-gradient(135deg, #1c1c1e 0%, #111 100%); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; cursor:pointer;">
                                     <i class="ph-fill ph-file-pdf" style="position: absolute; right: -10px; bottom: -10px; font-size: 80px; color: rgba(255,255,255,0.03); transform: rotate(-15deg);"></i>
                                     <div>
                                         <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
@@ -436,13 +924,20 @@
                     <div style="display: flex; gap: 16px; margin-bottom: 30px;">
                         
                         <!-- GRADE AVERAGE WIDGET -->
-                        <div class="card" onclick="alert('Dettaglio Voti')" style="flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0;">
+                        <div class="card" onclick="showVotiView()" style="flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0; cursor:pointer;">
                             <div style="position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
-                                <svg width="80" height="80" viewBox="0 0 80 80">
-                                    <circle cx="40" cy="40" r="34" fill="none" stroke="#333" stroke-width="6" />
-                                    <circle cx="40" cy="40" r="34" fill="none" stroke="#28cd41" stroke-width="6" stroke-dasharray="213" stroke-dashoffset="40" transform="rotate(-90 40 40)" stroke-linecap="round" />
-                                </svg>
-                                <span style="position: absolute; font-size: 20px; font-weight: 700; color: white;">7.8</span>
+                                ${(() => {
+                    const media = calcolaMedia(state.voti);
+                    const percent = media ? (parseFloat(media) / 10 * 213) : 0;
+                    const color = parseFloat(media) >= 6 ? 'var(--green)' : 'var(--red)';
+                    return `
+                                        <svg width="80" height="80" viewBox="0 0 80 80">
+                                            <circle cx="40" cy="40" r="34" fill="none" stroke="#333" stroke-width="6" />
+                                            <circle cx="40" cy="40" r="34" fill="none" stroke="${color}" stroke-width="6" stroke-dasharray="213" stroke-dashoffset="${213 - percent}" transform="rotate(-90 40 40)" stroke-linecap="round" />
+                                        </svg>
+                                        <span style="position: absolute; font-size: 20px; font-weight: 700; color: white;">${media || '--'}</span>
+                                    `;
+                })()}
                             </div>
                             <span style="font-size: 14px; color: var(--text-secondary); font-weight: 600;">Media Voti</span>
                         </div>
@@ -473,15 +968,15 @@
                         </div>
                         <h3 style="margin-bottom: 20px; font-size: 18px; line-height: 1.4;">Data prossima Assemblea? 🗓️</h3>
                         
-                        <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between;">
+                        <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer;">
                             <span>Venerdì 7 Feb</span>
                             <span>60%</span>
                         </div>
-                         <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between;">
+                         <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer;">
                             <span>Lunedì 10 Feb</span>
                             <span>15%</span>
                         </div>
-                         <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; font-weight: 600; display: flex; justify-content: space-between;">
+                         <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer;">
                             <span>Sabato 15 Feb</span>
                             <span>25%</span>
                         </div>
@@ -495,7 +990,7 @@
                 <div class="view">
                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
                         <h1>Market Libri</h1>
-                        <button onclick="openNewItemModal()" style="background:var(--green); color:black; padding:8px 16px; border-radius:20px; border:none; font-weight:700;">+ Vendi</button>
+                        <button onclick="openNewItemModal()" style="background:var(--green); color:black; padding:8px 16px; border-radius:20px; border:none; font-weight:700; cursor:pointer;">+ Vendi</button>
                     </div> 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                         ${state.marketItems.map(item => `
@@ -522,7 +1017,7 @@
                 <div class="view" style="padding-top: 0;">
                     <div class="search-container">
                          <div style="display:flex; align-items:center; gap:10px; margin: 10px 0;">
-                             <button onclick="navigate('home')" style="background:none; border:none; color:white; font-size:24px;"><i class="ph ph-arrow-left"></i></button>
+                             <button onclick="navigate('home')" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;"><i class="ph ph-arrow-left"></i></button>
                              <h1 style="margin:0;">Community</h1>
                          </div>
                         <div style="position: relative;">
@@ -538,6 +1033,8 @@
 
         function filterStudents(q) {
             const list = document.getElementById('student-list');
+            if (!list) return;
+
             const filtered = DIRECTORY.filter(u => u.name.toLowerCase().includes(q.toLowerCase()));
 
             if (filtered.length === 0) {
@@ -548,7 +1045,7 @@
             list.innerHTML = `
                 ${q === '' ? `<h3 style="margin-bottom: 12px;">Suggeriti</h3>` : ''}
                 ${filtered.map(u => `
-                    <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor:pointer;">
                         <div style="position: relative; margin-right: 16px;">
                             <div style="width: 50px; height: 50px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;">${u.name[0]}</div>
                             ${u.status === 'online' ? `<div style="position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; background: var(--green); border: 2px solid black; border-radius: 50%;"></div>` : ''}
@@ -596,7 +1093,7 @@
             <div class="view">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                     <h1>Feed</h1>
-                    <button onclick="openNewPostModal()" style="background:var(--blue); padding:8px 16px; border-radius:20px; border:none; color:white; font-weight:600;">+ Post</button>
+                    <button onclick="openNewPostModal()" style="background:var(--blue); padding:8px 16px; border-radius:20px; border:none; color:white; font-weight:600; cursor:pointer;">+ Post</button>
                 </div>
 
                 <!-- Search Bar -->
@@ -618,6 +1115,7 @@
                             white-space: nowrap;
                             font-size: 13px;
                             transition: all 0.2s;
+                            cursor: pointer;
                         ">${c}</button>
                     `).join('')}
                 </div>
@@ -625,15 +1123,18 @@
                 <!-- Found Users Section -->
                 ${foundUsers.length > 0 ? `
                     <div style="margin-bottom: 24px;">
-                        <h3 style="margin-bottom: 10px;">Utenti Trovati</h3>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom: 12px;">
+                            <i class="ph-fill ph-users" style="color:var(--blue);"></i>
+                            <h3 style="margin:0;">Persone Correlate</h3>
+                        </div>
                         ${foundUsers.map(u => `
-                             <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 8px;">
-                                <div style="width: 32px; height: 32px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 10px;">${u.name[0]}</div>
+                             <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 16px; margin-bottom: 8px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05);">
+                                <div style="width: 36px; height: 36px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 12px; border: 1px solid rgba(255,255,255,0.1);">${u.name[0]}</div>
                                 <div style="flex:1;">
                                     <div style="font-weight: 600; font-size: 15px;">${u.name}</div>
                                     <div style="color: var(--text-secondary); font-size: 11px;">Classe ${u.class}</div>
                                 </div>
-                                <i class="ph-fill ph-chat-circle-dots" style="color:var(--blue);"></i>
+                                <div style="background: rgba(10, 132, 255, 0.1); padding: 6px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; color: var(--blue);">MESSAGE</div>
                             </div>
                         `).join('')}
                     </div>
@@ -652,8 +1153,8 @@
                         <p>${post.text}</p>
                         ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:12px; margin-bottom:12px;">` : ''}
                         <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; gap:20px;">
-                            <button onclick="toggleLike(${post.id})" style="background:none; border:none; color:${post.liked ? 'var(--red)' : 'var(--text-secondary)'};"><i class="${post.liked ? 'ph-fill' : 'ph'} ph-heart"></i> ${post.likes}</button>
-                            <button style="background:none; border:none; color:var(--text-secondary);"><i class="ph ph-chat-circle"></i> Commenta</button>
+                            <button onclick="toggleLike(${post.id})" style="background:none; border:none; color:${post.liked ? 'var(--red)' : 'var(--text-secondary)'}; cursor:pointer;"><i class="${post.liked ? 'ph-fill' : 'ph'} ph-heart"></i> ${post.likes}</button>
+                            <button style="background:none; border:none; color:var(--text-secondary); cursor:pointer;"><i class="ph ph-chat-circle"></i> Commenta</button>
                         </div>
                     </div>
                 `).join('') : `<div style="text-align:center; padding:40px; opacity:0.5;">Nessun post trovato</div>`}
@@ -662,51 +1163,372 @@
 
         function renderChat() {
             const msgs = state.messages[state.currentChatUser] || [];
-            return `<div class="view" style="display:flex; flex-direction:column; height:100vh; padding:0;"><div style="padding:20px; padding-top:60px; background:rgba(28,28,30,0.9); display:flex; align-items:center; gap:16px; border-bottom:1px solid rgba(255,255,255,0.1);"><button onclick="navigate('search')" style="background:none; border:none; color:white; font-size:24px;"><i class="ph ph-arrow-left"></i></button><h2>${state.currentChatUser}</h2></div><div id="chat-history" style="flex:1; overflow-y:auto; padding:20px;">${msgs.map(m => `<div class="message-bubble ${m.me ? 'msg-me' : 'msg-other'}">${m.text}</div>`).join('')}</div><div style="padding:20px; padding-bottom: 40px; background:black; display:flex; gap:10px; border-top:1px solid rgba(255,255,255,0.1);"><input id="msg-input" placeholder="Messaggio..." style="margin-bottom:0;"><button onclick="sendMessage()" style="background:var(--blue); width:50px; border-radius:50%; border:none; color:white;"><i class="ph-fill ph-paper-plane-right"></i></button></div></div>`;
-        }
-
-        function renderPlanner() {
             return `
-            <div class="view">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h1>Planner</h1>
-                    ${!state.didup.connected ?
-                    `<button onclick="openArgoLogin()" style="background:linear-gradient(135deg, #106690 0%, #0c4b6e 100%); color:white; padding:8px 16px; border-radius:20px; border:none; font-weight:600; font-size:13px; display:flex; align-items:center; gap:6px;">
-                            <i class="ph-fill ph-plugs-connected"></i> Collega Registro
-                        </button>` :
-                    `<div style="color:var(--green); font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px;">
-                            <i class="ph-fill ph-check-circle"></i> Argo Sincronizzato
-                        </div>`
-                }
+            <div class="view" style="display:flex; flex-direction:column; height:100vh; padding:0;">
+                <div style="padding:20px; padding-top:60px; background:rgba(28,28,30,0.9); display:flex; align-items:center; gap:16px; border-bottom:1px solid rgba(255,255,255,0.1);">
+                    <button onclick="navigate('search')" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;"><i class="ph ph-arrow-left"></i></button>
+                    <h2>${state.currentChatUser}</h2>
                 </div>
-                <div style="margin-top:20px;">
-                    ${state.tasks.map(t => `
-                        <div onclick="toggleTask(${t.id})" style="background: ${t.done ? 'rgba(255,255,255,0.05)' : 'rgba(28,28,30,0.6)'}; padding: 16px; border-radius: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 16px; transition: all 0.2s;">
-                            <div style="width: 24px; height: 24px; border: 2px solid ${t.done ? 'var(--green)' : 'rgba(255,255,255,0.3)'}; background:${t.done ? 'var(--green)' : 'transparent'}; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-                                ${t.done ? '<i class="ph-bold ph-check" style="font-size: 14px; color: black;"></i>' : ''}
-                            </div>
-                            <span style="font-size: 16px; text-decoration: ${t.done ? 'line-through' : 'none'}; opacity: ${t.done ? 0.5 : 1};">${t.text}</span>
-                        </div>
-                    `).join('')}
-                    <button onclick="alert('Aggiungi Task Manuale')" style="margin-top: 10px; width: 100%; padding: 16px; border: 1px dashed rgba(255,255,255,0.2); border-radius: 16px; color: var(--text-secondary); background: none;">+ Aggiungi Attività</button>
+                <div id="chat-history" style="flex:1; overflow-y:auto; padding:20px;">
+                    ${msgs.map(m => `<div class="message-bubble ${m.me ? 'msg-me' : 'msg-other'}">${m.text}</div>`).join('')}
+                </div>
+                <div style="padding:20px; padding-bottom: 40px; background:black; display:flex; gap:10px; border-top:1px solid rgba(255,255,255,0.1);">
+                    <input id="msg-input" placeholder="Messaggio..." style="margin-bottom:0;">
+                    <button onclick="sendMessage()" style="background:var(--blue); width:50px; border-radius:50%; border:none; color:white; cursor:pointer;">
+                        <i class="ph-fill ph-paper-plane-right"></i>
+                    </button>
                 </div>
             </div>`;
         }
-        function toggleTask(id) { const t = state.tasks.find(x => x.id === id); t.done = !t.done; render(); }
-        function renderProfile() { return `<div class="view"><h1>Profilo</h1><div style="margin-top:20px;"><button class="btn-primary" onclick="state.view='login'; render();" style="background:var(--red);">Esci</button></div></div>`; }
-        function renderLogin() { return `<div class="view flex-center" style="height:100vh; display:flex; flex-direction:column; justify-content:center;"><h1 style="margin-bottom:40px;">G-Connect</h1><button class="btn-primary" onclick="state.view='home'; render();">Entra</button></div>`; }
 
-        // Core Functions
-        function navigate(v) { state.view = v; render(); }
+        function renderPlanner() {
+            setTimeout(() => {
+                const calendarEl = document.getElementById('calendar');
+                if (calendarEl) {
+                    // Rimuovi il calendario esistente se presente
+                    const existingCalendar = calendarEl._fullCalendar;
+                    if (existingCalendar) {
+                        existingCalendar.destroy();
+                    }
+                    
+                    const calendar = new FullCalendar.Calendar(calendarEl, {
+                        initialView: 'dayGridMonth',
+                        locale: 'it',
+                        themeSystem: 'standard',
+                        height: 'auto',
+                        headerToolbar: { left: 'title', center: '', right: 'prev,next' },
+                        events: state.tasks
+                            .filter(t => t.due_date && t.hasValidDate)
+                            .map(t => ({
+                                title: `${t.subject}: ${t.text.substring(0, 30)}${t.text.length > 30 ? '...' : ''}`,
+                                start: t.due_date,
+                                color: t.done ? '#30D158' : '#0A84FF',
+                                textColor: t.done ? '#000' : '#fff',
+                                extendedProps: {
+                                    fullText: t.text,
+                                    subject: t.subject
+                                }
+                            })),
+                        eventClick: function(info) {
+                            const event = info.event;
+                            modalContainer.innerHTML = `
+                                <div class="modal-overlay" onclick="closeModal(event)">
+                                    <div class="modal-content">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                            <h2 style="margin: 0;">Dettaglio Compito</h2>
+                                            <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px; cursor: pointer;">Chiudi</button>
+                                        </div>
+                                        <div style="margin-bottom: 12px;">
+                                            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Materia</div>
+                                            <div style="font-size: 18px; font-weight: 600; color: white;">${event.extendedProps.subject}</div>
+                                        </div>
+                                        <div style="margin-bottom: 12px;">
+                                            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Descrizione</div>
+                                            <div style="font-size: 16px; color: white; line-height: 1.5;">${event.extendedProps.fullText}</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Scadenza</div>
+                                            <div style="font-size: 16px; color: white; display: flex; align-items: center; gap: 6px;">
+                                                <i class="ph ph-calendar"></i>
+                                                ${new Date(event.start).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        },
+                        dateClick: function (info) {
+                            const tasksForDay = state.tasks.filter(t => {
+                                if (!t.due_date) return false;
+                                const taskDate = new Date(t.due_date);
+                                const clickedDate = new Date(info.dateStr);
+                                return taskDate.toDateString() === clickedDate.toDateString();
+                            });
+                            
+                            if (tasksForDay.length > 0) {
+                                const tasksList = tasksForDay.map(t => `• ${t.subject}: ${t.text}`).join('\\n');
+                                alert(`Compiti per ${info.dateStr}:\\n\\n${tasksList}`);
+                            } else {
+                                alert(`Nessun compito per ${info.dateStr}`);
+                            }
+                        }
+                    });
+                    calendar.render();
+                    calendarEl._fullCalendar = calendar;
+                }
+            }, 100);
+
+            return `
+            <div class="view" style="padding: 20px; padding-bottom: 100px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <h1 style="margin: 0;">Planner</h1>
+                    <button onclick="performSync()" style="background: var(--blue); color: white; border: none; padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <i class="ph ph-arrow-clockwise" style="font-size: 16px; ${state.syncing ? 'animation: spin 1s linear infinite;' : ''}"></i>
+                        ${state.syncing ? 'Sincronizzazione...' : 'Sincronizza'}
+                    </button>
+                </div>
+                ${state.lastSync ? `<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; display: flex; align-items: center; gap: 6px;">
+                    <i class="ph ph-check-circle" style="color: var(--green);"></i>
+                    Ultima sincronizzazione: ${state.lastSync}
+                </div>` : ''}
+                
+                <div style="background: #1C1C1E; border-radius: 20px; padding: 15px; margin-bottom: 20px; border: 1px solid #2C2C2E;">
+                    <div id="calendar"></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
+                    <div class="card" onclick="showVotiView()" style="margin-bottom:0; background: rgba(48, 209, 88, 0.1); border: 1px solid #30D158; cursor:pointer;">
+                        <i class="ph-fill ph-graduation-cap" style="color:#30D158; font-size: 24px;"></i>
+                        <div style="font-size: 20px; font-weight: 800; margin-top: 5px; color: white;">${state.voti.length}</div>
+                        <div style="font-size: 12px; opacity: 0.7; color: var(--text-secondary);">Voti Registrati</div>
+                    </div>
+                    <div class="card" onclick="showBachecaModal()" style="margin-bottom:0; background: rgba(255, 159, 10, 0.1); border: 1px solid #FF9F0A; cursor:pointer;">
+                        <i class="ph-fill ph-megaphone" style="color:#FF9F0A; font-size: 24px;"></i>
+                        <div style="font-size: 20px; font-weight: 800; margin-top: 5px; color: white;">${state.promemoria.length}</div>
+                        <div style="font-size: 12px; opacity: 0.7; color: var(--text-secondary);">Avvisi Bacheca</div>
+                    </div>
+                </div>
+
+                <h3>Scadenze</h3>
+                <div id="tasks-list">
+                    ${state.tasks.map(t => {
+                        const dueDate = t.dateObj && !isNaN(t.dateObj.getTime()) ? t.dateObj : null;
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const daysUntil = dueDate ? Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
+                        let dateLabel = '';
+                        let dateColor = 'var(--text-secondary)';
+                        
+                        if (dueDate) {
+                            if (daysUntil === 0) {
+                                dateLabel = 'OGGI';
+                                dateColor = 'var(--red)';
+                            } else if (daysUntil === 1) {
+                                dateLabel = 'DOMANI';
+                                dateColor = 'var(--orange)';
+                            } else if (daysUntil < 0) {
+                                dateLabel = 'SCADUTO';
+                                dateColor = 'var(--red)';
+                            } else {
+                                dateLabel = dueDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+                                dateColor = daysUntil <= 3 ? 'var(--orange)' : 'var(--blue)';
+                            }
+                        } else {
+                            dateLabel = t.display_date || 'Data non disponibile';
+                        }
+                        
+                        return `
+                        <div class="card" style="display:flex; align-items:center; gap:15px; background: rgba(255,255,255,0.03); border-left: 3px solid ${t.done ? 'var(--green)' : dateColor};">
+                            <div style="width: 40px; height: 40px; border-radius: 10px; background: ${t.done ? 'rgba(48, 209, 88, 0.2)' : 'rgba(10, 132, 255, 0.2)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                ${t.done ? '<i class="ph-fill ph-check" style="color: var(--green); font-size: 20px;"></i>' : '<i class="ph ph-calendar" style="color: var(--blue); font-size: 18px;"></i>'}
+                            </div>
+                            <div style="flex:1; min-width: 0;">
+                                <div style="font-size:11px; color:var(--blue); font-weight:700; margin-bottom: 4px;">${t.subject}</div>
+                                <div style="color: white; margin-top: 4px; font-size: 15px; font-weight: 500; ${t.done ? 'opacity: 0.5; text-decoration: line-through;' : ''}">${t.text}</div>
+                                <div style="font-size: 12px; color: ${dateColor}; font-weight: 600; margin-top: 6px; display: flex; align-items: center; gap: 6px;">
+                                    <i class="ph ph-clock" style="font-size: 14px;"></i>
+                                    ${dateLabel}
+                                    ${daysUntil !== null && daysUntil >= 0 ? `<span style="opacity: 0.7;">(${daysUntil === 0 ? 'oggi' : daysUntil === 1 ? 'domani' : `tra ${daysUntil} giorni`})</span>` : ''}
+                        </div>
+                            </div>
+                            <button onclick="toggleTask('${t.id}')" style="background: none; border: none; color: ${t.done ? 'var(--green)' : 'var(--text-secondary)'}; font-size: 24px; cursor: pointer; padding: 8px;">
+                                <i class="${t.done ? 'ph-fill ph-check-circle' : 'ph ph-circle'}"></i>
+                            </button>
+                        </div>
+                    `;
+                    }).join('')}
+                    ${state.tasks.length === 0 ? '<div style="text-align:center; padding: 40px; opacity: 0.5;"><i class="ph ph-check-circle" style="font-size: 48px; color: var(--green); margin-bottom: 12px; display: block;"></i>Finito tutto! 🎉<br><span style="font-size: 12px; color: var(--text-secondary);">Non hai compiti in scadenza</span></div>' : ''}
+                </div>
+            </div>`;
+        }
+
+        function selectDay(day) {
+            state.selectedDay = day;
+            render();
+        }
+
+        function showVotiView() {
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" onclick="closeModal(event)">
+                <div class="modal-content" style="max-height:85vh; overflow-y:auto; padding: 0;">
+                    <div style="position: sticky; top: 0; background:rgba(28,28,30,0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); padding: 20px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; z-index: 10;">
+                        <h2 style="margin:0;">Voti DidUP</h2>
+                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue); font-weight:700; font-size:16px;">Chiudi</button>
+                    </div>
+                    <div style="padding: 20px;">
+                        ${renderVoti()}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderVoti() {
+            // ⭐ DEBUG: Log completo per capire cosa c'è
+            console.log("🎓 renderVoti chiamato - state.voti:", state.voti);
+            console.log("🎓 renderVoti chiamato - state.grades:", state.grades);
+            console.log("🎓 renderVoti chiamato - localStorage argo_voti:", localStorage.getItem('argo_voti'));
+            
+            // ⭐ Prova prima voti, poi grades
+            const votiData = (state.voti && state.voti.length > 0) ? state.voti : 
+                            ((state.grades && state.grades.length > 0) ? state.grades : []);
+            
+            console.log("🎓 votiData finale:", votiData);
+            
+            if (votiData.length === 0) {
+                return `
+                    <div style="text-align:center; padding: 40px; color: var(--text-secondary);">
+                        <i class="ph ph-graduation-cap" style="font-size: 48px; opacity: 0.3; margin-bottom: 12px; display: block;"></i>
+                        Nessun voto caricato<br>
+                        <span style="font-size: 12px; margin-top: 8px; display: block;">I voti verranno caricati dopo la sincronizzazione con DidUP</span>
+                        <button onclick="performSync(); closeModal();" style="background:var(--blue); color:white; padding:10px 20px; border-radius:10px; border:none; margin-top:16px; cursor:pointer; font-weight:600;">
+                            <i class="ph ph-arrow-clockwise"></i> Sincronizza Ora
+                        </button>
+                        <div style="margin-top: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 11px; text-align: left;">
+                            <strong>Debug Info:</strong><br>
+                            state.voti.length: ${state.voti?.length || 0}<br>
+                            state.grades.length: ${state.grades?.length || 0}<br>
+                            localStorage: ${localStorage.getItem('argo_voti') ? 'Presente' : 'Vuoto'}
+                        </div>
+                    </div>`;
+            }
+
+            const media = calcolaMedia(votiData);
+            const mediaNum = media ? parseFloat(media) : null;
+
+            return `
+                <div style="margin-bottom: 20px;">
+                    <div class="card" style="background: linear-gradient(135deg, rgba(10, 132, 255, 0.2), rgba(94, 92, 230, 0.2)); border: 1px solid var(--blue); padding: 20px; text-align: center; margin-bottom: 16px;">
+                        <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Media Generale</div>
+                        <div style="font-size: 48px; font-weight: 800; color: white; margin-bottom: 4px;">${media || '--'}</div>
+                        <div style="font-size: 14px; color: var(--text-secondary);">Su ${votiData.length} voti registrati</div>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    ${votiData.map(v => {
+                const val = (v.valore || v.value || '').toString();
+                const mat = v.materia || v.subject || 'Materia non specificata';
+                const data = v.data || v.date || 'Data non disponibile';
+                const tipo = v.tipo || v.type || '';
+                const valNum = parseFloat(val.replace(',', '.'));
+                const isSufficient = !isNaN(valNum) && valNum >= 6;
+                const color = isSufficient ? 'var(--green)' : '#FF453A';
+
+                return `
+                            <div class="card" style="margin-bottom: 0; padding: 16px; display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.03); border-left: 3px solid ${color};">
+                                <div style="width: 60px; height: 60px; border-radius: 12px; background: ${color}20; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: ${color}; border: 2px solid ${color}40; flex-shrink: 0;">
+                                    ${val}
+                                </div>
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="font-weight: 700; font-size: 16px; color: white; margin-bottom: 4px;">${mat}</div>
+                                    ${tipo ? `<div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">${tipo}</div>` : ''}
+                                    <div style="font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                                        <i class="ph ph-calendar" style="font-size: 12px;"></i>
+                                        ${data}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+            }).join('')}
+                </div>
+            `;
+        }
+
+        function showBachecaModal() {
+            // ⭐ Prova prima promemoria, poi announcements
+            const dataBacheca = state.promemoria && state.promemoria.length > 0 ? state.promemoria : 
+                               (state.announcements && state.announcements.length > 0 ? state.announcements : []);
+            
+            console.log("📢 Rendering bacheca - state.promemoria:", state.promemoria?.length || 0, "state.announcements:", state.announcements?.length || 0);
+
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" onclick="closeModal(event)">
+                <div class="modal-content" style="max-height:85vh; overflow-y:auto; padding: 0;">
+                    <div style="position: sticky; top: 0; background:rgba(28,28,30,0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); padding: 20px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; z-index: 10;">
+                        <h2 style="margin:0;">Bacheca & Avvisi</h2>
+                        <button onclick="closeModal()" style="background:none; border:none; color:var(--orange); font-weight:700; font-size:16px; cursor:pointer;">Chiudi</button>
+                    </div>
+                    <div style="padding: 20px; display:flex; flex-direction:column; gap:12px;">
+                        ${dataBacheca.length === 0 ?
+                    `<div style="text-align:center; padding: 40px; color: var(--text-secondary);">
+                        <i class="ph ph-megaphone" style="font-size: 48px; opacity: 0.3; margin-bottom: 12px; display: block;"></i>
+                        Nessun avviso in bacheca<br>
+                        <span style="font-size: 12px; margin-top: 8px; display: block;">Gli avvisi verranno caricati dopo la sincronizzazione con DidUP</span>
+                        <button onclick="performSync(); closeModal();" style="background:var(--orange); color:black; padding:10px 20px; border-radius:10px; border:none; margin-top:16px; cursor:pointer; font-weight:600;">
+                            <i class="ph ph-arrow-clockwise"></i> Sincronizza Ora
+                        </button>
+                    </div>` :
+                    dataBacheca.map(item => {
+                        const data = item.data || item.date || item.datGiorno || 'Data non disponibile';
+                        const autore = item.autore || item.docente || 'Docente';
+                        const oggetto = item.oggetto || item.titolo || item.title || 'Avviso';
+                        const testo = item.testo || item.text || item.descrizione || item.description || '';
+                        const url = item.url || item.allegato || null;
+                        
+                        return `
+                                <div class="card" style="margin-bottom:0; padding:16px; border-left: 4px solid var(--orange); background: rgba(255, 159, 10, 0.05);">
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                        <i class="ph ph-bell" style="color: var(--orange); font-size: 18px;"></i>
+                                        <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;">
+                                            ${data} - ${autore}
+                                    </div>
+                                </div>
+                                    <div style="font-weight:600; font-size:16px; margin-bottom:8px; color: white;">${oggetto}</div>
+                                    ${testo ? `<div style="font-size:14px; opacity:0.8; line-height:1.5; color: var(--text-secondary); margin-bottom: ${url ? '8px' : '0'}; white-space: pre-wrap;">${testo}</div>` : ''}
+                                    ${url ? `<a href="${url}" target="_blank" style="color:var(--blue); font-size:12px; display:inline-flex; align-items:center; gap:4px; margin-top:8px; font-weight:600;">
+                                        <i class="ph ph-paperclip"></i> Scarica Allegato <i class="ph-bold ph-arrow-up-right" style="font-size:10px;"></i>
+                                    </a>` : ''}
+                                </div>
+                            `;
+                    }).join('')
+                }
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderProfile() {
+            return `
+            <div class="view">
+                <h1>Profilo</h1>
+                <div style="margin-top:20px;">
+                    <div class="card">
+                        <div style="font-size: 14px; color:var(--text-secondary); margin-bottom:8px;">Utente Collegato</div>
+                        <div style="font-size:18px; font-weight:700; margin-bottom:16px;">${state.user.name || 'Non specificato'}</div>
+                        <div style="font-size:14px; color: var(--text-secondary); margin-bottom:12px;">Classe: ${state.user.class || 'Non specificata'}</div>
+                        ${state.lastSync ? `<div style="font-size:12px; color: var(--text-secondary); display:flex; align-items:center; gap:6px;">
+                            <i class="ph ph-clock" style="font-size:14px;"></i>
+                            Ultima sincronizzazione: ${state.lastSync}
+                        </div>` : ''}
+                    </div>
+                    <div class="card" style="margin-top:16px;">
+                        <div style="font-size: 14px; color:var(--text-secondary); margin-bottom:12px; font-weight:600;">Stato Connessione</div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                            <div style="width:12px; height:12px; border-radius:50%; background:${state.didup.connected ? 'var(--green)' : 'var(--red)'};"></div>
+                            <span>DidUP: ${state.didup.connected ? 'Connesso' : 'Non connesso'}</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div style="width:12px; height:12px; border-radius:50%; background:${state.isOffline ? 'var(--red)' : 'var(--green)'};"></div>
+                            <span>Server: ${state.isOffline ? 'Offline' : 'Online'}</span>
+                        </div>
+                    </div>
+                    <button class="btn-primary" onclick="logout()" style="background:var(--red); margin-top:20px; cursor:pointer;">Esci e Disconnetti</button>
+                    <button onclick="openArgoLogin()" style="background:var(--blue); width:100%; padding:16px; border-radius:14px; font-weight:600; font-size:16px; cursor:pointer; border:none; color:white; margin-top:12px;">
+                        <i class="ph ph-arrow-clockwise"></i> Riconnetti DidUP
+                    </button>
+                </div>
+            </div>`;
+        }
+
+        // --- CORE UI MODALS & ACTIONS ---
 
         function openNewPostModal() {
             modalContainer.innerHTML = `
             <div class="modal-overlay" onclick="closeModal(event)">
                 <div class="modal-content">
                     <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
-                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue);">Annulla</button>
+                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue); cursor:pointer;">Annulla</button>
                         <b>Nuovo Post</b>
-                        <button onclick="publishPost()" style="background:none; border:none; color:var(--blue); font-weight:700;">Pubblica</button>
+                        <button onclick="publishPost()" style="background:none; border:none; color:var(--blue); font-weight:700; cursor:pointer;">Pubblica</button>
                     </div>
                     <textarea id="new-post-text" rows="5" placeholder="Scrivi qualcosa..."></textarea>
                     
@@ -745,8 +1567,9 @@
                     <input id="argo-user" placeholder="Nome Utente">
                     <input type="password" id="argo-pass" placeholder="Password">
                     
-                    <button id="login-btn" onclick="performArgoSync()" style="background:var(--blue); width:100%; padding: 14px; border-radius:12px; font-weight:700; margin-top:10px; border:none; color:white;">Accedi e Sincronizza</button>
-                    <button onclick="closeModal()" style="background:none; width:100%; padding: 10px; margin-top:5px; border:none; color:var(--text-secondary);">Annulla</button>
+                    <button id="login-btn" onclick="performArgoSync()" style="background:var(--blue); width:100%; padding: 14px; border-radius:12px; font-weight:700; margin-top:10px; border:none; color:white; cursor:pointer;">Accedi e Sincronizza</button>
+                    <button onclick="closeModal()" style="background:none; width:100%; padding: 10px; margin-top:5px; border:none; color:var(--text-secondary); cursor:pointer;">Annulla</button>
+                    <button onclick="testBackendConnection()" style="background:rgba(255,255,255,0.1); width:100%; padding: 10px; margin-top:5px; border:1px solid rgba(255,255,255,0.2); border-radius:12px; color:var(--text-secondary); cursor:pointer; font-size:12px;">🔍 Test Connessione Backend</button>
                 </div>
             </div>`;
 
@@ -758,14 +1581,9 @@
             const statusEl = document.getElementById('server-status');
             if (!statusEl) return;
 
-            // Update Status Text
-            if (attempt === 1) statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span> Cerco il Server...`;
-            else statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span> Sveglio il Server (${attempt})...`; // Visual feedback
-
             try {
-                // Timeout logic: race against a 5s timeout
                 const controller = new AbortController();
-                const id = setTimeout(() => controller.abort(), 5000);
+                const id = setTimeout(() => controller.abort(), 3500);
 
                 const res = await fetch(`${API_BASE_URL}/health`, {
                     method: 'GET',
@@ -777,107 +1595,15 @@
                     statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></span> Server Online`;
                     statusEl.style.color = "var(--green)";
                 } else {
-                    throw new Error("Status: " + res.status);
+                    throw new Error("Server error");
                 }
             } catch (e) {
-                console.warn(`Health Check Failed (${attempt}):`, e);
-                // Retry up to 20 times (approx 1-2 mins for boot)
-                if (attempt < 20) {
-                    setTimeout(() => checkServerHealth(attempt + 1), 3000);
+                if (attempt < 15) {
+                    statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span> Sveglio il server (${attempt})...`;
+                    setTimeout(() => checkServerHealth(attempt + 1), 2500);
                 } else {
-                    statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--red); border-radius: 50%;"></span> Server Irraggiungibile`;
+                    statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--red); border-radius: 50%;"></span> Offline (uso dati cached)`;
                     statusEl.style.color = "var(--red)";
-                }
-            }
-        }
-
-        async function performArgoSync() {
-            const btn = document.getElementById('login-btn');
-            const school = document.getElementById('argo-school').value;
-            const user = document.getElementById('argo-user').value;
-            const pass = document.getElementById('argo-pass').value;
-
-            if (!school || !user || !pass) {
-                alert("Inserisci tutti i dati!");
-                return;
-            }
-
-            // DEBUG ALERT
-            // alert(`DEBUG: Inizio Login per ${user} @ ${school}`);
-
-            if (btn) {
-                btn.innerText = "Connessione in corso (fino a 60s)...";
-                btn.style.opacity = 0.7;
-                btn.disabled = true;
-            }
-
-            try {
-                // DEBUG ALERT
-                // alert(`DEBUG: Contatto il server: ${API_BASE_URL}/login`);
-
-                // Call Backend
-                const response = await fetch(`${API_BASE_URL}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ schoolCode: school, username: user, password: pass })
-                });
-
-                // alert(`DEBUG: Ricevuta risposta: ${response.status}`);
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || `Errore Server: ${response.status}`);
-                }
-
-                if (data.success) {
-                    state.didup.connected = true;
-
-                    // SAVE SESSION PERSISTENTLY
-                    if (data.session) {
-                        localStorage.setItem('argo_session', JSON.stringify(data.session));
-                    }
-
-                    // UPDATE REAL USER INFO
-                    if (data.student) {
-                        state.user.name = data.student.name;
-                        state.user.class = data.student.class;
-                    }
-
-                    // UPDATE REAL TASKS (from argofamiglia)
-                    let newTasks = [];
-                    if (data.tasks && data.tasks.length > 0) {
-                        newTasks = data.tasks.map(t => ({
-                            id: t.id || Math.random(),
-                            text: t.text,
-                            done: false
-                        }));
-                    } else {
-                        newTasks.push({ id: 997, text: "Nessun compito trovato su Argo", done: true });
-                    }
-
-                    // Add connection confirmation
-                    state.tasks = [
-                        { id: 999, text: `✅ Connesso: ${data.student.name}`, done: true },
-                        ...newTasks
-                    ];
-
-                    closeModal();
-                    alert(`Benvenuto ${data.student.name}!\nSessione salvata. Non dovrai più fare login.`);
-                    render();
-                } else {
-                    alert("Errore Argo: " + (data.error || "Credenziali Errate"));
-                    if (btn) {
-                        btn.innerText = "Accedi e Sincronizza";
-                        btn.disabled = false;
-                    }
-                }
-            } catch (e) {
-                console.error("Connection Failed:", e);
-                alert("Errore di Connessione:\n" + e.message);
-                if (btn) {
-                    btn.innerText = "Accedi e Sincronizza";
-                    btn.disabled = false;
                 }
             }
         }
@@ -887,9 +1613,9 @@
             <div class="modal-overlay" onclick="closeModal(event)">
                 <div class="modal-content">
                     <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
-                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue);">Annulla</button>
+                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue); cursor:pointer;">Annulla</button>
                         <b>Vendi Libro</b>
-                        <button onclick="publishItem()" style="background:none; border:none; color:var(--green); font-weight:700;">Metti in vendita</button>
+                        <button onclick="publishItem()" style="background:none; border:none; color:var(--green); font-weight:700; cursor:pointer;">Metti in vendita</button>
                     </div>
                     <input id="item-title" placeholder="Titolo Libro">
                     <input id="item-price" placeholder="Prezzo (es. 15€)">
@@ -914,17 +1640,142 @@
             }
         }
 
+        async function performArgoSync() {
+            const btn = document.getElementById('login-btn');
+            const school = document.getElementById('argo-school').value;
+            const user = document.getElementById('argo-user').value;
+            const pass = document.getElementById('argo-pass').value;
+
+            if (!school || !user || !pass) {
+                alert("Inserisci tutti i dati!");
+                return;
+            }
+
+            btn.innerText = "Connessione... ";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ schoolCode: school, username: user, password: pass })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Errore Server");
+                }
+
+                if (data.success) {
+                    console.log("✅ Login OK, saving...");
+                    console.log("📥 Dati ricevuti dal login:", {
+                        tasks: data.tasks?.length || 0,
+                        voti: data.voti?.length || 0,
+                        promemoria: data.promemoria?.length || data.announcements?.length || 0,
+                        student: data.student
+                    });
+                    
+                    // ⭐ CRITICO: Salva sessione con credenziali codificate (come nel codice vecchio che funzionava)
+                    if (data.session) {
+                        data.session.storedUser = btoa(unescape(encodeURIComponent(user)));
+                        data.session.storedPass = btoa(unescape(encodeURIComponent(pass)));
+                        data.session.schoolCode = school;
+                        sessionManager.save(data.session);
+                        console.log("💾 Sessione salvata con credenziali");
+                    } else {
+                        // ⭐ Se non c'è sessione dal backend, crea una con le credenziali
+                        sessionManager.save({
+                            schoolCode: school,
+                            storedUser: btoa(unescape(encodeURIComponent(user))),
+                            storedPass: btoa(unescape(encodeURIComponent(pass)))
+                        });
+                        console.log("💾 Sessione minima creata con credenziali");
+                    }
+                    
+                    // ⭐ Salva user
+                    if (data.student) {
+                        state.user = data.student;
+                        localStorage.setItem('argo_user', JSON.stringify(state.user));
+                        console.log("💾 User salvato:", state.user.name);
+                    }
+                    
+                    // ⭐ Carica compiti con updateTasks per preservare date
+                    if (data.tasks && data.tasks.length > 0) {
+                        updateTasks(data.tasks, false);
+                        console.log("✅ Compiti caricati:", state.tasks.length);
+                    }
+                    
+                    // ⭐ CRITICO: Carica voti e salva SEMPRE
+                    console.log("🎓 LOGIN - Controllo voti in data:", data);
+                    console.log("🎓 LOGIN - data.voti:", data.voti);
+                    console.log("🎓 LOGIN - typeof data.voti:", typeof data.voti);
+                    console.log("🎓 LOGIN - Array.isArray(data.voti):", Array.isArray(data.voti));
+                    
+                    if (data.voti !== undefined) {
+                        state.voti = Array.isArray(data.voti) ? data.voti : [];
+                        localStorage.setItem('argo_voti', JSON.stringify(state.voti));
+                        console.log("✅ Voti caricati e salvati:", state.voti.length);
+                        console.log("✅ Voti salvati - contenuto completo:", JSON.stringify(state.voti));
+                        if (state.voti.length === 0) {
+                            console.warn("⚠️ ATTENZIONE: Array voti vuoto - il backend NON sta recuperando i voti da DidUP");
+                        } else {
+                            console.log("✅ Primo voto esempio:", state.voti[0]);
+                        }
+                    } else {
+                        console.error("❌ ERRORE CRITICO: Campo 'voti' non presente nella risposta del login!");
+                        console.error("❌ Chiavi disponibili in data:", Object.keys(data));
+                        console.error("❌ Risposta completa:", data);
+                    }
+                    
+                    // ⭐ CRITICO: Carica promemoria e salva SEMPRE
+                    const promemoriaData = data.promemoria || data.announcements;
+                    if (promemoriaData !== undefined) {
+                        state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
+                        localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
+                        console.log("✅ Promemoria caricati e salvati:", state.promemoria.length);
+                        if (state.promemoria.length === 0) {
+                            console.warn("⚠️ ATTENZIONE: Array promemoria vuoto - il backend NON sta recuperando i promemoria da DidUP");
+                        }
+                    } else {
+                        console.warn("⚠️ ATTENZIONE: Campo 'promemoria'/'announcements' non presente nella risposta del login");
+                    }
+
+                    state.isLoggedIn = true;
+                    state.didup.connected = true;
+                    state.isOffline = false;
+                    state.lastSync = new Date().toLocaleTimeString();
+                    updateOfflineBadge();
+
+                    closeModal();
+                    alert(`✅ Benvenuto ${data.student?.name || user}! Dati sincronizzati.`);
+                    render();
+                } else {
+                    alert("❌ Credenziali errate: " + (data.error || "Errore sconosciuto"));
+                    console.error("❌ Login fallito:", data);
+                }
+            } catch (e) {
+                alert("❌ Errore:  " + e.message);
+            } finally {
+                btn.innerText = "Accedi";
+                btn.disabled = false;
+            }
+        }
+
         function publishPost() {
             const text = document.getElementById('new-post-text').value;
-            const anon = document.getElementById('post-anon-toggle').checked;
+            const isAnon = document.getElementById('post-anon-toggle').checked;
             const imgPreview = document.querySelector('#image-preview img');
+
             if (text) {
                 state.posts.unshift({
                     id: Date.now(),
-                    author: state.user.name,
-                    class: state.user.class,
-                    text: text, likes: 0, liked: false,
-                    anon: anon,
+                    author: isAnon ? "Studente" : state.user.name,
+                    class: isAnon ? "5B" : state.user.class,
+                    text: text,
+                    likes: 0,
+                    liked: false,
+                    anon: isAnon,
                     image: imgPreview ? imgPreview.src : null,
                     comments: []
                 });
@@ -937,6 +1788,7 @@
             const title = document.getElementById('item-title').value;
             const price = document.getElementById('item-price').value;
             const imgPreview = document.querySelector('#image-preview img');
+
             if (title && price) {
                 state.marketItems.unshift({
                     id: Date.now(),
@@ -950,31 +1802,122 @@
             }
         }
 
-        function toggleLike(id) { const p = state.posts.find(x => x.id === id); p.liked = !p.liked; p.likes += p.liked ? 1 : -1; render(); }
+        function toggleLike(id) {
+            const p = state.posts.find(x => x.id === id);
+            if (p) {
+                p.liked = !p.liked;
+                p.likes += p.liked ? 1 : -1;
+                render();
+            }
+        }
+
         function closeModal(e) {
-            // Only close if clicking the overlay (background) or if called without event (explicit call)
             if (!e || e.target.classList.contains('modal-overlay')) {
                 modalContainer.innerHTML = '';
             }
         }
 
-        // Chat & Search Logic
-        function openChat(u) { state.currentChatUser = u; if (!state.messages[u]) state.messages[u] = []; navigate('chat'); }
+        function openChat(u) {
+            state.currentChatUser = u;
+            if (!state.messages[u]) state.messages[u] = [];
+            navigate('chat');
+        }
+
         function sendMessage() {
             const input = document.getElementById('msg-input');
             const txt = input.value;
             if (txt) {
                 state.messages[state.currentChatUser].push({ text: txt, me: true });
-                input.value = ''; // clear input
+                input.value = '';
                 render();
-                setTimeout(() => document.getElementById('chat-history').scrollTop = 10000, 10);
+                setTimeout(() => {
+                    const history = document.getElementById('chat-history');
+                    if (history) history.scrollTop = history.scrollHeight;
+                }, 10);
             }
         }
 
-        // Init
-        render();
-        filterStudents('');
+        function toggleTask(id) {
+            let t = state.tasks.find(x => x.id === id);
+            if (!t) t = state.reminders.find(x => x.id === id);
+
+            if (t) {
+                t.done = !t.done;
+                saveTasks();
+                if (state.reminders.find(x => x.id === id)) {
+                localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
+                }
+                render();
+            }
+        }
+
+        function addManualReminder() {
+            const text = prompt("Cosa devi fare? (es. Compito Mate per il 20/01)");
+            if (text) {
+                state.reminders.push({
+                    id: Date.now(),
+                    text: text,
+                    done: false
+                });
+                localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
+                render();
+            }
+        }
+
+        function updateFeedSearch(value) {
+            state.feed.search = value;
+            render();
+        }
+
+        function setFeedClass(c) {
+            state.feed.classFilter = c;
+            render();
+        }
+
+        // ⭐ Funzione di test per verificare la connessione backend
+        async function testBackendConnection() {
+            const statusEl = document.getElementById('server-status');
+            if (statusEl) {
+                statusEl.innerHTML = '<span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span> Test in corso...';
+                statusEl.style.color = "var(--orange)";
+            }
+            
+            try {
+                console.log("🔍 Test connessione backend...");
+                
+                // Test 1: Health check
+                const healthRes = await fetch(`${API_BASE_URL}/health`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                console.log("✅ Health check:", healthRes.status, healthRes.ok);
+                
+                // Test 2: Verifica formato risposta (se disponibile)
+                if (healthRes.ok) {
+                    const healthData = await healthRes.json().catch(() => ({}));
+                    console.log("📋 Health response:", healthData);
+                }
+                
+                if (statusEl) {
+                    statusEl.innerHTML = '<span style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></span> Backend raggiungibile';
+                    statusEl.style.color = "var(--green)";
+                }
+                
+                alert("✅ Backend raggiungibile! Controlla la console per i dettagli.");
+            } catch (e) {
+                console.error("❌ Test fallito:", e);
+                if (statusEl) {
+                    statusEl.innerHTML = '<span style="width: 8px; height: 8px; background: var(--red); border-radius: 50%;"></span> Backend non raggiungibile';
+                    statusEl.style.color = "var(--red)";
+                }
+                alert("❌ Backend non raggiungibile: " + e.message + "\n\nVerifica:\n- URL backend corretto: " + API_BASE_URL + "\n- Server online\n- CORS configurato");
+            }
+        }
+
+        // Init - render will be called by DOMContentLoaded
     </script>
 </body>
+
+</html>
 
 </html>
