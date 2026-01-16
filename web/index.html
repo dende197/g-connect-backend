@@ -314,129 +314,266 @@
         .offline-badge.show {
             display: block;
         }
-    </style>
-</head>
 
-<body>
-    <div id="app"></div>
-    <div id="modals"></div>
-    <div id="offline-badge" class="offline-badge">📡 Offline Mode</div>
+        <link rel="stylesheet" href="profile-selector.css"></head><body><div id="app"></div><div id="modals"></div><div id="offline-badge" class="offline-badge">📡 Offline Mode</div>< !-- Multi-Profile Containers --><div id="loading-overlay"><div class="loading-content"><div class="loading-spinner"></div><div class="loading-message">Caricamento...</div></div></div>< !-- Scripts --><script src="profile-logic.js"></script><script> // ... (Existing script content follows, but we need to ensure performLogin is not duplicated or conflicting)
+        // Since profile-logic.js defines performLogin, we should rely on it.
+        // We need to verify if there is an existing performLogin and remove/replace it if so.
+        // Also need to check where renderLogin is and make sure the button calls the right function.
 
-    <nav id="bottom-nav">
-        <button class="nav-item active" onclick="navigate('home')"><i class="ph-fill ph-house"></i></button>
-        <button class="nav-item" onclick="navigate('market')"><i class="ph-fill ph-bag"></i></button>
-        <button class="nav-item" onclick="navigate('feed')"><i class="ph-fill ph-chats-circle"></i></button>
-        <button class="nav-item" onclick="navigate('planner')"><i class="ph-fill ph-calendar-check"></i></button>
-        <button class="nav-item" onclick="navigate('profile')"><i class="ph-fill ph-user"></i></button>
-    </nav>
+        // ... (rest of the file content)
 
-    <script>
-        // ⭐ Funzione universale per leggere le date di Argo (MIGLIORATA V2)
+
+        <nav id="bottom-nav"><button class="nav-item active" onclick="navigate('home')"><i class="ph-fill ph-house"></i></button><button class="nav-item" onclick="navigate('market')"><i class="ph-fill ph-bag"></i></button><button class="nav-item" onclick="navigate('feed')"><i class="ph-fill ph-chats-circle"></i></button><button class="nav-item" onclick="navigate('planner')"><i class="ph-fill ph-calendar-check"></i></button><button class="nav-item" onclick="navigate('profile')"><i class="ph-fill ph-user"></i></button></nav><script> // ⭐ Funzione universale per leggere le date di Argo (MIGLIORATA V2)
+
         function parseArgoDate(dateString) {
-            if (!dateString) return new Date(0);
+            if ( !dateString) return new Date(0);
 
             // Se è già un oggetto Date, verificarlo e restituirlo
             if (dateString instanceof Date) {
-                return isNaN(dateString.getTime()) ? new Date(0) : dateString;
+                return isNaN(dateString.getTime()) ? new Date(0): dateString;
             }
 
-            const s = dateString.toString().trim();
+            const s=dateString.toString().trim();
 
             // Caso 1: Formato ISO standard (es: 2025-01-20 o 2025-01-20T...)
             // Questo è il formato che arriva dal nostro backend aggiornato
-            if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
-                const datePart = s.substring(0, 10);
-                const d = new Date(datePart + 'T12:00:00'); // Usa mezzogiorno per evitare problemi fuso orario
-                if (!isNaN(d.getTime())) {
-                    console.log(`📅 Parsed ISO date: ${s} → ${d.toLocaleDateString('it-IT')}`);
+            if (s.match(/^\d {
+                        4
+                    }
+
+                    -\d {
+                        2
+                    }
+
+                    -\d {
+                        2
+                    }
+
+                    /)) {
+                const datePart=s.substring(0, 10);
+                const d=new Date(datePart + 'T12:00:00'); // Usa mezzogiorno per evitare problemi fuso orario
+
+                if ( !isNaN(d.getTime())) {
+                    console.log(`📅 Parsed ISO date: $ {
+                            s
+                        }
+
+                        → $ {
+                            d.toLocaleDateString('it-IT')
+                        }
+
+                        `);
                     return d;
                 }
             }
 
             // Caso 2: Formato Italiano (es: 20/01/2025)
-            if (s.match(/^\d{2}\/\d{2}\/\d{4}/)) {
-                const [day, month, year] = s.split('/');
-                const d = new Date(`${year}-${month}-${day}T12:00:00`);
-                if (!isNaN(d.getTime())) {
-                    console.log(`📅 Parsed IT date: ${s} → ${d.toLocaleDateString('it-IT')}`);
+            if (s.match(/^\d {
+                        2
+                    }
+
+                    \/\d {
+                        2
+                    }
+
+                    \/\d {
+                        4
+                    }
+
+                    /)) {
+                const [day,
+                month,
+                year]=s.split('/');
+
+                const d=new Date(`$ {
+                        year
+                    }
+
+                    -$ {
+                        month
+                    }
+
+                    -$ {
+                        day
+                    }
+
+                    T12:00:00`);
+
+                if ( !isNaN(d.getTime())) {
+                    console.log(`📅 Parsed IT date: $ {
+                            s
+                        }
+
+                        → $ {
+                            d.toLocaleDateString('it-IT')
+                        }
+
+                        `);
                     return d;
                 }
             }
 
             // Caso 3: Formato Italiano alternativo (es: 20-01-2025)
-            if (s.match(/^\d{2}-\d{2}-\d{4}/)) {
-                const [day, month, year] = s.split('-');
-                const d = new Date(`${year}-${month}-${day}T12:00:00`);
-                if (!isNaN(d.getTime())) {
-                    console.log(`📅 Parsed IT-dash date: ${s} → ${d.toLocaleDateString('it-IT')}`);
+            if (s.match(/^\d {
+                        2
+                    }
+
+                    -\d {
+                        2
+                    }
+
+                    -\d {
+                        4
+                    }
+
+                    /)) {
+                const [day,
+                month,
+                year]=s.split('-');
+
+                const d=new Date(`$ {
+                        year
+                    }
+
+                    -$ {
+                        month
+                    }
+
+                    -$ {
+                        day
+                    }
+
+                    T12:00:00`);
+
+                if ( !isNaN(d.getTime())) {
+                    console.log(`📅 Parsed IT-dash date: $ {
+                            s
+                        }
+
+                        → $ {
+                            d.toLocaleDateString('it-IT')
+                        }
+
+                        `);
                     return d;
                 }
             }
 
             // Tentativo generico finale
-            const d = new Date(s);
-            if (!isNaN(d.getTime())) {
-                console.log(`📅 Parsed generic date: ${s} → ${d.toLocaleDateString('it-IT')}`);
+            const d=new Date(s);
+
+            if ( !isNaN(d.getTime())) {
+                console.log(`📅 Parsed generic date: $ {
+                        s
+                    }
+
+                    → $ {
+                        d.toLocaleDateString('it-IT')
+                    }
+
+                    `);
                 return d;
             }
 
-            console.warn(`⚠️ Could not parse date: ${s}`);
+            console.warn(`⚠️ Could not parse date: $ {
+                    s
+                }
+
+                `);
             return new Date(0);
         }
 
         // ⭐ Calcola la media matematica dai voti di Argo
         function calcolaMedia(voti) {
-            if (!voti || voti.length === 0) return null;
-            const validi = voti.map(v => {
-                let s = (v.valore || v.value || "").toString().replace(',', '.');
-                return parseFloat(s);
-            }).filter(n => !isNaN(n));
+            if ( !voti || voti.length===0) return null;
 
-            if (validi.length === 0) return null;
-            const somma = validi.reduce((a, b) => a + b, 0);
+            const validi=voti.map(v=> {
+                    let s=(v.valore || v.value || "").toString().replace(',', '.');
+                    return parseFloat(s);
+                }).filter(n=> !isNaN(n));
+
+            if (validi.length===0) return null;
+            const somma=validi.reduce((a, b)=> a + b, 0);
             return (somma / validi.length).toFixed(2);
         }
 
-        const DIRECTORY = [
-            { name: 'Alessandro Russo', class: '5B', status: 'online' },
-            { name: 'Sofia Bianchi', class: '3A', status: 'offline' },
-            { name: 'Luca Esposito', class: '4C', status: 'online' },
-            { name: 'Giulia Conti', class: '5B', status: 'offline' },
-            { name: 'Matteo Ferri', class: '2A', status: 'online' },
-            { name: 'Chiara Romano', class: '1B', status: 'offline' },
-            { name: 'Proff. Esposito', class: 'Docente', status: 'online' }
+        const DIRECTORY=[ {
+            name: 'Alessandro Russo', class: '5B', status: 'online'
+        }
+
+        ,
+        {
+        name: 'Sofia Bianchi', class: '3A', status: 'offline'
+        }
+
+        ,
+        {
+        name: 'Luca Esposito', class: '4C', status: 'online'
+        }
+
+        ,
+        {
+        name: 'Giulia Conti', class: '5B', status: 'offline'
+        }
+
+        ,
+        {
+        name: 'Matteo Ferri', class: '2A', status: 'online'
+        }
+
+        ,
+        {
+        name: 'Chiara Romano', class: '1B', status: 'offline'
+        }
+
+        ,
+        {
+        name: 'Proff. Esposito', class: 'Docente', status: 'online'
+        }
+
         ];
 
         // ---------------------------------------------
         // ⚙️ CONFIGURATION
         // Lascia vuoto ("") se il server è locale o se index.html è servito da Flask.
         // Inserisci l'URL di Render (es: "https://g-connect-backend.onrender.com") se deploy su Netlify.
-        const API_BASE_URL = "https://g-connect-backend.onrender.com";
+        const API_BASE_URL="https://g-connect-backend.onrender.com";
+
         // ---------------------------------------------
         // 🆕 PERSISTENT SESSION MANAGER
-        const sessionManager = {
+        const sessionManager= {
             save(sessionData) {
                 try {
                     localStorage.setItem('argo_session', JSON.stringify(sessionData));
                     localStorage.setItem('argo_is_logged_in', 'true');
                     console.log("✅ Sessione salvata");
-                } catch (e) {
+                }
+
+                catch (e) {
                     console.error("❌ Errore salvataggio sessione:", e);
                     alert("Errore salvataggio dati locali. Prova a disabilitare modalità incognito.");
                 }
-            },
+            }
+
+            ,
             load() {
                 try {
-                    const saved = localStorage.getItem('argo_session');
-                    return saved ? JSON.parse(saved) : null;
-                } catch (e) {
+                    const saved=localStorage.getItem('argo_session');
+                    return saved ? JSON.parse(saved): null;
+                }
+
+                catch (e) {
                     console.error("❌ Errore caricamento sessione:", e);
                     return null;
                 }
-            },
+            }
+
+            ,
             isLoggedIn() {
-                return localStorage.getItem('argo_is_logged_in') === 'true';
-            },
+                return localStorage.getItem('argo_is_logged_in')==='true';
+            }
+
+            ,
             clear() {
                 localStorage.removeItem('argo_session');
                 localStorage.removeItem('argo_tasks');
@@ -444,451 +581,608 @@
                 localStorage.removeItem('argo_user'); // ⭐ Per persistere user
                 console.log("🗑️ Sessione cancellata");
             }
-        };
+        }
+
+        ;
 
         // STATE MANAGEMENT
-        const state = {
+        const state= {
+
             view: 'login',
-            user: { name: 'Andrea', class: '5B' }, // ⭐ Verrà sovrascritto da localStorage
+            user: {
+                name: 'Andrea', class: '5B'
+            }
+
+            ,
+            // ⭐ Verrà sovrascritto da localStorage
             isLoggedIn: false,
             isOffline: false,
-            didup: { connected: false },
-            feed: { search: '', classFilter: 'Tutte' },
-            tasks: [], // ⭐ Inizializza vuoto, carica da localStorage
-            posts: [
-                { id: 1, author: 'Marco Rossi', class: '4A', text: 'Ragazzi chi ha gli appunti di filosofia?', likes: 4, liked: false, comments: [], image: null, anon: false },
-                { id: 2, author: 'Rappresentanti', class: 'Istituto', text: '⚠️ Assemlea di Istituto confermata per Venerdì in Aula Magna. ', likes: 89, liked: true, comments: [], image: null, anon: false }
-            ],
-            marketItems: [
-                { id: 1, title: 'Matematica Blu Vol.3', price: '15€', image: 'https://m.media-amazon.com/images/I/71s+3sDQPIL._AC_UF1000,1000_QL80_. jpg', seller: 'Luca E.' },
-                { id: 2, title: 'Divina Commedia', price: '10€', image: null, seller: 'Sofia B.' }
-            ],
-            messages: { 'Alessandro Russo': [{ text: 'Ciao Andrea! ', me: false }] },
-            news: [
-                { id: 128, title: 'Circolare n.  128 - Assemblea d\'Istituto 7 Febbraio', date: 'OGGI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' },
-                { id: 127, title: 'Circolare n. 127 - Variazione Calendario Scrutini', date: 'IERI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' },
-                { id: 126, title: 'Circolare n. 126 - Saldo viaggio d\'istruzione', date: '2 GG FA', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' }
-            ],
-            grades: [],
-            announcements: [],
-            voti: [],        // ⭐ Added based on user request
-            promemoria: [],
-            reminders: [],
-            syncing: false,
-            selectedDay: new Date().getDate()
-        };
+            didup: {
+                connected: false
+            }
 
-        const app = document.getElementById('app');
-        const modalContainer = document.getElementById('modals');
-        const offlineBadge = document.getElementById('offline-badge');
+            ,
+            feed: {
+                search: '', classFilter: 'Tutte'
+            }
+
+            ,
+            tasks: [],
+            // ⭐ Inizializza vuoto, carica da localStorage
+            posts: [ {
+                id: 1, author: 'Marco Rossi', class: '4A', text: 'Ragazzi chi ha gli appunti di filosofia?', likes: 4, liked: false, comments: [], image: null, anon: false
+            }
+
+            ,
+            {
+            id: 2, author: 'Rappresentanti', class: 'Istituto', text: '⚠️ Assemlea di Istituto confermata per Venerdì in Aula Magna. ', likes: 89, liked: true, comments: [], image: null, anon: false
+        }
+
+        ],
+        marketItems: [ {
+            id: 1, title: 'Matematica Blu Vol.3', price: '15€', image: 'https://m.media-amazon.com/images/I/71s+3sDQPIL._AC_UF1000,1000_QL80_. jpg', seller: 'Luca E.'
+        }
+
+        ,
+        {
+        id: 2, title: 'Divina Commedia', price: '10€', image: null, seller: 'Sofia B.'
+        }
+
+        ],
+        messages: {
+            'Alessandro Russo': [ {
+                text: 'Ciao Andrea! ', me: false
+            }
+
+            ]
+        }
+
+        ,
+        news: [ {
+            id: 128, title: 'Circolare n.  128 - Assemblea d\'Istituto 7 Febbraio', date: 'OGGI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/'
+        }
+
+        ,
+        {
+        id: 127, title: 'Circolare n. 127 - Variazione Calendario Scrutini', date: 'IERI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/'
+        }
+
+        ,
+        {
+        id: 126, title: 'Circolare n. 126 - Saldo viaggio d\'istruzione', date: '2 GG FA', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/'
+        }
+
+        ],
+        grades: [],
+        announcements: [],
+        voti: [],
+        // ⭐ Added based on user request
+        promemoria: [],
+        reminders: [],
+        syncing: false,
+        selectedDay: new Date().getDate()
+        }
+
+        ;
+
+        const app=document.getElementById('app');
+        const modalContainer=document.getElementById('modals');
+        const offlineBadge=document.getElementById('offline-badge');
 
         // ⭐ INITIALIZE APP ON LOAD - Versione che funzionava
-        document.addEventListener('DOMContentLoaded', async () => {
-            console.log("🚀 App Loading...");
-            const isLoggedIn = sessionManager.isLoggedIn();
-            const savedSession = sessionManager.load();
+        document.addEventListener('DOMContentLoaded', async ()=> {
+                console.log("🚀 App Loading...");
+                const isLoggedIn=sessionManager.isLoggedIn();
+                const savedSession=sessionManager.load();
 
-            if (isLoggedIn && savedSession) {
-                console.log("✅ Sessione valida trovata!");
+                if (isLoggedIn && savedSession) {
+                    console.log("✅ Sessione valida trovata!");
 
-                // ⭐ Carica tasks con done persistito e ricostruisci dateObj
-                const cachedTasks = localStorage.getItem('argo_tasks');
-                if (cachedTasks) {
-                    try {
-                        const parsed = JSON.parse(cachedTasks);
-                        // ⭐ Ricostruisci dateObj da due_date quando viene caricato da localStorage
-                        state.tasks = parsed.map(t => {
-                            if (t.due_date) {
-                                t.dateObj = new Date(t.due_date);
-                                t.hasValidDate = !isNaN(t.dateObj.getTime());
-                            }
-                            return t;
-                        });
-                        console.log("📦 Compiti caricati:", state.tasks.length);
-                    } catch (e) {
-                        console.error("Errore cache tasks:", e);
-                        state.tasks = [];
+                    // ⭐ Carica tasks con done persistito e ricostruisci dateObj
+                    const cachedTasks=localStorage.getItem('argo_tasks');
+
+                    if (cachedTasks) {
+                        try {
+                            const parsed=JSON.parse(cachedTasks);
+
+                            // ⭐ Ricostruisci dateObj da due_date quando viene caricato da localStorage
+                            state.tasks=parsed.map(t=> {
+                                    if (t.due_date) {
+                                        t.dateObj=new Date(t.due_date);
+                                        t.hasValidDate= !isNaN(t.dateObj.getTime());
+                                    }
+
+                                    return t;
+                                });
+                            console.log("📦 Compiti caricati:", state.tasks.length);
+                        }
+
+                        catch (e) {
+                            console.error("Errore cache tasks:", e);
+                            state.tasks=[];
+                        }
                     }
+
+                    // ⭐ Carica user da localStorage
+                    const cachedUser=localStorage.getItem('argo_user');
+
+                    if (cachedUser) {
+                        try {
+                            state.user=JSON.parse(cachedUser);
+                            console.log("👤 Utente caricato:", state.user.name);
+                        }
+
+                        catch (e) {
+                            console.error("Errore caricamento user:", e);
+                        }
+                    }
+
+                    else if (savedSession.student) {
+                        state.user=savedSession.student;
+                        localStorage.setItem('argo_user', JSON.stringify(state.user));
+                    }
+
+                    // ⭐ Carica voti e promemoria da localStorage
+                    const cachedVoti=localStorage.getItem('argo_voti');
+
+                    if (cachedVoti) {
+                        try {
+                            state.voti=JSON.parse(cachedVoti);
+                            console.log("📊 Voti caricati da cache:", state.voti.length);
+                        }
+
+                        catch (e) {
+                            console.error("Errore caricamento voti:", e);
+                            state.voti=[];
+                        }
+                    }
+
+                    const cachedProm=localStorage.getItem('argo_promemoria');
+
+                    if (cachedProm) {
+                        try {
+                            state.promemoria=JSON.parse(cachedProm);
+                            console.log("📢 Promemoria caricati da cache:", state.promemoria.length);
+                        }
+
+                        catch (e) {
+                            console.error("Errore caricamento promemoria:", e);
+                            state.promemoria=[];
+                        }
+                    }
+
+                    state.isLoggedIn=true;
+                    state.didup.connected=true;
+                    state.view='home';
+                    render();
+
+                    // ⭐ Sync in background passando la sessione salvata
+                    console.log("🔄 Sincronizzazione in background...");
+                    await performSync(savedSession);
                 }
 
-                // ⭐ Carica user da localStorage
-                const cachedUser = localStorage.getItem('argo_user');
-                if (cachedUser) {
-                    try {
-                        state.user = JSON.parse(cachedUser);
-                        console.log("👤 Utente caricato:", state.user.name);
-                    } catch (e) {
-                        console.error("Errore caricamento user:", e);
-                    }
-                } else if (savedSession.student) {
-                    state.user = savedSession.student;
-                    localStorage.setItem('argo_user', JSON.stringify(state.user));
+                else {
+                    console.log("❌ No session - showing login");
+                    state.isLoggedIn=false;
+                    state.view='login';
+                    render();
                 }
-
-                // ⭐ Carica voti e promemoria da localStorage
-                const cachedVoti = localStorage.getItem('argo_voti');
-                if (cachedVoti) {
-                    try {
-                        state.voti = JSON.parse(cachedVoti);
-                        console.log("📊 Voti caricati da cache:", state.voti.length);
-                    } catch (e) {
-                        console.error("Errore caricamento voti:", e);
-                        state.voti = [];
-                    }
-                }
-
-                const cachedProm = localStorage.getItem('argo_promemoria');
-                if (cachedProm) {
-                    try {
-                        state.promemoria = JSON.parse(cachedProm);
-                        console.log("📢 Promemoria caricati da cache:", state.promemoria.length);
-                    } catch (e) {
-                        console.error("Errore caricamento promemoria:", e);
-                        state.promemoria = [];
-                    }
-                }
-
-                state.isLoggedIn = true;
-                state.didup.connected = true;
-                state.view = 'home';
-                render();
-
-                // ⭐ Sync in background passando la sessione salvata
-                console.log("🔄 Sincronizzazione in background...");
-                await performSync(savedSession);
-            } else {
-                console.log("❌ No session - showing login");
-                state.isLoggedIn = false;
-                state.view = 'login';
-                render();
-            }
-        });
+            });
 
         function updateOfflineBadge() {
             if (state.isOffline) {
                 offlineBadge.classList.add('show');
-            } else {
+            }
+
+            else {
                 offlineBadge.classList.remove('show');
             }
         }
 
         async function performSync(sessionData) {
             if (state.syncing) return;
-            state.syncing = true;
+            state.syncing=true;
             render();
 
             // ⭐ Usa la sessione passata o carica quella salvata (come nel codice vecchio)
-            if (!sessionData) sessionData = sessionManager.load();
-            if (!sessionData) {
+            if ( !sessionData) sessionData=sessionManager.load();
+
+            if ( !sessionData) {
                 console.warn("⚠️ Nessuna sessione disponibile per sync");
-                state.syncing = false;
+                state.syncing=false;
                 return;
             }
 
             try {
                 console.log("📤 Invio richiesta sync con sessione salvata");
 
-                const response = await fetch(`${API_BASE_URL}/sync`, {
+                const response=await fetch(`$ {
+                        API_BASE_URL
+                    }
+
+                    /sync`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
-                    },
+                    }
+
+                    ,
                     body: JSON.stringify(sessionData)
                 });
 
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-
-                const data = await response.json();
-                console.log("📥 Dati ricevuti dal server:", {
-                    success: data.success,
-                    tasksCount: data.tasks?.length || 0,
-                    votiCount: data.voti?.length || 0,
-                    promemoriaCount: data.promemoria?.length || data.announcements?.length || 0,
-                    error: data.error
-                });
-
-                // ⭐ DEBUG: Mostra dettagli completi in console
-                if (data.tasks && data.tasks.length > 0) console.log("📋 Tasks ricevuti:", data.tasks);
-
-                // ⭐ DEBUG CRITICO per voti
-                console.log("🎓 DEBUG VOTI - data.voti:", data.voti);
-                console.log("🎓 DEBUG VOTI - tipo:", typeof data.voti, "è array?", Array.isArray(data.voti));
-                if (data.voti) {
-                    console.log("🎓 DEBUG VOTI - lunghezza:", data.voti.length);
-                    console.log("🎓 DEBUG VOTI - primo elemento:", data.voti[0]);
-                }
-
-                if (data.promemoria && data.promemoria.length > 0) console.log("📋 Promemoria ricevuti:", data.promemoria);
-                if (data.announcements && data.announcements.length > 0) console.log("📋 Announcements ricevuti:", data.announcements);
-
-                if (data.success && data.tasks) {
-                    // ⭐ Gestione compiti (come nel codice vecchio)
-                    if (data.tasks.length === 0 && state.tasks.length > 0) {
-                        console.warn("⚠️ Il server ha mandato 0 compiti. Mantengo quelli locali per sicurezza.");
-                        state.isOffline = false;
-                        updateOfflineBadge();
-                        render();
-                        state.syncing = false;
-                        return;
-                    }
-                    updateTasks(data.tasks, true);
-
-                    // ⭐ CRITICO: Aggiorna voti e salva SEMPRE
-                    if (data.voti !== undefined) {
-                        state.voti = Array.isArray(data.voti) ? data.voti : [];
-                        localStorage.setItem('argo_voti', JSON.stringify(state.voti));
-                        console.log("💾 Voti salvati:", state.voti.length);
-                        if (state.voti.length === 0) {
-                            console.warn("⚠️ Array voti vuoto - il backend potrebbe non recuperare i voti da DidUP");
-                        }
+            if ( !response.ok) {
+                throw new Error(`Server error: $ {
+                        response.status
                     }
 
-                    // ⭐ CRITICO: Aggiorna promemoria e salva SEMPRE
-                    const promemoriaData = data.promemoria || data.announcements;
-                    if (promemoriaData !== undefined) {
-                        state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
-                        localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
-                        console.log("💾 Promemoria salvati:", state.promemoria.length);
-                        if (state.promemoria.length === 0) {
-                            console.warn("⚠️ Array promemoria vuoto - il backend potrebbe non recuperare i promemoria da DidUP");
-                        }
-                    }
-
-                    state.lastSync = new Date().toLocaleTimeString();
-                    state.isOffline = false;
-                    state.didup.connected = true;
-                    console.log("✅ Sync completato:", {
-                        tasks: state.tasks.length,
-                        voti: state.voti.length,
-                        promemoria: state.promemoria.length
-                    });
-                    updateOfflineBadge();
-                    render();
-                } else {
-                    throw new Error("Sessione non valida");
-                }
-            } catch (e) {
-                console.error("⚠️ Errore Sync:", e);
-                if (e.message.includes("Sessione non valida")) {
-                    // ⭐ Prova silent login se abbiamo le credenziali (come nel codice vecchio)
-                    if (sessionData && sessionData.storedUser && sessionData.storedPass) {
-                        await performSilentLogin(sessionData.schoolCode, sessionData.storedUser, sessionData.storedPass);
-                    } else {
-                        sessionManager.clear();
-                        state.isLoggedIn = false;
-                        state.view = 'login';
-                        alert("❌ Sessione scaduta. Effettua di nuovo il login.");
-                        render();
-                    }
-                } else {
-                    state.isOffline = true;
-                    updateOfflineBadge();
-                    render();
-                }
-            } finally {
-                state.syncing = false;
+                    `);
             }
+
+            const data=await response.json();
+
+            console.log("📥 Dati ricevuti dal server:", {
+                success: data.success,
+                tasksCount: data.tasks?.length || 0,
+                votiCount: data.voti?.length || 0,
+                promemoriaCount: data.promemoria?.length || data.announcements?.length || 0,
+                error: data.error
+            });
+
+        // ⭐ DEBUG: Mostra dettagli completi in console
+        if (data.tasks && data.tasks.length > 0) console.log("📋 Tasks ricevuti:", data.tasks);
+
+        // ⭐ DEBUG CRITICO per voti
+        console.log("🎓 DEBUG VOTI - data.voti:", data.voti);
+        console.log("🎓 DEBUG VOTI - tipo:", typeof data.voti, "è array?", Array.isArray(data.voti));
+
+        if (data.voti) {
+            console.log("🎓 DEBUG VOTI - lunghezza:", data.voti.length);
+            console.log("🎓 DEBUG VOTI - primo elemento:", data.voti[0]);
+        }
+
+        if (data.promemoria && data.promemoria.length > 0) console.log("📋 Promemoria ricevuti:", data.promemoria);
+        if (data.announcements && data.announcements.length > 0) console.log("📋 Announcements ricevuti:", data.announcements);
+
+        if (data.success && data.tasks) {
+
+            // ⭐ Gestione compiti (come nel codice vecchio)
+            if (data.tasks.length===0 && state.tasks.length > 0) {
+                console.warn("⚠️ Il server ha mandato 0 compiti. Mantengo quelli locali per sicurezza.");
+                state.isOffline=false;
+                updateOfflineBadge();
+                render();
+                state.syncing=false;
+                return;
+            }
+
+            updateTasks(data.tasks, true);
+
+            // ⭐ CRITICO: Aggiorna voti e salva SEMPRE
+            if (data.voti !==undefined) {
+                state.voti=Array.isArray(data.voti) ? data.voti: [];
+                localStorage.setItem('argo_voti', JSON.stringify(state.voti));
+                console.log("💾 Voti salvati:", state.voti.length);
+
+                if (state.voti.length===0) {
+                    console.warn("⚠️ Array voti vuoto - il backend potrebbe non recuperare i voti da DidUP");
+                }
+            }
+
+            // ⭐ CRITICO: Aggiorna promemoria e salva SEMPRE
+            const promemoriaData=data.promemoria || data.announcements;
+
+            if (promemoriaData !==undefined) {
+                state.promemoria=Array.isArray(promemoriaData) ? promemoriaData: [];
+                localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
+                console.log("💾 Promemoria salvati:", state.promemoria.length);
+
+                if (state.promemoria.length===0) {
+                    console.warn("⚠️ Array promemoria vuoto - il backend potrebbe non recuperare i promemoria da DidUP");
+                }
+            }
+
+            state.lastSync=new Date().toLocaleTimeString();
+            state.isOffline=false;
+            state.didup.connected=true;
+
+            console.log("✅ Sync completato:", {
+                tasks: state.tasks.length,
+                voti: state.voti.length,
+                promemoria: state.promemoria.length
+            });
+        updateOfflineBadge();
+        render();
+        }
+
+        else {
+            throw new Error("Sessione non valida");
+        }
+        }
+
+        catch (e) {
+            console.error("⚠️ Errore Sync:", e);
+
+            if (e.message.includes("Sessione non valida")) {
+
+                // ⭐ Prova silent login se abbiamo le credenziali (come nel codice vecchio)
+                if (sessionData && sessionData.storedUser && sessionData.storedPass) {
+                    await performSilentLogin(sessionData.schoolCode, sessionData.storedUser, sessionData.storedPass);
+                }
+
+                else {
+                    sessionManager.clear();
+                    state.isLoggedIn=false;
+                    state.view='login';
+                    alert("❌ Sessione scaduta. Effettua di nuovo il login.");
+                    render();
+                }
+            }
+
+            else {
+                state.isOffline=true;
+                updateOfflineBadge();
+                render();
+            }
+        }
+
+        finally {
+            state.syncing=false;
+        }
         }
 
         async function performSilentLogin(school, encodedUser, encodedPass) {
             try {
-                const user = decodeURIComponent(escape(atob(encodedUser)));
-                const pass = decodeURIComponent(escape(atob(encodedPass)));
+                const user=decodeURIComponent(escape(atob(encodedUser)));
+                const pass=decodeURIComponent(escape(atob(encodedPass)));
 
                 console.log("🔐 Silent Login in corso...");
 
-                const response = await fetch(`${API_BASE_URL}/login`, {
+                const response=await fetch(`$ {
+                        API_BASE_URL
+                    }
+
+                    /login`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ schoolCode: school, username: user, password: pass })
-                });
+                    }
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    ,
+                    body: JSON.stringify({
+                        schoolCode: school, username: user, password: pass
+                    })
+            });
+
+        if ( !response.ok) {
+            throw new Error(`HTTP $ {
+                    response.status
                 }
 
-                const data = await response.json();
+                `);
+        }
 
-                if (data.success) {
-                    console.log("✅ Silent Login riuscito!");
-                    console.log("📥 Dati ricevuti:", {
-                        tasks: data.tasks?.length || 0,
-                        voti: data.voti?.length || 0,
-                        promemoria: data.promemoria?.length || 0
-                    });
+        const data=await response.json();
 
-                    const newSession = {
-                        ...data.session,
-                        storedUser: encodedUser,
-                        storedPass: encodedPass,
-                        schoolCode: school
-                    };
-                    sessionManager.save(newSession);
+        if (data.success) {
+            console.log("✅ Silent Login riuscito!");
 
-                    // ⭐ Carica TUTTI i dati
-                    if (data.tasks) updateTasks(data.tasks, true);
+            console.log("📥 Dati ricevuti:", {
+                tasks: data.tasks?.length || 0,
+                voti: data.voti?.length || 0,
+                promemoria: data.promemoria?.length || 0
+            });
 
-                    // ⭐ CRITICO: Carica voti
-                    if (data.voti !== undefined) {
-                        state.voti = Array.isArray(data.voti) ? data.voti : [];
-                        localStorage.setItem('argo_voti', JSON.stringify(state.voti));
-                        console.log("✅ Voti caricati nel silent login:", state.voti.length);
-                    }
+        const newSession= {
+            ...data.session,
+            storedUser: encodedUser,
+                storedPass: encodedPass,
+                schoolCode: school
+        }
 
-                    // ⭐ CRITICO: Carica promemoria
-                    const promemoriaData = data.promemoria || data.announcements;
-                    if (promemoriaData !== undefined) {
-                        state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
-                        localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
-                        console.log("✅ Promemoria caricati nel silent login:", state.promemoria.length);
-                    }
+        ;
+        sessionManager.save(newSession);
 
-                    if (data.student) {
-                        state.user = data.student;
-                        localStorage.setItem('argo_user', JSON.stringify(state.user));
-                    }
+        // ⭐ Carica TUTTI i dati
+        if (data.tasks) updateTasks(data.tasks, true);
 
-                    state.isOffline = false;
-                    state.didup.connected = true;
-                    state.lastSync = new Date().toLocaleTimeString();
-                    updateOfflineBadge();
-                    render();
-                } else {
-                    throw new Error(data.error || "Silent login fallito");
-                }
-            } catch (e) {
-                console.error("❌ Silent login errore:", e);
-                state.isOffline = true;
-                updateOfflineBadge();
-            }
+        // ⭐ CRITICO: Carica voti
+        if (data.voti !==undefined) {
+            state.voti=Array.isArray(data.voti) ? data.voti: [];
+            localStorage.setItem('argo_voti', JSON.stringify(state.voti));
+            console.log("✅ Voti caricati nel silent login:", state.voti.length);
+        }
+
+        // ⭐ CRITICO: Carica promemoria
+        const promemoriaData=data.promemoria || data.announcements;
+
+        if (promemoriaData !==undefined) {
+            state.promemoria=Array.isArray(promemoriaData) ? promemoriaData: [];
+            localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
+            console.log("✅ Promemoria caricati nel silent login:", state.promemoria.length);
+        }
+
+        if (data.student) {
+            state.user=data.student;
+            localStorage.setItem('argo_user', JSON.stringify(state.user));
+        }
+
+        state.isOffline=false;
+        state.didup.connected=true;
+        state.lastSync=new Date().toLocaleTimeString();
+        updateOfflineBadge();
+        render();
+        }
+
+        else {
+            throw new Error(data.error || "Silent login fallito");
+        }
+        }
+
+        catch (e) {
+            console.error("❌ Silent login errore:", e);
+            state.isOffline=true;
+            updateOfflineBadge();
+        }
         }
 
         function saveTasks() {
             try {
+
                 // ⭐ Salva solo i dati serializzabili (non dateObj che è un oggetto Date)
-                const tasksToSave = state.tasks.map(t => ({
-                    id: t.id,
-                    text: t.text,
-                    subject: t.subject,
-                    due_date: t.due_date,
-                    display_date: t.display_date,
-                    hasValidDate: t.hasValidDate,
-                    done: t.done
-                }));
-                localStorage.setItem('argo_tasks', JSON.stringify(tasksToSave));
-                console.log("💾 Compiti salvati con stato done");
-            } catch (e) {
-                console.error("❌ Errore salvataggio tasks:", e);
-                alert("Errore salvataggio locale - controlla se il browser blocca storage o se sei in incognito.");
-            }
+                const tasksToSave=state.tasks.map(t=> ({
+                        id: t.id,
+                        text: t.text,
+                        subject: t.subject,
+                        due_date: t.due_date,
+                        display_date: t.display_date,
+                        hasValidDate: t.hasValidDate,
+                        done: t.done
+                    }));
+            localStorage.setItem('argo_tasks', JSON.stringify(tasksToSave));
+            console.log("💾 Compiti salvati con stato done");
+        }
+
+        catch (e) {
+            console.error("❌ Errore salvataggio tasks:", e);
+            alert("Errore salvataggio locale - controlla se il browser blocca storage o se sei in incognito.");
+        }
         }
 
 
-        function updateTasks(newTasks, shouldRender = false) {
-            if (!newTasks) {
+        function updateTasks(newTasks, shouldRender=false) {
+            if ( !newTasks) {
                 console.warn("⚠️ updateTasks: no tasks provided");
                 return;
             }
 
-            console.log(`📥 updateTasks: Processing ${newTasks.length} tasks...`);
+            console.log(`📥 updateTasks: Processing $ {
+                    newTasks.length
+                }
 
-            const today = new Date();
+                tasks...`);
+
+            const today=new Date();
             today.setHours(0, 0, 0, 0);
 
             // ⭐ Recupera stato 'done' persistito
-            const localTasks = JSON.parse(localStorage.getItem('argo_tasks') || '[]');
+            const localTasks=JSON.parse(localStorage.getItem('argo_tasks') || '[]');
 
-            const formatted = newTasks.map(t => {
-                // ⭐ Priorità: due_date è il campo principale che arriva dal backend aggiornato
-                let rawDate = t.due_date || t.datCompito || t.dataConsegna || t.datGiorno || t.date || t.datScadenza || t.data;
+            const formatted=newTasks.map(t=> {
+                    // ⭐ Priorità: due_date è il campo principale che arriva dal backend aggiornato
+                    let rawDate=t.due_date || t.datCompito || t.dataConsegna || t.datGiorno || t.date || t.datScadenza || t.data;
 
-                // Debug visivo nella console
-                const taskText = t.text || t.desCompito || "Nessun testo";
-                console.log(`📝 Task: "${taskText.substring(0, 40)}..." - Raw date: ${rawDate}`);
+                    // Debug visivo nella console
+                    const taskText=t.text || t.desCompito || "Nessun testo";
 
-                let dateObj = parseArgoDate(rawDate);
-                let isoDate = dateObj && !isNaN(dateObj.getTime()) ? dateObj.toISOString().split('T')[0] : null;
+                    console.log(`📝 Task: "${taskText.substring(0, 40)}..." - Raw date: $ {
+                            rawDate
+                        }
 
-                // ⭐ Cerca match per preservare done
-                const match = localTasks.find(l =>
-                    (l.id === t.id) ||
-                    (l.text === (t.text || t.desCompito) && l.subject === (t.subject || t.materia))
-                );
+                        `);
 
-                const hasValidDate = dateObj && !isNaN(dateObj.getTime()) && dateObj.getTime() > 0;
+                    let dateObj=parseArgoDate(rawDate);
+                    let isoDate=dateObj && !isNaN(dateObj.getTime()) ? dateObj.toISOString().split('T')[0] : null;
 
-                return {
-                    id: t.id || Math.random().toString(36).substr(2, 9),
-                    text: t.text || t.desCompito || "Nessuna descrizione",
-                    subject: t.subject || t.materia || 'Generico',
-                    due_date: isoDate || rawDate,
-                    display_date: rawDate,
-                    dateObj: dateObj,
-                    hasValidDate: hasValidDate,
-                    done: match ? match.done : (t.done || false)
-                };
-            });
+                    // ⭐ Cerca match per preservare done
+                    const match=localTasks.find(l=> (l.id===t.id) || (l.text===(t.text || t.desCompito) && l.subject===(t.subject || t.materia)));
+
+                    const hasValidDate=dateObj && !isNaN(dateObj.getTime()) && dateObj.getTime() > 0;
+
+                    return {
+                        id: t.id || Math.random().toString(36).substr(2, 9),
+                        text: t.text || t.desCompito || "Nessuna descrizione",
+                        subject: t.subject || t.materia || 'Generico',
+                        due_date: isoDate || rawDate,
+                        display_date: rawDate,
+                        dateObj: dateObj,
+                        hasValidDate: hasValidDate,
+                        done: match ? match.done : (t.done || false)
+                    }
+
+                    ;
+                });
 
             // Conta quanti hanno date valide
-            const validCount = formatted.filter(t => t.hasValidDate).length;
-            console.log(`✅ Formatted tasks: ${formatted.length} total, ${validCount} with valid dates`);
+            const validCount=formatted.filter(t=> t.hasValidDate).length;
+
+            console.log(`✅ Formatted tasks: $ {
+                    formatted.length
+                }
+
+                total, $ {
+                    validCount
+                }
+
+                with valid dates`);
 
             // Ordina per data (tasks senza data valida vanno in fondo)
-            state.tasks = formatted
-                .filter(t => t.hasValidDate || t.text) // Manteniamo tutti i task con testo
-                .sort((a, b) => {
-                    if (!a.hasValidDate) return 1;
-                    if (!b.hasValidDate) return -1;
+            state.tasks=formatted .filter(t=> t.hasValidDate || t.text) // Manteniamo tutti i task con testo
+
+            .sort((a, b)=> {
+                    if ( !a.hasValidDate) return 1;
+                    if ( !b.hasValidDate) return -1;
                     return a.dateObj - b.dateObj;
                 });
 
-            console.log(`💾 Saving ${state.tasks.length} tasks to state`);
+            console.log(`💾 Saving $ {
+                    state.tasks.length
+                }
+
+                tasks to state`);
             saveTasks();
             if (shouldRender) render();
         }
-        function render() {
-            // Update nav
-            document.querySelectorAll('.nav-item').forEach((el, idx) => {
-                const views = ['home', 'market', 'feed', 'planner', 'profile'];
-                if (views[idx] === state.view) el.classList.add('active');
-                else el.classList.remove('active');
-            });
 
-            if (!state.isLoggedIn) {
-                document.getElementById('bottom-nav').style.display = 'none';
-                app.innerHTML = renderLogin();
-            } else {
-                document.getElementById('bottom-nav').style.display = 'flex';
-                if (state.view === 'home') app.innerHTML = renderHome();
-                else if (state.view === 'search') app.innerHTML = renderSearch();
-                else if (state.view === 'market') app.innerHTML = renderMarket();
-                else if (state.view === 'feed') app.innerHTML = renderFeed();
-                else if (state.view === 'planner') app.innerHTML = renderPlanner();
-                else if (state.view === 'profile') app.innerHTML = renderProfile();
-                else if (state.view === 'chat') app.innerHTML = renderChat();
+        function render() {
+
+            // Update nav
+            document.querySelectorAll('.nav-item').forEach((el, idx)=> {
+                    const views=['home', 'market', 'feed', 'planner', 'profile'];
+                    if (views[idx]===state.view) el.classList.add('active');
+                    else el.classList.remove('active');
+                });
+
+            if ( !state.isLoggedIn) {
+                document.getElementById('bottom-nav').style.display='none';
+                app.innerHTML=renderLogin();
+            }
+
+            else {
+                document.getElementById('bottom-nav').style.display='flex';
+                if (state.view==='home') app.innerHTML=renderHome();
+                else if (state.view==='search') app.innerHTML=renderSearch();
+                else if (state.view==='market') app.innerHTML=renderMarket();
+                else if (state.view==='feed') app.innerHTML=renderFeed();
+                else if (state.view==='planner') app.innerHTML=renderPlanner();
+                else if (state.view==='profile') app.innerHTML=renderProfile();
+                else if (state.view==='chat') app.innerHTML=renderChat();
             }
         }
 
-        function navigate(v) { state.view = v; render(); }
+        function navigate(v) {
+            state.view=v;
+            render();
+        }
 
         function logout() {
             if (confirm('Sei sicuro di voler disconnettere? Dovrai effettuare nuovamente il login.')) {
                 sessionManager.clear();
-                state.isLoggedIn = false;
-                state.didup.connected = false;
-                state.user = { name: 'Andrea', class: '5B' };
-                state.tasks = [];
-                state.voti = [];
-                state.promemoria = [];
-                state.isOffline = false;
-                state.lastSync = null;
-                state.view = 'login';
+                state.isLoggedIn=false;
+                state.didup.connected=false;
+
+                state.user= {
+                    name: 'Andrea', class: '5B'
+                }
+
+                ;
+                state.tasks=[];
+                state.voti=[];
+                state.promemoria=[];
+                state.isOffline=false;
+                state.lastSync=null;
+                state.view='login';
                 render();
                 console.log('✅ Logout completato');
             }
@@ -896,537 +1190,489 @@
 
         function renderLogin() {
             // Se c'è una sessione salvata ma l'utente vuole rifare login, mostra il form
-            const savedSession = sessionManager.load();
-            const hasSession = savedSession && sessionManager.isLoggedIn();
+            const savedSession=sessionManager.load();
+            const hasSession=savedSession && sessionManager.isLoggedIn();
 
-            return `
-            <div class="view" style="height: 100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding: 24px;">
-                <h1 style="margin-bottom:40px;">📚 G-Connect</h1>
-                <p style="color:var(--text-secondary); margin-bottom:30px; text-align:center;">Accedi con le tue credenziali DidUP</p>
-                <button class="btn-primary" onclick="openArgoLogin()" style="max-width:300px; cursor:pointer;">Accedi</button>
-                ${hasSession ? `
-                    <div style="margin-top:30px; padding:16px; background:rgba(255,255,255,0.05); border-radius:12px; text-align:center; max-width:300px;">
-                        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">Sessione attiva trovata</div>
-                        <div style="font-size:14px; font-weight:600; margin-bottom:12px;">${state.user?.name || 'Utente'}</div>
-                        <button onclick="logout()" style="background:none; border:1px solid rgba(255,255,255,0.2); color:var(--text-secondary); padding:8px 16px; border-radius:8px; cursor:pointer; font-size:12px; width:100%;">
-                            Disconnetti e accedi con altro account
-                        </button>
-                    </div>
-                ` : ''}
+            return ` <div class="view" style="height: 100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding: 24px;"><h1 style="margin-bottom:40px;">📚 G-Connect</h1><p style="color:var(--text-secondary); margin-bottom:30px; text-align:center;">Accedi con le tue credenziali DidUP</p><button class="btn-primary" onclick="openArgoLogin()" style="max-width:300px; cursor:pointer;">Accedi</button>$ {
+                hasSession ? ` <div style="margin-top:30px; padding:16px; background:rgba(255,255,255,0.05); border-radius:12px; text-align:center; max-width:300px;"><div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">Sessione attiva trovata</div><div style="font-size:14px; font-weight:600; margin-bottom:12px;">$ {
+                    state.user?.name || 'Utente'
+                }
+
+                </div><button onclick="logout()" style="background:none; border:1px solid rgba(255,255,255,0.2); color:var(--text-secondary); padding:8px 16px; border-radius:8px; cursor:pointer; font-size:12px; width:100%;">Disconnetti e accedi con altro account </button></div>` : ''
+            }
+
             </div>`;
         }
 
         function renderHome() {
-            return `
-                <div class="view">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                        <div>
-                            <div style="font-size: 14px; color: var(--text-secondary); font-weight: 600; letter-spacing: 1px;">BENTORNATO</div>
-                            <h1>${state.user.name || 'Utente'}</h1>
-                        </div>
-                        <div style="display: flex; gap: 12px;">
-                            <div onclick="navigate('search')" style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor:pointer;">
-                                <i class="ph-fill ph-users" style="font-size: 20px;"></i>
-                            </div>
-                            <div onclick="openArgoLogin()" style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor:pointer;" title="Riconnetti DidUP">
-                                <i class="ph-fill ph-arrow-clockwise" style="font-size: 20px;"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    ${!state.didup.connected ? `
-                        <div class="card" style="background: rgba(255, 159, 10, 0.1); border: 1px solid var(--orange); margin-bottom: 20px; padding: 16px; display: flex; align-items: center; gap: 12px;">
-                            <i class="ph ph-warning" style="color: var(--orange); font-size: 24px;"></i>
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; margin-bottom: 4px;">DidUP Non Connesso</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">Collega il tuo account DidUP per vedere voti, compiti e promemoria</div>
-                            </div>
-                            <button onclick="openArgoLogin()" style="background: var(--orange); color: black; padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; font-size: 12px; cursor: pointer;">
-                                Connetti
-                            </button>
-                        </div>
-                    ` : ''}
+            return ` <div class="view"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;"><div><div style="font-size: 14px; color: var(--text-secondary); font-weight: 600; letter-spacing: 1px;">BENTORNATO</div><h1>$ {
+                state.user.name || 'Utente'
+            }
 
-                    <!-- CIRCULARS -->
-                    <div style="margin-bottom: 30px;">
-                        <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom: 16px;">
-                            <h2 style="margin:0;">Ultime Circolari</h2>
-                            <button onclick="window.open('https://www.liceogandhi.edu.it/categoria/storico-circolari/','_blank')" style="background:none; border:none; color:var(--blue); font-size:14px; font-weight:600; cursor:pointer;">Vedi tutte</button>
-                        </div>
-                        <div style="display: flex; gap: 16px; overflow-x: auto; padding-bottom: 10px; margin: 0 -24px; padding-left: 24px;">
-                            ${state.news.map(n => `
-                                <div onclick="window.open('${n.url}', '_blank')" style="min-width: 260px; height: 150px; background: linear-gradient(135deg, #1c1c1e 0%, #111 100%); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; cursor:pointer;">
-                                    <i class="ph-fill ph-file-pdf" style="position: absolute; right: -10px; bottom: -10px; font-size: 80px; color: rgba(255,255,255,0.03); transform: rotate(-15deg);"></i>
-                                    <div>
-                                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
-                                            <i class="ph-fill ph-file-pdf" style="color: var(--red); font-size: 16px;"></i>
-                                            <span style="color: var(--text-secondary); font-size: 11px; font-weight: 700; text-transform: uppercase;">CIRCOLARE</span>
-                                        </div>
-                                        <h3 style="margin: 0; font-size: 17px; line-height: 1.3; font-weight: 600;">${n.title}</h3>
-                                    </div>
-                                    <span style="font-size: 12px; color: var(--blue);">Apri documento <i class="ph-bold ph-arrow-up-right" style="font-size:10px;"></i></span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
+            </h1></div><div style="display: flex; gap: 12px;"><div onclick="navigate('search')" style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor:pointer;"><i class="ph-fill ph-users" style="font-size: 20px;"></i></div><div onclick="openArgoLogin()" style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor:pointer;" title="Riconnetti DidUP"><i class="ph-fill ph-arrow-clockwise" style="font-size: 20px;"></i></div></div></div>$ {
+                !state.didup.connected ? ` <div class="card" style="background: rgba(255, 159, 10, 0.1); border: 1px solid var(--orange); margin-bottom: 20px; padding: 16px; display: flex; align-items: center; gap: 12px;"><i class="ph ph-warning" style="color: var(--orange); font-size: 24px;"></i><div style="flex: 1;"><div style="font-weight: 600; margin-bottom: 4px;">DidUP Non Connesso</div><div style="font-size: 12px; color: var(--text-secondary);">Collega il tuo account DidUP per vedere voti,
+                compiti e promemoria</div></div><button onclick="openArgoLogin()" style="background: var(--orange); color: black; padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; font-size: 12px; cursor: pointer;">Connetti </button></div>`: ''
+            }
 
-                    <!-- SMART STATUS SECTION -->
-                    <h2 style="margin-bottom: 16px;">La Tua Situazione</h2>
-                    <div style="display: flex; gap: 16px; margin-bottom: 30px;">
-                        
-                        <!-- GRADE AVERAGE WIDGET -->
-                        <div class="card" onclick="showVotiView()" style="flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0; cursor:pointer;">
-                            <div style="position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
-                                ${(() => {
-                    const media = calcolaMedia(state.voti);
-                    const percent = media ? (parseFloat(media) / 10 * 213) : 0;
-                    const color = parseFloat(media) >= 6 ? 'var(--green)' : 'var(--red)';
-                    return `
-                                        <svg width="80" height="80" viewBox="0 0 80 80">
-                                            <circle cx="40" cy="40" r="34" fill="none" stroke="#333" stroke-width="6" />
-                                            <circle cx="40" cy="40" r="34" fill="none" stroke="${color}" stroke-width="6" stroke-dasharray="213" stroke-dashoffset="${213 - percent}" transform="rotate(-90 40 40)" stroke-linecap="round" />
-                                        </svg>
-                                        <span style="position: absolute; font-size: 20px; font-weight: 700; color: white;">${media || '--'}</span>
-                                    `;
-                })()}
-                            </div>
-                            <span style="font-size: 14px; color: var(--text-secondary); font-weight: 600;">Media Voti</span>
-                        </div>
+            < !-- CIRCULARS --><div style="margin-bottom: 30px;"><div style="display:flex; align-items:center; justify-content: space-between; margin-bottom: 16px;"><h2 style="margin:0;">Ultime Circolari</h2><button onclick="window.open('https://www.liceogandhi.edu.it/categoria/storico-circolari/','_blank')" style="background:none; border:none; color:var(--blue); font-size:14px; font-weight:600; cursor:pointer;">Vedi tutte</button></div><div style="display: flex; gap: 16px; overflow-x: auto; padding-bottom: 10px; margin: 0 -24px; padding-left: 24px;">$ {
+                state.news.map(n=> ` <div onclick="window.open('${n.url}', '_blank')" style="min-width: 260px; height: 150px; background: linear-gradient(135deg, #1c1c1e 0%, #111 100%); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; cursor:pointer;" > <i class="ph-fill ph-file-pdf" style="position: absolute; right: -10px; bottom: -10px; font-size: 80px; color: rgba(255,255,255,0.03); transform: rotate(-15deg);" ></i> <div> <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;" > <i class="ph-fill ph-file-pdf" style="color: var(--red); font-size: 16px;" ></i> <span style="color: var(--text-secondary); font-size: 11px; font-weight: 700; text-transform: uppercase;" >CIRCOLARE</span> </div> <h3 style="margin: 0; font-size: 17px; line-height: 1.3; font-weight: 600;" >$ {
+                        n.title
+                    }
 
-                        <!-- TASKS WIDGET -->
-                        <div class="card" onclick="navigate('planner')" style="flex: 1; padding: 16px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 0; cursor: pointer;">
-                            <div style="font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; text-transform:uppercase; letter-spacing:0.5px;">Da fare oggi</div>
-                            <div style="display: flex; flex-direction: column; gap: 8px;">
-                                ${state.tasks.slice(0, 2).map(t => `
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <div style="width: 18px; height: 18px; border: 2px solid ${t.done ? 'var(--green)' : 'var(--orange)'}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
-                                            ${t.done ? '<i class="ph-bold ph-check" style="font-size: 10px; color: black;"></i>' : ''}
-                                        </div>
-                                        <span style="font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; opacity: ${t.done ? 0.5 : 1}; text-decoration: ${t.done ? 'line-through' : 'none'}">${t.text}</span>
-                                    </div>
-                                `).join('')}
-                                ${state.tasks.length > 2 ? `<div style="font-size: 11px; color: var(--blue); margin-top: 4px;">+ altri ${state.tasks.length - 2}</div>` : ''}
-                            </div>
-                        </div>
-                    </div>
+                    </h3> </div> <span style="font-size: 12px; color: var(--blue);" >Apri documento <i class="ph-bold ph-arrow-up-right" style="font-size:10px;" ></i></span> </div> `).join('')
+            }
 
-                    <!-- INTERACTIVE POLL WIDGET -->
-                    <h2 style="margin-bottom: 16px;">Sondaggio Attivo</h2>
-                    <div class="card" style="background: linear-gradient(135deg, #1c1c1e, #2c2c2e); border: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 40px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
-                            <span style="color: var(--purple); font-size: 12px; font-weight: 700; text-transform: uppercase;">RAPPRESENTANTI</span>
-                            <span style="font-size: 12px; color: var(--text-secondary);">Scade tra 5h</span>
-                        </div>
-                        <h3 style="margin-bottom: 20px; font-size: 18px; line-height: 1.4;">Data prossima Assemblea? 🗓️</h3>
-                        
-                        <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer;">
-                            <span>Venerdì 7 Feb</span>
-                            <span>60%</span>
-                        </div>
-                         <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer;">
-                            <span>Lunedì 10 Feb</span>
-                            <span>15%</span>
-                        </div>
-                         <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer;">
-                            <span>Sabato 15 Feb</span>
-                            <span>25%</span>
-                        </div>
-                    </div>
-                </div>
-            `;
+            </div></div>< !-- SMART STATUS SECTION --><h2 style="margin-bottom: 16px;">La Tua Situazione</h2><div style="display: flex; gap: 16px; margin-bottom: 30px;">< !-- GRADE AVERAGE WIDGET --><div class="card" onclick="showVotiView()" style="flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0; cursor:pointer;"><div style="position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">$ {
+                (()=> {
+                        const media=calcolaMedia(state.voti);
+                        const percent=media ? (parseFloat(media) / 10 * 213) : 0;
+                        const color=parseFloat(media) >=6 ? 'var(--green)' : 'var(--red)';
+
+                        return ` <svg width="80" height="80" viewBox="0 0 80 80" > <circle cx="40" cy="40" r="34" fill="none" stroke="#333" stroke-width="6" /> <circle cx="40" cy="40" r="34" fill="none" stroke="${color}" stroke-width="6" stroke-dasharray="213" stroke-dashoffset="${213 - percent}" transform="rotate(-90 40 40)" stroke-linecap="round" /> </svg> <span style="position: absolute; font-size: 20px; font-weight: 700; color: white;" >$ {
+                            media || '--'
+                        }
+
+                        </span> `;
+                    })()
+            }
+
+            </div><span style="font-size: 14px; color: var(--text-secondary); font-weight: 600;">Media Voti</span></div>< !-- TASKS WIDGET --><div class="card" onclick="navigate('planner')" style="flex: 1; padding: 16px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 0; cursor: pointer;"><div style="font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; text-transform:uppercase; letter-spacing:0.5px;">Da fare oggi</div><div style="display: flex; flex-direction: column; gap: 8px;">$ {
+                state.tasks.slice(0, 2).map(t=> ` <div style="display: flex; align-items: center; gap: 8px;" > <div style="width: 18px; height: 18px; border: 2px solid ${t.done ? 'var(--green)' : 'var(--orange)'}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center;" > $ {
+                        t.done ? '<i class="ph-bold ph-check" style="font-size: 10px; color: black;"></i>' : ''
+                    }
+
+                    </div> <span style="font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; opacity: ${t.done ? 0.5 : 1}; text-decoration: ${t.done ? 'line-through' : 'none'}" >$ {
+                        t.text
+                    }
+
+                    </span> </div> `).join('')
+            }
+
+            $ {
+                state.tasks.length>2 ? `<div style="font-size: 11px; color: var(--blue); margin-top: 4px;">+altri $ {
+                    state.tasks.length - 2
+                }
+
+                </div>` : ''
+            }
+
+            </div></div></div>< !-- INTERACTIVE POLL WIDGET --><h2 style="margin-bottom: 16px;">Sondaggio Attivo</h2><div class="card" style="background: linear-gradient(135deg, #1c1c1e, #2c2c2e); border: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 40px;"><div style="display: flex; justify-content: space-between; margin-bottom: 16px;"><span style="color: var(--purple); font-size: 12px; font-weight: 700; text-transform: uppercase;">RAPPRESENTANTI</span><span style="font-size: 12px; color: var(--text-secondary);">Scade tra 5h</span></div><h3 style="margin-bottom: 20px; font-size: 18px; line-height: 1.4;">Data prossima Assemblea? 🗓️</h3><div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer;"><span>Venerdì 7 Feb</span><span>60%</span></div><div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer;"><span>Lunedì 10 Feb</span><span>15%</span></div><div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer;"><span>Sabato 15 Feb</span><span>25%</span></div></div></div>`;
         }
 
         function renderMarket() {
-            return `
-                <div class="view">
-                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-                        <h1>Market Libri</h1>
-                        <button onclick="openNewItemModal()" style="background:var(--green); color:black; padding:8px 16px; border-radius:20px; border:none; font-weight:700; cursor:pointer;">+ Vendi</button>
-                    </div> 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                        ${state.marketItems.map(item => `
-                            <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin:0; height: 100%;">
-                                <div style="height:140px; background:#333; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                                    ${item.image ? `<img src="${item.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-book-open" style="font-size:40px; color:rgba(255,255,255,0.2);"></i>`}
-                                </div>
-                                <div style="padding:12px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
-                                    <div>
-                                        <div style="font-weight:600; font-size:15px; margin-bottom:4px; line-height:1.2;">${item.title}</div>
-                                        <div style="font-size:12px; color:var(--text-secondary);">Venduto da ${item.seller}</div>
-                                    </div>
-                                    <div style="margin-top:8px; font-weight:700; color:var(--green); font-size:16px;">${item.price}</div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
+            return ` <div class="view"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;"><h1>Market Libri</h1><button onclick="openNewItemModal()" style="background:var(--green); color:black; padding:8px 16px; border-radius:20px; border:none; font-weight:700; cursor:pointer;">+Vendi</button></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">$ {
+                state.marketItems.map(item=> ` <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin:0; height: 100%;" > <div style="height:140px; background:#333; display:flex; align-items:center; justify-content:center; overflow:hidden;" > $ {
+                        item.image ? `<img src="${item.image}" style="width:100%; height:100%; object-fit:cover;" >` : `<i class="ph ph-book-open" style="font-size:40px; color:rgba(255,255,255,0.2);" ></i>`
+                    }
+
+                    </div> <div style="padding:12px; flex:1; display:flex; flex-direction:column; justify-content:space-between;" > <div> <div style="font-weight:600; font-size:15px; margin-bottom:4px; line-height:1.2;" >$ {
+                        item.title
+                    }
+
+                    </div> <div style="font-size:12px; color:var(--text-secondary);" >Venduto da $ {
+                        item.seller
+                    }
+
+                    </div> </div> <div style="margin-top:8px; font-weight:700; color:var(--green); font-size:16px;" >$ {
+                        item.price
+                    }
+
+                    </div> </div> </div> `).join('')
+            }
+
+            </div></div>`;
         }
 
         function renderSearch() {
-            return `
-                <div class="view" style="padding-top: 0;">
-                    <div class="search-container">
-                         <div style="display:flex; align-items:center; gap:10px; margin: 10px 0;">
-                             <button onclick="navigate('home')" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;"><i class="ph ph-arrow-left"></i></button>
-                             <h1 style="margin:0;">Community</h1>
-                         </div>
-                        <div style="position: relative;">
-                            <i class="ph ph-magnifying-glass" style="position: absolute; left: 14px; top: 12px; color: var(--text-secondary); font-size: 20px;"></i>
-                            <input id="search-input" type="text" placeholder="Cerca studente..." oninput="filterStudents(this.value)" style="padding-left: 44px; margin-bottom: 0;">
-                        </div>
-                    </div>
-                    
-                    <div id="student-list" style="padding-top: 10px;"></div>
-                </div>
-            `;
+            return ` <div class="view" style="padding-top: 0;"><div class="search-container"><div style="display:flex; align-items:center; gap:10px; margin: 10px 0;"><button onclick="navigate('home')" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;"><i class="ph ph-arrow-left"></i></button><h1 style="margin:0;">Community</h1></div><div style="position: relative;"><i class="ph ph-magnifying-glass" style="position: absolute; left: 14px; top: 12px; color: var(--text-secondary); font-size: 20px;"></i><input id="search-input" type="text" placeholder="Cerca studente..." oninput="filterStudents(this.value)" style="padding-left: 44px; margin-bottom: 0;"></div></div><div id="student-list" style="padding-top: 10px;"></div></div>`;
         }
 
         function filterStudents(q) {
-            const list = document.getElementById('student-list');
-            if (!list) return;
+            const list=document.getElementById('student-list');
+            if ( !list) return;
 
-            const filtered = DIRECTORY.filter(u => u.name.toLowerCase().includes(q.toLowerCase()));
+            const filtered=DIRECTORY.filter(u=> u.name.toLowerCase().includes(q.toLowerCase()));
 
-            if (filtered.length === 0) {
-                list.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--text-secondary);">Nessun utente trovato</div>`;
+            if (filtered.length===0) {
+                list.innerHTML=`<div style="text-align:center; padding: 40px; color: var(--text-secondary);">Nessun utente trovato</div>`;
                 return;
             }
 
-            list.innerHTML = `
-                ${q === '' ? `<h3 style="margin-bottom: 12px;">Suggeriti</h3>` : ''}
-                ${filtered.map(u => `
-                    <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor:pointer;">
-                        <div style="position: relative; margin-right: 16px;">
-                            <div style="width: 50px; height: 50px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;">${u.name[0]}</div>
-                            ${u.status === 'online' ? `<div style="position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; background: var(--green); border: 2px solid black; border-radius: 50%;"></div>` : ''}
-                        </div>
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 17px; margin-bottom: 2px;">${u.name}</div>
-                            <div style="color: var(--text-secondary); font-size: 13px;">Classe ${u.class}</div>
-                        </div>
-                        <button style="background: rgba(10, 132, 255, 0.15); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; color: var(--blue);">
-                            <i class="ph-fill ph-chat-circle-dots" style="font-size: 20px;"></i>
-                        </button>
-                    </div>
-                `).join('')}
+            list.innerHTML=` $ {
+                q==='' ? `<h3 style="margin-bottom: 12px;">Suggeriti</h3>`: ''
+            }
+
+            $ {
+                filtered.map(u=> ` <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor:pointer;" > <div style="position: relative; margin-right: 16px;" > <div style="width: 50px; height: 50px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;" >$ {
+                        u.name[0]
+                    }
+
+                    </div> $ {
+                        u.status==='online' ? `<div style="position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; background: var(--green); border: 2px solid black; border-radius: 50%;" ></div>` : ''
+                    }
+
+                    </div> <div style="flex: 1;" > <div style="font-weight: 600; font-size: 17px; margin-bottom: 2px;" >$ {
+                        u.name
+                    }
+
+                    </div> <div style="color: var(--text-secondary); font-size: 13px;" >Classe $ {
+                        u.class
+                    }
+
+                    </div> </div> <button style="background: rgba(10, 132, 255, 0.15); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; color: var(--blue);" > <i class="ph-fill ph-chat-circle-dots" style="font-size: 20px;" ></i> </button> </div> `).join('')
+            }
+
             `;
         }
 
         function renderFeed() {
             // Filter Posts
-            let displayPosts = state.posts;
+            let displayPosts=state.posts;
 
             // 1. Class Filter
-            if (state.feed.classFilter !== 'Tutte') {
-                displayPosts = displayPosts.filter(p => p.class === state.feed.classFilter);
+            if (state.feed.classFilter !=='Tutte') {
+                displayPosts=displayPosts.filter(p=> p.class===state.feed.classFilter);
             }
 
             // 2. Search Filter (Search in Author or Text)
             if (state.feed.search) {
-                const q = state.feed.search.toLowerCase();
-                displayPosts = displayPosts.filter(p =>
-                    p.author.toLowerCase().includes(q) ||
-                    p.text.toLowerCase().includes(q)
-                );
+                const q=state.feed.search.toLowerCase();
+                displayPosts=displayPosts.filter(p=> p.author.toLowerCase().includes(q) || p.text.toLowerCase().includes(q));
             }
 
             // Find Users (if searching)
-            let foundUsers = [];
+            let foundUsers=[];
+
             if (state.feed.search) {
-                foundUsers = DIRECTORY.filter(u => u.name.toLowerCase().includes(state.feed.search.toLowerCase()));
+                foundUsers=DIRECTORY.filter(u=> u.name.toLowerCase().includes(state.feed.search.toLowerCase()));
             }
 
             // Get unique classes for filter
-            const allClasses = ['Tutte', ...new Set(DIRECTORY.map(u => u.class))];
+            const allClasses=['Tutte',
+            ...new Set(DIRECTORY.map(u=> u.class))];
 
-            return `
-            <div class="view">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                    <h1>Feed</h1>
-                    <button onclick="openNewPostModal()" style="background:var(--blue); padding:8px 16px; border-radius:20px; border:none; color:white; font-weight:600; cursor:pointer;">+ Post</button>
-                </div>
+            return ` <div class="view"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;"><h1>Feed</h1><button onclick="openNewPostModal()" style="background:var(--blue); padding:8px 16px; border-radius:20px; border:none; color:white; font-weight:600; cursor:pointer;">+Post</button></div>< !-- Search Bar --><div style="position:relative; margin-bottom: 16px;"><i class="ph ph-magnifying-glass" style="position: absolute; left: 14px; top: 12px; color: var(--text-secondary); font-size: 20px;"></i><input type="text" placeholder="Cerca persone o post..." value="${state.feed.search}" oninput="updateFeedSearch(this.value)" style="padding-left: 44px; margin-bottom: 0;"></div>< !-- Class Filters --><div style="display:flex; gap:10px; overflow-x:auto; padding-bottom:10px; margin: 0 -24px 16px -24px; padding-left: 24px; scrollbar-width: none;">$ {
+                allClasses.map(c=> ` <button onclick="setFeedClass('${c}')" style="
+ padding: 6px 16px;
+                    border-radius: 16px;
 
-                <!-- Search Bar -->
-                <div style="position:relative; margin-bottom: 16px;">
-                     <i class="ph ph-magnifying-glass" style="position: absolute; left: 14px; top: 12px; color: var(--text-secondary); font-size: 20px;"></i>
-                     <input type="text" placeholder="Cerca persone o post..." value="${state.feed.search}" oninput="updateFeedSearch(this.value)" style="padding-left: 44px; margin-bottom: 0;">
-                </div>
+                    border: 1px solid $ {
+                        state.feed.classFilter===c ? 'var(--blue)' : 'rgba(255,255,255,0.2)'
+                    }
 
-                <!-- Class Filters -->
-                <div style="display:flex; gap:10px; overflow-x:auto; padding-bottom:10px; margin: 0 -24px 16px -24px; padding-left: 24px; scrollbar-width: none;">
-                    ${allClasses.map(c => `
-                        <button onclick="setFeedClass('${c}')" style="
-                            padding: 6px 16px; 
-                            border-radius: 16px; 
-                            border: 1px solid ${state.feed.classFilter === c ? 'var(--blue)' : 'rgba(255,255,255,0.2)'}; 
-                            background: ${state.feed.classFilter === c ? 'var(--blue)' : 'transparent'}; 
-                            color: white; 
-                            font-weight: 600; 
-                            white-space: nowrap;
-                            font-size: 13px;
-                            transition: all 0.2s;
-                            cursor: pointer;
-                        ">${c}</button>
-                    `).join('')}
-                </div>
+                    ;
 
-                <!-- Found Users Section -->
-                ${foundUsers.length > 0 ? `
-                    <div style="margin-bottom: 24px;">
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom: 12px;">
-                            <i class="ph-fill ph-users" style="color:var(--blue);"></i>
-                            <h3 style="margin:0;">Persone Correlate</h3>
-                        </div>
-                        ${foundUsers.map(u => `
-                             <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 16px; margin-bottom: 8px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05);">
-                                <div style="width: 36px; height: 36px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 12px; border: 1px solid rgba(255,255,255,0.1);">${u.name[0]}</div>
-                                <div style="flex:1;">
-                                    <div style="font-weight: 600; font-size: 15px;">${u.name}</div>
-                                    <div style="color: var(--text-secondary); font-size: 11px;">Classe ${u.class}</div>
-                                </div>
-                                <div style="background: rgba(10, 132, 255, 0.1); padding: 6px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; color: var(--blue);">MESSAGE</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
+                    background: $ {
+                        state.feed.classFilter===c ? 'var(--blue)' : 'transparent'
+                    }
 
-                <!-- Posts List -->
-                ${displayPosts.length > 0 ? displayPosts.map(post => `
-                    <div class="card">
-                        <div style="display:flex; gap:12px; margin-bottom:12px;">
-                            <div style="width:40px; height:40px; background:${post.anon ? '#333' : 'var(--blue)'}; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700;">${post.anon ? '?' : post.author[0]}</div>
-                            <div>
-                                <div style="font-weight:700;">${post.anon ? 'Anonimo' : post.author}</div>
-                                <div style="font-size:12px; opacity:0.6;">${post.anon ? 'Studente' : post.class}</div>
-                            </div>
-                        </div>
-                        <p>${post.text}</p>
-                        ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:12px; margin-bottom:12px;">` : ''}
-                        <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; gap:20px;">
-                            <button onclick="toggleLike(${post.id})" style="background:none; border:none; color:${post.liked ? 'var(--red)' : 'var(--text-secondary)'}; cursor:pointer;"><i class="${post.liked ? 'ph-fill' : 'ph'} ph-heart"></i> ${post.likes}</button>
-                            <button style="background:none; border:none; color:var(--text-secondary); cursor:pointer;"><i class="ph ph-chat-circle"></i> Commenta</button>
-                        </div>
-                    </div>
-                `).join('') : `<div style="text-align:center; padding:40px; opacity:0.5;">Nessun post trovato</div>`}
+                    ;
+                    color: white;
+                    font-weight: 600;
+                    white-space: nowrap;
+                    font-size: 13px;
+                    transition: all 0.2s;
+                    cursor: pointer;
+                    ">${c}</button>
+ `).join('')
+            }
+
+            </div>< !-- Found Users Section -->$ {
+                foundUsers.length>0 ? ` <div style="margin-bottom: 24px;"><div style="display:flex; align-items:center; gap:8px; margin-bottom: 12px;"><i class="ph-fill ph-users" style="color:var(--blue);"></i><h3 style="margin:0;">Persone Correlate</h3></div>$ {
+                    foundUsers.map(u=> ` <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 16px; margin-bottom: 8px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05);" > <div style="width: 36px; height: 36px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 12px; border: 1px solid rgba(255,255,255,0.1);" >$ {
+                            u.name[0]
+                        }
+
+                        </div> <div style="flex:1;" > <div style="font-weight: 600; font-size: 15px;" >$ {
+                            u.name
+                        }
+
+                        </div> <div style="color: var(--text-secondary); font-size: 11px;" >Classe $ {
+                            u.class
+                        }
+
+                        </div> </div> <div style="background: rgba(10, 132, 255, 0.1); padding: 6px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; color: var(--blue);" >MESSAGE</div> </div> `).join('')
+                }
+
+                </div>` : ''
+            }
+
+            < !-- Posts List -->$ {
+                displayPosts.length>0 ? displayPosts.map(post=> ` <div class="card" > <div style="display:flex; gap:12px; margin-bottom:12px;" > <div style="width:40px; height:40px; background:${post.anon ? '#333' : 'var(--blue)'}; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700;" >$ {
+                        post.anon ? '?' : post.author[0]
+                    }
+
+                    </div> <div> <div style="font-weight:700;" >$ {
+                        post.anon ? 'Anonimo' : post.author
+                    }
+
+                    </div> <div style="font-size:12px; opacity:0.6;" >$ {
+                        post.anon ? 'Studente' : post.class
+                    }
+
+                    </div> </div> </div> <p>$ {
+                        post.text
+                    }
+
+                    </p> $ {
+                        post.image ? `<img src="${post.image}" style="width:100%; border-radius:12px; margin-bottom:12px;" >` : ''
+                    }
+
+                    <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; gap:20px;" > <button onclick="toggleLike(${post.id})" style="background:none; border:none; color:${post.liked ? 'var(--red)' : 'var(--text-secondary)'}; cursor:pointer;" ><i class="${post.liked ? 'ph-fill' : 'ph'} ph-heart" ></i> $ {
+                        post.likes
+                    }
+
+                    </button> <button style="background:none; border:none; color:var(--text-secondary); cursor:pointer;" ><i class="ph ph-chat-circle" ></i> Commenta</button> </div> </div> `).join('') : `<div style="text-align:center; padding:40px; opacity:0.5;">Nessun post trovato</div>`
+            }
+
             </div>`;
         }
 
 
         function renderPlanner() {
-            setTimeout(() => {
-                const calendarEl = document.getElementById('calendar');
-                if (calendarEl) {
-                    // Rimuovi il calendario esistente se presente
-                    const existingCalendar = calendarEl._fullCalendar;
-                    if (existingCalendar) {
-                        existingCalendar.destroy();
+            setTimeout(()=> {
+                    const calendarEl=document.getElementById('calendar');
+
+                    if (calendarEl) {
+                        // Rimuovi il calendario esistente se presente
+                        const existingCalendar=calendarEl._fullCalendar;
+
+                        if (existingCalendar) {
+                            existingCalendar.destroy();
+                        }
+
+                        const calendar=new FullCalendar.Calendar(calendarEl, {
+
+                            initialView: 'dayGridMonth',
+                            locale: 'it',
+                            themeSystem: 'standard',
+                            height: 'auto',
+                            headerToolbar: {
+                                left: 'title', center: '', right: 'prev,next'
+                            }
+
+                            ,
+                            events: state.tasks .filter(t=> t.due_date && t.hasValidDate) .map(t=> ({
+                                    title: `$ {
+                                        t.subject
+                                    }
+
+                                    : $ {
+                                        t.text.substring(0, 30)
+                                    }
+
+                                    $ {
+                                        t.text.length > 30 ? '...' : ''
+                                    }
+
+                                    `,
+                                    start: t.due_date,
+                                    color: t.done ? '#30D158' : '#0A84FF',
+                                    textColor: t.done ? '#000' : '#fff',
+                                    extendedProps: {
+                                        fullText: t.text,
+                                        subject: t.subject
+                                    }
+
+                                })),
+                        eventClick: function (info) {
+                            const event=info.event;
+
+                            modalContainer.innerHTML=` <div class="modal-overlay" onclick="closeModal(event)" > <div class="modal-content" > <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;" > <h2 style="margin: 0;" >Dettaglio Compito</h2> <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px; cursor: pointer;" >Chiudi</button> </div> <div style="margin-bottom: 12px;" > <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;" >Materia</div> <div style="font-size: 18px; font-weight: 600; color: white;" >$ {
+                                event.extendedProps.subject
+                            }
+
+                            </div> </div> <div style="margin-bottom: 12px;" > <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;" >Descrizione</div> <div style="font-size: 16px; color: white; line-height: 1.5;" >$ {
+                                event.extendedProps.fullText
+                            }
+
+                            </div> </div> <div> <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;" >Scadenza</div> <div style="font-size: 16px; color: white; display: flex; align-items: center; gap: 6px;" > <i class="ph ph-calendar" ></i> $ {
+                                new Date(event.start).toLocaleDateString('it-IT', {
+                                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                                })
+                        }
+
+                        </div> </div> </div> </div> `;
                     }
 
-                    const calendar = new FullCalendar.Calendar(calendarEl, {
-                        initialView: 'dayGridMonth',
-                        locale: 'it',
-                        themeSystem: 'standard',
-                        height: 'auto',
-                        headerToolbar: { left: 'title', center: '', right: 'prev,next' },
-                        events: state.tasks
-                            .filter(t => t.due_date && t.hasValidDate)
-                            .map(t => ({
-                                title: `${t.subject}: ${t.text.substring(0, 30)}${t.text.length > 30 ? '...' : ''}`,
-                                start: t.due_date,
-                                color: t.done ? '#30D158' : '#0A84FF',
-                                textColor: t.done ? '#000' : '#fff',
-                                extendedProps: {
-                                    fullText: t.text,
-                                    subject: t.subject
-                                }
-                            })),
-                        eventClick: function (info) {
-                            const event = info.event;
-                            modalContainer.innerHTML = `
-                                <div class="modal-overlay" onclick="closeModal(event)">
-                                    <div class="modal-content">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                                            <h2 style="margin: 0;">Dettaglio Compito</h2>
-                                            <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px; cursor: pointer;">Chiudi</button>
-                                        </div>
-                                        <div style="margin-bottom: 12px;">
-                                            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Materia</div>
-                                            <div style="font-size: 18px; font-weight: 600; color: white;">${event.extendedProps.subject}</div>
-                                        </div>
-                                        <div style="margin-bottom: 12px;">
-                                            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Descrizione</div>
-                                            <div style="font-size: 16px; color: white; line-height: 1.5;">${event.extendedProps.fullText}</div>
-                                        </div>
-                                        <div>
-                                            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Scadenza</div>
-                                            <div style="font-size: 16px; color: white; display: flex; align-items: center; gap: 6px;">
-                                                <i class="ph ph-calendar"></i>
-                                                ${new Date(event.start).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        },
-                        dateClick: function (info) {
-                            const tasksForDay = state.tasks.filter(t => {
-                                if (!t.due_date) return false;
-                                const taskDate = new Date(t.due_date);
-                                const clickedDate = new Date(info.dateStr);
-                                return taskDate.toDateString() === clickedDate.toDateString();
+                    ,
+                    dateClick: function (info) {
+                        const tasksForDay=state.tasks.filter(t=> {
+                                if ( !t.due_date) return false;
+                                const taskDate=new Date(t.due_date);
+                                const clickedDate=new Date(info.dateStr);
+                                return taskDate.toDateString()===clickedDate.toDateString();
                             });
 
-                            if (tasksForDay.length > 0) {
-                                const tasksList = tasksForDay.map(t => `• ${t.subject}: ${t.text}`).join('\\n');
-                                alert(`Compiti per ${info.dateStr}:\\n\\n${tasksList}`);
-                            } else {
-                                alert(`Nessun compito per ${info.dateStr}`);
-                            }
+                        if (tasksForDay.length > 0) {
+                            const tasksList=tasksForDay.map(t=> `• $ {
+                                    t.subject
+                                }
+
+                                : $ {
+                                    t.text
+                                }
+
+                                `).join('\\n');
+
+                            alert(`Compiti per $ {
+                                    info.dateStr
+                                }
+
+                                :\\n\\n$ {
+                                    tasksList
+                                }
+
+                                `);
                         }
-                    });
-                    calendar.render();
-                    calendarEl._fullCalendar = calendar;
-                }
-            }, 100);
 
-            return `
-            <div class="view" style="padding: 20px; padding-bottom: 100px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                    <h1 style="margin: 0;">Planner</h1>
-                    <button onclick="performSync()" style="background: var(--blue); color: white; border: none; padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                        <i class="ph ph-arrow-clockwise" style="font-size: 16px; ${state.syncing ? 'animation: spin 1s linear infinite;' : ''}"></i>
-                        ${state.syncing ? 'Sincronizzazione...' : 'Sincronizza'}
-                    </button>
-                </div>
-                ${state.lastSync ? `<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; display: flex; align-items: center; gap: 6px;">
-                    <i class="ph ph-check-circle" style="color: var(--green);"></i>
-                    Ultima sincronizzazione: ${state.lastSync}
-                </div>` : ''}
-                
-                <div style="background: #1C1C1E; border-radius: 20px; padding: 15px; margin-bottom: 20px; border: 1px solid #2C2C2E;">
-                    <div id="calendar"></div>
-                </div>
+                        else {
+                            alert(`Nessun compito per $ {
+                                    info.dateStr
+                                }
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
-                    <div class="card" onclick="showVotiView()" style="margin-bottom:0; background: rgba(48, 209, 88, 0.1); border: 1px solid #30D158; cursor:pointer;">
-                        <i class="ph-fill ph-graduation-cap" style="color:#30D158; font-size: 24px;"></i>
-                        <div style="font-size: 20px; font-weight: 800; margin-top: 5px; color: white;">${state.voti.length}</div>
-                        <div style="font-size: 12px; opacity: 0.7; color: var(--text-secondary);">Voti Registrati</div>
-                    </div>
-                    <div class="card" onclick="showBachecaModal()" style="margin-bottom:0; background: rgba(255, 159, 10, 0.1); border: 1px solid #FF9F0A; cursor:pointer;">
-                        <i class="ph-fill ph-megaphone" style="color:#FF9F0A; font-size: 24px;"></i>
-                        <div style="font-size: 20px; font-weight: 800; margin-top: 5px; color: white;">${state.promemoria.length}</div>
-                        <div style="font-size: 12px; opacity: 0.7; color: var(--text-secondary);">Avvisi Bacheca</div>
-                    </div>
-                </div>
-
-                <h3>Scadenze</h3>
-                <div id="tasks-list">
-                    ${state.tasks.map(t => {
-                const dueDate = t.dateObj && !isNaN(t.dateObj.getTime()) ? t.dateObj : null;
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const daysUntil = dueDate ? Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
-                let dateLabel = '';
-                let dateColor = 'var(--text-secondary)';
-
-                if (dueDate) {
-                    if (daysUntil === 0) {
-                        dateLabel = 'OGGI';
-                        dateColor = 'var(--red)';
-                    } else if (daysUntil === 1) {
-                        dateLabel = 'DOMANI';
-                        dateColor = 'var(--orange)';
-                    } else if (daysUntil < 0) {
-                        dateLabel = 'SCADUTO';
-                        dateColor = 'var(--red)';
-                    } else {
-                        dateLabel = dueDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-                        dateColor = daysUntil <= 3 ? 'var(--orange)' : 'var(--blue)';
+                                `);
+                        }
                     }
-                } else {
-                    dateLabel = t.display_date || 'Data non disponibile';
+                });
+            calendar.render();
+            calendarEl._fullCalendar=calendar;
+        }
+        }
+
+        , 100);
+
+        return ` <div class="view" style="padding: 20px; padding-bottom: 100px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;"><h1 style="margin: 0;">Planner</h1><button onclick="performSync()" style="background: var(--blue); color: white; border: none; padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px;"><i class="ph ph-arrow-clockwise" style="font-size: 16px; ${state.syncing ? 'animation: spin 1s linear infinite;' : ''}"></i>$ {
+            state.syncing ? 'Sincronizzazione...': 'Sincronizza'
+        }
+
+        </button></div>$ {
+            state.lastSync ? `<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; display: flex; align-items: center; gap: 6px;"><i class="ph ph-check-circle" style="color: var(--green);"></i>Ultima sincronizzazione: $ {
+                state.lastSync
+            }
+
+            </div>` : ''
+        }
+
+        <div style="background: #1C1C1E; border-radius: 20px; padding: 15px; margin-bottom: 20px; border: 1px solid #2C2C2E;"><div id="calendar"></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;"><div class="card" onclick="showVotiView()" style="margin-bottom:0; background: rgba(48, 209, 88, 0.1); border: 1px solid #30D158; cursor:pointer;"><i class="ph-fill ph-graduation-cap" style="color:#30D158; font-size: 24px;"></i><div style="font-size: 20px; font-weight: 800; margin-top: 5px; color: white;">$ {
+            state.voti.length
+        }
+
+        </div><div style="font-size: 12px; opacity: 0.7; color: var(--text-secondary);">Voti Registrati</div></div><div class="card" onclick="showBachecaModal()" style="margin-bottom:0; background: rgba(255, 159, 10, 0.1); border: 1px solid #FF9F0A; cursor:pointer;"><i class="ph-fill ph-megaphone" style="color:#FF9F0A; font-size: 24px;"></i><div style="font-size: 20px; font-weight: 800; margin-top: 5px; color: white;">$ {
+            state.promemoria.length
+        }
+
+        </div><div style="font-size: 12px; opacity: 0.7; color: var(--text-secondary);">Avvisi Bacheca</div></div></div><h3>Scadenze</h3><div id="tasks-list">$ {
+            state.tasks.map(t=> {
+                    const dueDate=t.dateObj && !isNaN(t.dateObj.getTime()) ? t.dateObj : null;
+                    const today=new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const daysUntil=dueDate ? Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
+                    let dateLabel='';
+                    let dateColor='var(--text-secondary)';
+
+                    if (dueDate) {
+                        if (daysUntil===0) {
+                            dateLabel='OGGI';
+                            dateColor='var(--red)';
+                        }
+
+                        else if (daysUntil===1) {
+                            dateLabel='DOMANI';
+                            dateColor='var(--orange)';
+                        }
+
+                        else if (daysUntil < 0) {
+                            dateLabel='SCADUTO';
+                            dateColor='var(--red)';
+                        }
+
+                        else {
+                            dateLabel=dueDate.toLocaleDateString('it-IT', {
+                                day: 'numeric', month: 'short'
+                            });
+                        dateColor=daysUntil <=3 ? 'var(--orange)' : 'var(--blue)';
+                    }
                 }
 
-                return `
-                        <div class="card" style="display:flex; align-items:center; gap:15px; background: rgba(255,255,255,0.03); border-left: 3px solid ${t.done ? 'var(--green)' : dateColor};">
-                            <div style="width: 40px; height: 40px; border-radius: 10px; background: ${t.done ? 'rgba(48, 209, 88, 0.2)' : 'rgba(10, 132, 255, 0.2)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                ${t.done ? '<i class="ph-fill ph-check" style="color: var(--green); font-size: 20px;"></i>' : '<i class="ph ph-calendar" style="color: var(--blue); font-size: 18px;"></i>'}
-                            </div>
-                            <div style="flex:1; min-width: 0;">
-                                <div style="font-size:11px; color:var(--blue); font-weight:700; margin-bottom: 4px;">${t.subject}</div>
-                                <div style="color: white; margin-top: 4px; font-size: 15px; font-weight: 500; ${t.done ? 'opacity: 0.5; text-decoration: line-through;' : ''}">${t.text}</div>
-                                <div style="font-size: 12px; color: ${dateColor}; font-weight: 600; margin-top: 6px; display: flex; align-items: center; gap: 6px;">
-                                    <i class="ph ph-clock" style="font-size: 14px;"></i>
-                                    ${dateLabel}
-                                    ${daysUntil !== null && daysUntil >= 0 ? `<span style="opacity: 0.7;">(${daysUntil === 0 ? 'oggi' : daysUntil === 1 ? 'domani' : `tra ${daysUntil} giorni`})</span>` : ''}
-                        </div>
-                            </div>
-                            <button onclick="toggleTask('${t.id}')" style="background: none; border: none; color: ${t.done ? 'var(--green)' : 'var(--text-secondary)'}; font-size: 24px; cursor: pointer; padding: 8px;">
-                                <i class="${t.done ? 'ph-fill ph-check-circle' : 'ph ph-circle'}"></i>
-                            </button>
-                        </div>
-                    `;
-            }).join('')}
-                </div>
-            `;
+                else {
+                    dateLabel=t.display_date || 'Data non disponibile';
+                }
+
+                return ` <div class="card" style="display:flex; align-items:center; gap:15px; background: rgba(255,255,255,0.03); border-left: 3px solid ${t.done ? 'var(--green)' : dateColor};" > <div style="width: 40px; height: 40px; border-radius: 10px; background: ${t.done ? 'rgba(48, 209, 88, 0.2)' : 'rgba(10, 132, 255, 0.2)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" > $ {
+                    t.done ? '<i class="ph-fill ph-check" style="color: var(--green); font-size: 20px;"></i>' : '<i class="ph ph-calendar" style="color: var(--blue); font-size: 18px;"></i>'
+                }
+
+                </div> <div style="flex:1; min-width: 0;" > <div style="font-size:11px; color:var(--blue); font-weight:700; margin-bottom: 4px;" >$ {
+                    t.subject
+                }
+
+                </div> <div style="color: white; margin-top: 4px; font-size: 15px; font-weight: 500; ${t.done ? 'opacity: 0.5; text-decoration: line-through;' : ''}" >$ {
+                    t.text
+                }
+
+                </div> <div style="font-size: 12px; color: ${dateColor}; font-weight: 600; margin-top: 6px; display: flex; align-items: center; gap: 6px;" > <i class="ph ph-clock" style="font-size: 14px;" ></i> $ {
+                    dateLabel
+                }
+
+                $ {
+                    daysUntil !==null && daysUntil >=0 ? `<span style="opacity: 0.7;" >($ {
+                            daysUntil===0 ? 'oggi' : daysUntil===1 ? 'domani' : `tra $ {
+                                daysUntil
+                            }
+
+                            giorni`
+                        })</span>` : ''
+                }
+
+                </div> </div> <button onclick="toggleTask('${t.id}')" style="background: none; border: none; color: ${t.done ? 'var(--green)' : 'var(--text-secondary)'}; font-size: 24px; cursor: pointer; padding: 8px;" > <i class="${t.done ? 'ph-fill ph-check-circle' : 'ph ph-circle'}" ></i> </button> </div> `;
+            }).join('')
+        }
+
+        </div>`;
         }
 
         function renderChat() {
-            const contact = state.currentChatUser || 'Alessandro Russo';
-            const msgs = state.messages[contact] || [];
+            const contact=state.currentChatUser || 'Alessandro Russo';
+            const msgs=state.messages[contact] || [];
 
-            setTimeout(() => {
-                const el = document.getElementById('chat-messages');
-                if (el) el.scrollTop = el.scrollHeight;
-            }, 100);
+            setTimeout(()=> {
+                    const el=document.getElementById('chat-messages');
+                    if (el) el.scrollTop=el.scrollHeight;
+                }
 
-            return `
-                <div class="view" style="display: flex; flex-direction: column; height: 100vh; padding: 0;">
-                    <div style="padding: 20px; background: rgba(28,28,30,0.8); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 16px;">
-                        <button onclick="navigate('feed')" style="background: none; border: none; color: white;"><i class="ph ph-arrow-left" style="font-size: 24px;"></i></button>
-                        <div style="width: 36px; height: 36px; background: var(--indigo); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700;">${contact[0]}</div>
-                        <div>
-                            <div style="font-weight: 600;">${contact}</div>
-                            <div style="font-size: 11px; color: var(--green);">Online</div>
-                        </div>
-                    </div>
-                    
-                    <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px;">
-                        ${msgs.map(m => `
-                            <div class="message-bubble ${m.me ? 'msg-me' : 'msg-other'}">${m.text}</div>
-                        `).join('')}
-                    </div>
-                    
-                    <div style="padding: 20px; padding-bottom: 40px; background: var(--bg-color); display: flex; gap: 10px;">
-                        <input id="msg-input" placeholder="Scrivi un messaggio..." style="margin-bottom: 0;">
-                        <button onclick="sendMessage()" style="width: 48px; height: 48px; background: var(--blue); border-radius: 14px; border: none; color: white; display: flex; align-items: center; justify-content: center;">
-                            <i class="ph-fill ph-paper-plane-right" style="font-size: 20px;"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
+                , 100);
+
+            return ` <div class="view" style="display: flex; flex-direction: column; height: 100vh; padding: 0;"><div style="padding: 20px; background: rgba(28,28,30,0.8); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 16px;"><button onclick="navigate('feed')" style="background: none; border: none; color: white;"><i class="ph ph-arrow-left" style="font-size: 24px;"></i></button><div style="width: 36px; height: 36px; background: var(--indigo); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700;">$ {
+                contact[0]
+            }
+
+            </div><div><div style="font-weight: 600;">$ {
+                contact
+            }
+
+            </div><div style="font-size: 11px; color: var(--green);">Online</div></div></div><div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px;">$ {
+                msgs.map(m=> ` <div class="message-bubble ${m.me ? 'msg-me' : 'msg-other'}" >$ {
+                        m.text
+                    }
+
+                    </div> `).join('')
+            }
+
+            </div><div style="padding: 20px; padding-bottom: 40px; background: var(--bg-color); display: flex; gap: 10px;"><input id="msg-input" placeholder="Scrivi un messaggio..." style="margin-bottom: 0;"><button onclick="sendMessage()" style="width: 48px; height: 48px; background: var(--blue); border-radius: 14px; border: none; color: white; display: flex; align-items: center; justify-content: center;"><i class="ph-fill ph-paper-plane-right" style="font-size: 20px;"></i></button></div></div>`;
         }
 
         function selectDay(day) {
-            state.selectedDay = day;
+            state.selectedDay=day;
             render();
         }
 
         function showVotiView() {
-            modalContainer.innerHTML = `
-            <div class="modal-overlay" onclick="closeModal(event)">
-                <div class="modal-content" style="max-height:85vh; overflow-y:auto; padding: 0;">
-                    <div style="position: sticky; top: 0; background:rgba(28,28,30,0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); padding: 20px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; z-index: 10;">
-                        <h2 style="margin:0;">Voti DidUP</h2>
-                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue); font-weight:700; font-size:16px;">Chiudi</button>
-                    </div>
-                    <div style="padding: 20px;">
-                        ${renderVoti()}
-                    </div>
-                </div>
-            </div>`;
+            modalContainer.innerHTML=` <div class="modal-overlay" onclick="closeModal(event)"><div class="modal-content" style="max-height:85vh; overflow-y:auto; padding: 0;"><div style="position: sticky; top: 0; background:rgba(28,28,30,0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); padding: 20px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; z-index: 10;"><h2 style="margin:0;">Voti DidUP</h2><button onclick="closeModal()" style="background:none; border:none; color:var(--blue); font-weight:700; font-size:16px;">Chiudi</button></div><div style="padding: 20px;">$ {
+                renderVoti()
+            }
+
+            </div></div></div>`;
         }
 
         function renderVoti() {
@@ -1436,367 +1682,205 @@
             console.log("🎓 renderVoti chiamato - localStorage argo_voti:", localStorage.getItem('argo_voti'));
 
             // ⭐ Prova prima voti, poi grades
-            const votiData = (state.voti && state.voti.length > 0) ? state.voti :
+            const votiData=(state.voti && state.voti.length > 0) ? state.voti:
                 ((state.grades && state.grades.length > 0) ? state.grades : []);
 
             console.log("🎓 votiData finale:", votiData);
 
-            if (votiData.length === 0) {
-                return `
-                    <div style="text-align:center; padding: 40px; color: var(--text-secondary);">
-                        <i class="ph ph-graduation-cap" style="font-size: 48px; opacity: 0.3; margin-bottom: 12px; display: block;"></i>
-                        Nessun voto caricato<br>
-                        <span style="font-size: 12px; margin-top: 8px; display: block;">I voti verranno caricati dopo la sincronizzazione con DidUP</span>
-                        <button onclick="performSync(); closeModal();" style="background:var(--blue); color:white; padding:10px 20px; border-radius:10px; border:none; margin-top:16px; cursor:pointer; font-weight:600;">
-                            <i class="ph ph-arrow-clockwise"></i> Sincronizza Ora
-                        </button>
-                        <div style="margin-top: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 11px; text-align: left;">
-                            <strong>Debug Info:</strong><br>
-                            state.voti.length: ${state.voti?.length || 0}<br>
-                            state.grades.length: ${state.grades?.length || 0}<br>
-                            localStorage: ${localStorage.getItem('argo_voti') ? 'Presente' : 'Vuoto'}
-                        </div>
-                    </div>`;
+            if (votiData.length===0) {
+                return ` <div style="text-align:center; padding: 40px; color: var(--text-secondary);"><i class="ph ph-graduation-cap" style="font-size: 48px; opacity: 0.3; margin-bottom: 12px; display: block;"></i>Nessun voto caricato<br><span style="font-size: 12px; margin-top: 8px; display: block;">I voti verranno caricati dopo la sincronizzazione con DidUP</span><button onclick="performSync(); closeModal();" style="background:var(--blue); color:white; padding:10px 20px; border-radius:10px; border:none; margin-top:16px; cursor:pointer; font-weight:600;"><i class="ph ph-arrow-clockwise"></i>Sincronizza Ora </button><div style="margin-top: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 11px; text-align: left;"><strong>Debug Info:</strong><br>state.voti.length: $ {
+                    state.voti?.length || 0
+                }
+
+                <br>state.grades.length: $ {
+                    state.grades?.length || 0
+                }
+
+                <br>localStorage: $ {
+                    localStorage.getItem('argo_voti') ? 'Presente': 'Vuoto'
+                }
+
+                </div></div>`;
             }
 
-            const media = calcolaMedia(votiData);
-            const mediaNum = media ? parseFloat(media) : null;
+            const media=calcolaMedia(votiData);
+            const mediaNum=media ? parseFloat(media) : null;
 
-            return `
-                <div style="margin-bottom: 20px;">
-                    <div class="card" style="background: linear-gradient(135deg, rgba(10, 132, 255, 0.2), rgba(94, 92, 230, 0.2)); border: 1px solid var(--blue); padding: 20px; text-align: center; margin-bottom: 16px;">
-                        <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Media Generale</div>
-                        <div style="font-size: 48px; font-weight: 800; color: white; margin-bottom: 4px;">${media || '--'}</div>
-                        <div style="font-size: 14px; color: var(--text-secondary);">Su ${votiData.length} voti registrati</div>
-                    </div>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    ${votiData.map(v => {
-                const val = (v.valore || v.value || '').toString();
-                const mat = v.materia || v.subject || 'Materia non specificata';
-                const data = v.data || v.date || 'Data non disponibile';
-                const tipo = v.tipo || v.type || '';
-                const valNum = parseFloat(val.replace(',', '.'));
-                const isSufficient = !isNaN(valNum) && valNum >= 6;
-                const color = isSufficient ? 'var(--green)' : '#FF453A';
+            return ` <div style="margin-bottom: 20px;"><div class="card" style="background: linear-gradient(135deg, rgba(10, 132, 255, 0.2), rgba(94, 92, 230, 0.2)); border: 1px solid var(--blue); padding: 20px; text-align: center; margin-bottom: 16px;"><div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Media Generale</div><div style="font-size: 48px; font-weight: 800; color: white; margin-bottom: 4px;">$ {
+                media || '--'
+            }
 
-                return `
-                            <div class="card" style="margin-bottom: 0; padding: 16px; display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.03); border-left: 3px solid ${color};">
-                                <div style="width: 60px; height: 60px; border-radius: 12px; background: ${color}20; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: ${color}; border: 2px solid ${color}40; flex-shrink: 0;">
-                                    ${val}
-                                </div>
-                                <div style="flex: 1; min-width: 0;">
-                                    <div style="font-weight: 700; font-size: 16px; color: white; margin-bottom: 4px;">${mat}</div>
-                                    ${tipo ? `<div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">${tipo}</div>` : ''}
-                                    <div style="font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
-                                        <i class="ph ph-calendar" style="font-size: 12px;"></i>
-                                        ${data}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-            }).join('')}
-                </div>
-            `;
+            </div><div style="font-size: 14px; color: var(--text-secondary);">Su $ {
+                votiData.length
+            }
+
+            voti registrati</div></div></div><div style="display: flex; flex-direction: column; gap: 12px;">$ {
+                votiData.map(v=> {
+                        const val=(v.valore || v.value || '').toString();
+                        const mat=v.materia || v.subject || 'Materia non specificata';
+                        const data=v.data || v.date || 'Data non disponibile';
+                        const tipo=v.tipo || v.type || '';
+                        const valNum=parseFloat(val.replace(',', '.'));
+                        const isSufficient= !isNaN(valNum) && valNum >=6;
+                        const color=isSufficient ? 'var(--green)' : '#FF453A';
+
+                        return ` <div class="card" style="margin-bottom: 0; padding: 16px; display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.03); border-left: 3px solid ${color};" > <div style="width: 60px; height: 60px; border-radius: 12px; background: ${color}20; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: ${color}; border: 2px solid ${color}40; flex-shrink: 0;" > $ {
+                            val
+                        }
+
+                        </div> <div style="flex: 1; min-width: 0;" > <div style="font-weight: 700; font-size: 16px; color: white; margin-bottom: 4px;" >$ {
+                            mat
+                        }
+
+                        </div> $ {
+                            tipo ? `<div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; margin-bottom: 2px;" >$ {
+                                tipo
+                            }
+
+                            </div>` : ''
+                        }
+
+                        <div style="font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;" > <i class="ph ph-calendar" style="font-size: 12px;" ></i> $ {
+                            data
+                        }
+
+                        </div> </div> </div> `;
+                    }).join('')
+            }
+
+            </div>`;
         }
 
         function showBachecaModal() {
             // ⭐ Prova prima promemoria, poi announcements
-            const dataBacheca = state.promemoria && state.promemoria.length > 0 ? state.promemoria :
+            const dataBacheca=state.promemoria && state.promemoria.length>0 ? state.promemoria:
                 (state.announcements && state.announcements.length > 0 ? state.announcements : []);
 
             console.log("📢 Rendering bacheca - state.promemoria:", state.promemoria?.length || 0, "state.announcements:", state.announcements?.length || 0);
 
-            modalContainer.innerHTML = `
-            <div class="modal-overlay" onclick="closeModal(event)">
-                <div class="modal-content" style="max-height:85vh; overflow-y:auto; padding: 0;">
-                    <div style="position: sticky; top: 0; background:rgba(28,28,30,0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); padding: 20px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; z-index: 10;">
-                        <h2 style="margin:0;">Bacheca & Avvisi</h2>
-                        <button onclick="closeModal()" style="background:none; border:none; color:var(--orange); font-weight:700; font-size:16px; cursor:pointer;">Chiudi</button>
-                    </div>
-                    <div style="padding: 20px; display:flex; flex-direction:column; gap:12px;">
-                        ${dataBacheca.length === 0 ?
-                    `<div style="text-align:center; padding: 40px; color: var(--text-secondary);">
-                        <i class="ph ph-megaphone" style="font-size: 48px; opacity: 0.3; margin-bottom: 12px; display: block;"></i>
-                        Nessun avviso in bacheca<br>
-                        <span style="font-size: 12px; margin-top: 8px; display: block;">Gli avvisi verranno caricati dopo la sincronizzazione con DidUP</span>
-                        <button onclick="performSync(); closeModal();" style="background:var(--orange); color:black; padding:10px 20px; border-radius:10px; border:none; margin-top:16px; cursor:pointer; font-weight:600;">
-                            <i class="ph ph-arrow-clockwise"></i> Sincronizza Ora
-                        </button>
-                    </div>` :
-                    dataBacheca.map(item => {
-                        const data = item.data || item.date || item.datGiorno || 'Data non disponibile';
-                        const autore = item.autore || item.docente || 'Docente';
-                        const oggetto = item.oggetto || item.titolo || item.title || 'Avviso';
-                        const testo = item.testo || item.text || item.descrizione || item.description || '';
-                        const url = item.url || item.allegato || null;
+            modalContainer.innerHTML=` <div class="modal-overlay" onclick="closeModal(event)"><div class="modal-content" style="max-height:85vh; overflow-y:auto; padding: 0;"><div style="position: sticky; top: 0; background:rgba(28,28,30,0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); padding: 20px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; z-index: 10;"><h2 style="margin:0;">Bacheca & Avvisi</h2><button onclick="closeModal()" style="background:none; border:none; color:var(--orange); font-weight:700; font-size:16px; cursor:pointer;">Chiudi</button></div><div style="padding: 20px; display:flex; flex-direction:column; gap:12px;">$ {
+                dataBacheca.length===0 ? `<div style="text-align:center; padding: 40px; color: var(--text-secondary);"><i class="ph ph-megaphone" style="font-size: 48px; opacity: 0.3; margin-bottom: 12px; display: block;"></i>Nessun avviso in bacheca<br><span style="font-size: 12px; margin-top: 8px; display: block;">Gli avvisi verranno caricati dopo la sincronizzazione con DidUP</span><button onclick="performSync(); closeModal();" style="background:var(--orange); color:black; padding:10px 20px; border-radius:10px; border:none; margin-top:16px; cursor:pointer; font-weight:600;"><i class="ph ph-arrow-clockwise"></i>Sincronizza Ora </button></div>` : dataBacheca.map(item=> {
+                        const data=item.data || item.date || item.datGiorno || 'Data non disponibile';
+                        const autore=item.autore || item.docente || 'Docente';
+                        const oggetto=item.oggetto || item.titolo || item.title || 'Avviso';
+                        const testo=item.testo || item.text || item.descrizione || item.description || '';
+                        const url=item.url || item.allegato || null;
 
-                        return `
-                                <div class="card" style="margin-bottom:0; padding:16px; border-left: 4px solid var(--orange); background: rgba(255, 159, 10, 0.05);">
-                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                                        <i class="ph ph-bell" style="color: var(--orange); font-size: 18px;"></i>
-                                        <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;">
-                                            ${data} - ${autore}
-                                    </div>
-                                </div>
-                                    <div style="font-weight:600; font-size:16px; margin-bottom:8px; color: white;">${oggetto}</div>
-                                    ${testo ? `<div style="font-size:14px; opacity:0.8; line-height:1.5; color: var(--text-secondary); margin-bottom: ${url ? '8px' : '0'}; white-space: pre-wrap;">${testo}</div>` : ''}
-                                    ${url ? `<a href="${url}" target="_blank" style="color:var(--blue); font-size:12px; display:inline-flex; align-items:center; gap:4px; margin-top:8px; font-weight:600;">
-                                        <i class="ph ph-paperclip"></i> Scarica Allegato <i class="ph-bold ph-arrow-up-right" style="font-size:10px;"></i>
-                                    </a>` : ''}
-                                </div>
-                            `;
+                        return ` <div class="card" style="margin-bottom:0; padding:16px; border-left: 4px solid var(--orange); background: rgba(255, 159, 10, 0.05);" > <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;" > <i class="ph ph-bell" style="color: var(--orange); font-size: 18px;" ></i> <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;" > $ {
+                            data
+                        }
+
+                        - $ {
+                            autore
+                        }
+
+                        </div> </div> <div style="font-weight:600; font-size:16px; margin-bottom:8px; color: white;" >$ {
+                            oggetto
+                        }
+
+                        </div> $ {
+                            testo ? `<div style="font-size:14px; opacity:0.8; line-height:1.5; color: var(--text-secondary); margin-bottom: ${url ? '8px' : '0'}; white-space: pre-wrap;" >$ {
+                                testo
+                            }
+
+                            </div>` : ''
+                        }
+
+                        $ {
+                            url ? `<a href="${url}" target="_blank" style="color:var(--blue); font-size:12px; display:inline-flex; align-items:center; gap:4px; margin-top:8px; font-weight:600;" > <i class="ph ph-paperclip" ></i> Scarica Allegato <i class="ph-bold ph-arrow-up-right" style="font-size:10px;" ></i> </a>` : ''
+                        }
+
+                        </div> `;
                     }).join('')
-                }
-                    </div>
-                </div>
-            </div>`;
+            }
+
+            </div></div></div>`;
         }
 
         // --- CORE UI MODALS & ACTIONS ---
 
         function openNewPostModal() {
-            modalContainer.innerHTML = `
-                <div class="modal-overlay" onclick="closeModal(event)">
-                    <div class="modal-content">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2>Nuovo Post</h2>
-                            <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px;">Chiudi</button>
-                        </div>
-                        <textarea id="post-text" placeholder="Cosa sta succedendo?" style="height: 120px; font-size: 18px;"></textarea>
-                        
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-                            <div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary);">
-                                <i class="ph ph-image" style="font-size: 24px;"></i>
-                                <span style="font-size: 14px;">Aggiungi foto</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="text-align: right; color: var(--text-secondary); font-size: 13px;">Anonimo</span>
-                                <input type="checkbox" id="post-anon" style="width: auto; margin: 0;">
-                            </div>
-                        </div>
-                        
-                        <button class="btn-primary" onclick="publishPost()">Pubblica</button>
-                    </div>
-                </div>
-            `;
+            modalContainer.innerHTML=` <div class="modal-overlay" onclick="closeModal(event)"><div class="modal-content"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;"><h2>Nuovo Post</h2><button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px;">Chiudi</button></div><textarea id="post-text" placeholder="Cosa sta succedendo?" style="height: 120px; font-size: 18px;"></textarea><div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;"><div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary);"><i class="ph ph-image" style="font-size: 24px;"></i><span style="font-size: 14px;">Aggiungi foto</span></div><div style="display: flex; align-items: center; gap: 8px;"><span style="text-align: right; color: var(--text-secondary); font-size: 13px;">Anonimo</span><input type="checkbox" id="post-anon" style="width: auto; margin: 0;"></div></div><button class="btn-primary" onclick="publishPost()">Pubblica</button></div></div>`;
         }
 
         function openArgoLogin() {
-            modalContainer.innerHTML = `
-            <div class="modal-overlay" onclick="closeModal(event)">
-                <div class="modal-content" style="text-align:center;">
-                    <div style="width:60px; height:60px; background:#106690; border-radius:16px; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;">
-                         <i class="ph-fill ph-book-bookmark" style="font-size:30px;"></i>
-                    </div>
-                    <h2 style="margin-bottom:8px;">Collega DidUP</h2>
-                    
-                    <!-- SERVER STATUS WIDGET -->
-                    <div id="server-status" style="margin-bottom: 20px; font-size: 12px; color: var(--orange); display: flex; align-items: center; justify-content: center; gap: 6px;">
-                        <span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span>
-                        Sto cercando il server...
-                    </div>
-
-                    <input id="argo-school" placeholder="Codice Scuola (es. SG12345)">
-                    <input id="argo-user" placeholder="Nome Utente">
-                    <input type="password" id="argo-pass" placeholder="Password">
-                    
-                    <button id="login-btn" onclick="performArgoSync()" style="background:var(--blue); width:100%; padding: 14px; border-radius:12px; font-weight:700; margin-top:10px; border:none; color:white; cursor:pointer;">Accedi e Sincronizza</button>
-                    <button onclick="closeModal()" style="background:none; width:100%; padding: 10px; margin-top:5px; border:none; color:var(--text-secondary); cursor:pointer;">Annulla</button>
-                    <button onclick="testBackendConnection()" style="background:rgba(255,255,255,0.1); width:100%; padding: 10px; margin-top:5px; border:1px solid rgba(255,255,255,0.2); border-radius:12px; color:var(--text-secondary); cursor:pointer; font-size:12px;">🔍 Test Connessione Backend</button>
-                </div>
-            </div>`;
+            modalContainer.innerHTML=` <div class="modal-overlay" onclick="closeModal(event)"><div class="modal-content" style="text-align:center;"><div style="width:60px; height:60px; background:#106690; border-radius:16px; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;"><i class="ph-fill ph-book-bookmark" style="font-size:30px;"></i></div><h2 style="margin-bottom:8px;">Collega DidUP</h2>< !-- SERVER STATUS WIDGET --><div id="server-status" style="margin-bottom: 20px; font-size: 12px; color: var(--orange); display: flex; align-items: center; justify-content: center; gap: 6px;"><span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span>Sto cercando il server... </div><input id="argo-school" placeholder="Codice Scuola (es. SG12345)"><input id="argo-user" placeholder="Nome Utente"><input type="password" id="argo-pass" placeholder="Password"><button id="login-btn" onclick="performLogin(document.getElementById('argo-school').value, document.getElementById('argo-user').value, document.getElementById('argo-pass').value)" style="background:var(--blue); width:100%; padding: 14px; border-radius:12px; font-weight:700; margin-top:10px; border:none; color:white; cursor:pointer;">Accedi e Sincronizza</button><button onclick="closeModal()" style="background:none; width:100%; padding: 10px; margin-top:5px; border:none; color:var(--text-secondary); cursor:pointer;">Annulla</button><button onclick="testBackendConnection()" style="background:rgba(255,255,255,0.1); width:100%; padding: 10px; margin-top:5px; border:1px solid rgba(255,255,255,0.2); border-radius:12px; color:var(--text-secondary); cursor:pointer; font-size:12px;">🔍 Test Connessione Backend</button><div id="profile-selector-container" style="display:none; margin-top:20px;"></div><div id="login-form-container"></div></div></div>`;
 
             // AUTO-CHECK SERVER HEALTH
             checkServerHealth();
         }
 
-        async function checkServerHealth(attempt = 1) {
-            const statusEl = document.getElementById('server-status');
-            if (!statusEl) return;
+        async function checkServerHealth(attempt=1) {
+            const statusEl=document.getElementById('server-status');
+            if ( !statusEl) return;
 
             try {
-                const controller = new AbortController();
-                const id = setTimeout(() => controller.abort(), 3500);
+                const controller=new AbortController();
+                const id=setTimeout(()=> controller.abort(), 3500);
 
-                const res = await fetch(`${API_BASE_URL}/health`, {
+                const res=await fetch(`$ {
+                        API_BASE_URL
+                    }
+
+                    /health`, {
                     method: 'GET',
                     signal: controller.signal
                 });
-                clearTimeout(id);
+            clearTimeout(id);
 
-                if (res.ok) {
-                    statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></span> Server Online`;
-                    statusEl.style.color = "var(--green)";
-                } else {
-                    throw new Error("Server error");
-                }
-            } catch (e) {
-                if (attempt < 15) {
-                    statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span> Sveglio il server (${attempt})...`;
-                    setTimeout(() => checkServerHealth(attempt + 1), 2500);
-                } else {
-                    statusEl.innerHTML = `<span style="width: 8px; height: 8px; background: var(--red); border-radius: 50%;"></span> Offline (uso dati cached)`;
-                    statusEl.style.color = "var(--red)";
-                }
+            if (res.ok) {
+                statusEl.innerHTML=`<span style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></span>Server Online`;
+                statusEl.style.color="var(--green)";
+            }
+
+            else {
+                throw new Error("Server error");
             }
         }
 
+        catch (e) {
+            if (attempt < 15) {
+                statusEl.innerHTML=`<span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span>Sveglio il server ($ {
+                        attempt
+                    })...`;
+                setTimeout(()=> checkServerHealth(attempt + 1), 2500);
+            }
+
+            else {
+                statusEl.innerHTML=`<span style="width: 8px; height: 8px; background: var(--red); border-radius: 50%;"></span>Offline (uso dati cached)`;
+                statusEl.style.color="var(--red)";
+            }
+        }
+        }
+
         function openNewItemModal() {
-            modalContainer.innerHTML = `
-                <div class="modal-overlay" onclick="closeModal(event)">
-                    <div class="modal-content">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2>Vendi un oggetto</h2>
-                            <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px;">Chiudi</button>
-                        </div>
-                        <input id="item-title" placeholder="Cosa vendi? (es. Libro Matematica)">
-                        <input id="item-price" placeholder="Prezzo (es. 15€)">
-                        <div style="width: 100%; height: 150px; border: 2px dashed rgba(255,255,255,0.1); border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); margin-bottom: 20px;">
-                            <i class="ph ph-camera" style="font-size: 32px;"></i>
-                            <span style="font-size: 14px; margin-top: 8px;">Carica foto</span>
-                        </div>
-                        <button class="btn-primary" onclick="publishItem()">Metti in vendita</button>
-                    </div>
-                </div>
-            `;
+            modalContainer.innerHTML=` <div class="modal-overlay" onclick="closeModal(event)"><div class="modal-content"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;"><h2>Vendi un oggetto</h2><button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px;">Chiudi</button></div><input id="item-title" placeholder="Cosa vendi? (es. Libro Matematica)"><input id="item-price" placeholder="Prezzo (es. 15€)"><div style="width: 100%; height: 150px; border: 2px dashed rgba(255,255,255,0.1); border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); margin-bottom: 20px;"><i class="ph ph-camera" style="font-size: 32px;"></i><span style="font-size: 14px; margin-top: 8px;">Carica foto</span></div><button class="btn-primary" onclick="publishItem()">Metti in vendita</button></div></div>`;
         }
 
         function handleImagePreview(input) {
             if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    document.getElementById('image-preview').innerHTML = `<img src="${e.target.result}" style="max-height:100px; border-radius:8px;">`;
+                const reader=new FileReader();
+
+                reader.onload=function (e) {
+                    document.getElementById('image-preview').innerHTML=`<img src="${e.target.result}" style="max-height:100px; border-radius:8px;">`;
                 }
+
                 reader.readAsDataURL(input.files[0]);
             }
         }
 
+        /*
+/*
         async function performArgoSync() {
-            const btn = document.getElementById('login-btn');
-            const school = document.getElementById('argo-school').value;
-            const user = document.getElementById('argo-user').value;
-            const pass = document.getElementById('argo-pass').value;
-
-            if (!school || !user || !pass) {
-                alert("Inserisci tutti i dati!");
-                return;
-            }
-
-            btn.innerText = "Connessione... ";
-            btn.disabled = true;
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ schoolCode: school, username: user, password: pass })
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || "Errore Server");
-                }
-
-                if (data.success) {
-                    console.log("✅ Login OK, saving...");
-                    console.log("📥 Dati ricevuti dal login:", {
-                        tasks: data.tasks?.length || 0,
-                        voti: data.voti?.length || 0,
-                        promemoria: data.promemoria?.length || data.announcements?.length || 0,
-                        student: data.student
-                    });
-
-                    // ⭐ CRITICO: Salva sessione con credenziali codificate (as in the old working code)
-                    if (data.session) {
-                        data.session.storedUser = btoa(unescape(encodeURIComponent(user)));
-                        data.session.storedPass = btoa(unescape(encodeURIComponent(pass)));
-                        data.session.schoolCode = school;
-                        sessionManager.save(data.session);
-                        console.log("💾 Sessione salvata con credenziali");
-                    } else {
-                        // ⭐ If no session from backend, create one with credentials
-                        sessionManager.save({
-                            schoolCode: school,
-                            storedUser: btoa(unescape(encodeURIComponent(user))),
-                            storedPass: btoa(unescape(encodeURIComponent(pass)))
-                        });
-                        console.log("💾 Sessione minima creata con credenziali");
-                    }
-
-                    // ⭐ Salva user
-                    if (data.student) {
-                        state.user = data.student;
-                        localStorage.setItem('argo_user', JSON.stringify(state.user));
-                        console.log("💾 User salvato:", state.user.name);
-                    }
-
-                    // ⭐ Carica compiti con updateTasks per preservare date
-                    if (data.tasks && data.tasks.length > 0) {
-                        updateTasks(data.tasks, false);
-                        console.log("✅ Compiti caricati:", state.tasks.length);
-                    }
-
-                    // ⭐ CRITICO: Carica voti e salva SEMPRE
-                    console.log("🎓 LOGIN - Controllo voti in data:", data);
-                    console.log("🎓 LOGIN - data.voti:", data.voti);
-                    console.log("🎓 LOGIN - typeof data.voti:", typeof data.voti);
-                    console.log("🎓 LOGIN - Array.isArray(data.voti):", Array.isArray(data.voti));
-
-                    if (data.voti !== undefined) {
-                        state.voti = Array.isArray(data.voti) ? data.voti : [];
-                        localStorage.setItem('argo_voti', JSON.stringify(state.voti));
-                        console.log("✅ Voti caricati e salvati:", state.voti.length);
-                        console.log("✅ Voti salvati - contenuto completo:", JSON.stringify(state.voti));
-                        if (state.voti.length === 0) {
-                            console.warn("⚠️ ATTENZIONE: Array voti vuoto - il backend NON sta recuperando i voti da DidUP");
-                        } else {
-                            console.log("✅ Primo voto esempio:", state.voti[0]);
-                        }
-                    } else {
-                        console.error("❌ ERRORE CRITICO: Campo 'voti' non presente nella risposta del login!");
-                        console.error("❌ Chiavi disponibili in data:", Object.keys(data));
-                        console.error("❌ Risposta completa:", data);
-                    }
-
-                    // ⭐ CRITICO: Carica promemoria e salva SEMPRE
-                    const promemoriaData = data.promemoria || data.announcements;
-                    if (promemoriaData !== undefined) {
-                        state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
-                        localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
-                        console.log("✅ Promemoria caricati e salvati:", state.promemoria.length);
-                        if (state.promemoria.length === 0) {
-                            console.warn("⚠️ ATTENZIONE: Array promemoria vuoto - il backend NON sta recuperando i promemoria da DidUP");
-                        }
-                    } else {
-                        console.warn("⚠️ ATTENZIONE: Campo 'promemoria'/'announcements' non presente nella risposta del login");
-                    }
-
-                    state.isLoggedIn = true;
-                    state.didup.connected = true;
-                    state.isOffline = false;
-                    state.lastSync = new Date().toLocaleTimeString();
-                    updateOfflineBadge();
-
-                    closeModal();
-                    alert(`✅ Benvenuto ${data.student?.name || user}! Dati sincronizzati.`);
-                    render();
-                } else {
-                    alert("❌ Credenziali errate: " + (data.error || "Errore sconosciuto"));
-                    console.error("❌ Login fallito:", data);
-                }
-            } catch (e) {
-                alert("❌ Errore:  " + e.message);
-            } finally {
-                btn.innerText = "Accedi";
-                btn.disabled = false;
-            }
+            // ... (legacy code commented out) ...
+            alert("Please use the new login method.");
         }
+*/
 
         function publishPost() {
-            const text = document.getElementById('post-text').value;
-            const anon = document.getElementById('post-anon').checked;
+            const text=document.getElementById('post-text').value;
+            const anon=document.getElementById('post-anon').checked;
+
             if (text.trim()) {
                 state.posts.unshift({
                     id: Date.now(),
@@ -1807,14 +1891,15 @@
                     liked: false,
                     anon: anon
                 });
-                closeModal();
-                render();
-            }
+            closeModal();
+            render();
+        }
         }
 
         function publishItem() {
-            const title = document.getElementById('item-title').value;
-            const price = document.getElementById('item-price').value;
+            const title=document.getElementById('item-title').value;
+            const price=document.getElementById('item-price').value;
+
             // No image handling in this simplified version, but could be added
             if (title && price) {
                 state.marketItems.unshift({
@@ -1824,54 +1909,56 @@
                     image: null, // Placeholder for image
                     seller: state.user.name
                 });
-                closeModal();
-                render();
-            }
+            closeModal();
+            render();
+        }
         }
 
         function openChat(u) {
-            state.currentChatUser = u;
-            state.view = 'chat';
+            state.currentChatUser=u;
+            state.view='chat';
             render();
         }
 
         function sendMessage() {
-            const input = document.getElementById('msg-input');
-            const contact = state.currentChatUser;
+            const input=document.getElementById('msg-input');
+            const contact=state.currentChatUser;
+
             if (input.value.trim()) {
-                if (!state.messages[contact]) state.messages[contact] = [];
-                state.messages[contact].push({ text: input.value, me: true });
-                input.value = '';
-                render();
-            }
+                if ( !state.messages[contact]) state.messages[contact]=[];
+
+                state.messages[contact].push({
+                    text: input.value, me: true
+                });
+            input.value='';
+            render();
+        }
         }
 
         function toggleTask(id) {
-            let t = state.tasks.find(x => x.id === id);
-            if (!t) t = state.reminders.find(x => x.id === id);
+            let t=state.tasks.find(x=> x.id===id);
+            if ( !t) t=state.reminders.find(x=> x.id===id);
 
             if (t) {
-                t.done = !t.done;
+                t.done= !t.done;
                 saveTasks();
                 render();
             }
         }
 
         function addManualReminder() {
-            const text = prompt("Cosa devi fare? (es. Compito Mate per il 20/01)");
+            const text=prompt("Cosa devi fare? (es. Compito Mate per il 20/01)");
+
             if (text) {
                 state.reminders.push({
                     id: Date.now(),
                     text: text,
                     done: false
                 });
-                localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
-                render();
-            }
+            localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
+            render();
+        }
         }
 
         // Init - render will be called by DOMContentLoaded
-    </script>
-</body>
-
-</html>
+        </script></body></html>

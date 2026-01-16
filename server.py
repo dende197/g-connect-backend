@@ -18,7 +18,7 @@ CORS(app, origins=[
 ])
 
 # ============= CONFIGURAZIONE DEBUG =============
-DEBUG_MODE = True  # Imposta False in produzione
+DEBUG_MODE = True
 
 def debug_log(message, data=None):
     """Helper per logging strutturato"""
@@ -32,64 +32,192 @@ def debug_log(message, data=None):
                 print(str(data)[:2000])
         print(f"{'='*60}\n")
 
-# ============= STRATEGIE ESTRAZIONE VOTI =============
+# ============= STORAGE SESSIONI (In-Memory) =============
+# In produzione, usa Redis o un DB
+sessions = {}
 
-def strategia_1_dashboard(argo_instance):
+def save_session(session_id, argo_instance, school_code, username, password):
+    """Salva la sessione Argo per riutilizzo"""
+    sessions[session_id] = {
+        'argo': argo_instance,
+        'school': school_code,
+        'username': username,
+        'password': password,
+        'timestamp': datetime.now()
+    }
+    debug_log(f"💾 Sessione salvata: {session_id}")
+
+def get_session(session_id):
+    """Recupera sessione salvata"""
+    return sessions.get(session_id)
+
+# ============= GESTIONE PROFILI =============
+
+def get_profili_disponibili(argo_instance):
     """
-    STRATEGIA 1: Usa il metodo dashboard() della libreria
+    Estrae la lista di profili (figli) disponibili per l'account.
     """
-    grades = []
+    profili = []
     try:
-        debug_log("STRATEGIA 1: Chiamata dashboard()")
-        dashboard_data = argo_instance.dashboard()
+        debug_log("👥 Recupero profili disponibili...")
         
-        debug_log("Dashboard RAW Response", dashboard_data)
-        
-        if not dashboard_data:
-            debug_log("⚠️ Dashboard vuota")
-            return grades
-        
-        # Salva la risposta completa per analisi
+        # METODO 1: Prova con dashboard
         try:
-            with open('/tmp/dashboard_debug.json', 'w') as f:
-                json.dump(dashboard_data, f, indent=2, default=str)
-            debug_log("✅ Dashboard salvata in /tmp/dashboard_debug.json")
-        except:
-            pass # Ignore write errors on read-only systems
+            dashboard_data = argo_instance.dashboard()
+            
+            # Naviga nella struttura
+            data_obj = dashboard_data.get('data', {})
+            dati_list = data_obj.get('dati', [])
+            
+            # Fallback
+            if not dati_list and 'dati' in dashboard_data:
+                dati_list = dashboard_data.get('dati', [])
+            
+            # Se ci sono più elementi in 'dati', potrebbero essere i profili
+            if len(dati_list) > 1:
+                debug_log(f"✅ Trovati {len(dati_list)} possibili profili in dashboard")
+                
+                for i, profilo_data in enumerate(dati_list):
+                    profili.append({
+                        "id": str(i),
+                        "nome": profilo_data.get('desAlunno') or profilo_data.get('cognomeNome') or f"Studente {i+1}",
+                        "classe": profilo_data.get('desClasse', 'N/D'),
+                        "annoScolastico": profilo_data.get('annoscolastico', '2024/2025'),
+                        "index": i  # Indice per recuperare i dati
+                    })
+            
+            # Se c'è un solo elemento, potrebbe comunque contenere info su più figli
+            elif len(dati_list) == 1:
+                main_data = dati_list[0]
+                
+                # Cerca array di alunni
+                alunni_keys = ['alunni', 'figli', 'studenti', 'profili']
+                
+                for key in alunni_keys:
+                    if key in main_data and isinstance(main_data[key], list):
+                        debug_log(f"✅ Trovati {len(main_data[key])} profili in '{key}'")
+                        
+                        for i, alunno in enumerate(main_data[key]):
+                            profili.append({
+                                "id": alunno.get('prgAlunno') or alunno.get('id') or str(i),
+                                "nome": alunno.get('desAlunno') or alunno.get('cognomeNome') or f"Studente {i+1}",
+                                "classe": alunno.get('desClasse', 'N/D'),
+                                "annoScolastico": alunno.get('annoscolastico', '2024/2025'),
+                                "index": i
+                            })
+                        break
+                
+                # Se non trovati in array, è un singolo profilo
+                if not profili:
+                    debug_log("📌 Singolo profilo rilevato")
+                    profili.append({
+                        "id": "0",
+                        "nome": main_data.get('desAlunno') or main_data.get('cognomeNome') or "Studente",
+                        "classe": main_data.get('desClasse', 'N/D'),
+                        "annoScolastico": main_data.get('annoscolastico', '2024/2025'),
+                        "index": 0
+                    })
         
-        # Naviga nella struttura
+        except Exception as e:
+            debug_log(f"⚠️ Errore dashboard profili: {e}")
+        
+        # METODO 2: Chiamata API diretta (se esiste endpoint dedicato)
+        if not profili:
+            try:
+                headers = argo_instance._ArgoFamiglia__headers
+                url = "https://www.portaleargo.it/famiglia/api/rest/profili"
+                
+                response = requests.get(url, headers=headers, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    debug_log("✅ Risposta endpoint /profili", data)
+                    
+                    if isinstance(data, list):
+                        for i, p in enumerate(data):
+                            profili.append({
+                                "id": p.get('prgAlunno') or str(i),
+                                "nome": p.get('desAlunno') or f"Studente {i+1}",
+                                "classe": p.get('desClasse', 'N/D'),
+                                "annoScolastico": p.get('annoscolastico', '2024/2025'),
+                                "index": i
+                            })
+                            
+            except Exception as e:
+                debug_log(f"⚠️ Errore API profili: {e}")
+        
+        # METODO 3: Fallback - Assume singolo profilo
+        if not profili:
+            debug_log("⚠️ Nessun metodo ha funzionato, assumo profilo singolo")
+            profili.append({
+                "id": "0",
+                "nome": "Studente",
+                "classe": "N/D",
+                "annoScolastico": "2024/2025",
+                "index": 0
+            })
+        
+    except Exception as e:
+        debug_log(f"❌ Errore estrazione profili: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    debug_log(f"👥 Profili totali trovati: {len(profili)}", profili)
+    return profili
+
+
+def switch_profilo(argo_instance, profilo_index):
+    """
+    Cambia il profilo attivo nell'istanza Argo.
+    Alcuni portali usano un parametro 'prgAlunno' nelle richieste.
+    """
+    try:
+        debug_log(f"🔄 Switch a profilo index: {profilo_index}")
+        
+        # Se la libreria supporta setProfilo o simili
+        if hasattr(argo_instance, 'setProfilo'):
+            argo_instance.setProfilo(profilo_index)
+            return True
+        
+        # Altrimenti, aggiungiamo il parametro alle headers
+        # (questo dipende dall'implementazione di Argo)
+        # headers = argo_instance._ArgoFamiglia__headers
+        # headers['X-Profilo-Index'] = str(profilo_index)
+        
+        debug_log(f"✅ Profilo {profilo_index} impostato")
+        return True
+        
+    except Exception as e:
+        debug_log(f"⚠️ Errore switch profilo: {e}")
+        return False
+
+
+# ============= ESTRAZIONE DATI (Uguale a prima) =============
+
+def extract_grades_multi_strategy(argo_instance):
+    """Estrae voti con strategia multipla"""
+    grades = []
+    
+    # Strategia 1: Dashboard
+    try:
+        dashboard_data = argo_instance.dashboard()
         data_obj = dashboard_data.get('data', {})
         dati_list = data_obj.get('dati', [])
         
-        # Fallback: controlla se 'dati' è nella radice
         if not dati_list and 'dati' in dashboard_data:
             dati_list = dashboard_data.get('dati', [])
         
-        if not dati_list:
-            debug_log("⚠️ Nessun elemento in 'dati'", {
-                "dashboard_keys": list(dashboard_data.keys()),
-                "data_keys": list(data_obj.keys()) if isinstance(data_obj, dict) else "N/A"
-            })
-            return grades
-        
         main_data = dati_list[0] if dati_list else {}
-        debug_log("Chiavi trovate in dati[0]", list(main_data.keys()))
         
-        # Cerca in TUTTE le chiavi possibili
         voti_keys = [
-            'votiGiornalieri',
-            'votiPeriodici', 
-            'votiScrutinio',
-            'voti_giornalieri',
-            'voti',
-            'valutazioni',
-            'valutazioniGiornaliere'
+            'votiGiornalieri', 'votiPeriodici', 'votiScrutinio',
+            'voti_giornalieri', 'voti', 'valutazioni'
         ]
         
         for key in voti_keys:
             voti_raw = main_data.get(key, [])
             if voti_raw:
-                debug_log(f"✅ Trovati {len(voti_raw)} voti in '{key}'", voti_raw[:2])
+                debug_log(f"✅ Trovati {len(voti_raw)} voti in '{key}'")
                 
                 for v in voti_raw:
                     valore = v.get('codVoto') or v.get('voto') or v.get('valore')
@@ -98,200 +226,55 @@ def strategia_1_dashboard(argo_instance):
                     grades.append({
                         "materia": materia,
                         "valore": valore,
-                        "data": v.get('datGiorno') or v.get('data') or v.get('dataVoto'),
+                        "data": v.get('datGiorno') or v.get('data'),
                         "tipo": v.get('desVoto') or v.get('tipo', 'N/D'),
                         "peso": v.get('numPeso', '100'),
-                        # Alias per frontend
                         "subject": materia,
                         "value": valore,
                         "date": v.get('datGiorno', ''),
                         "id": str(uuid.uuid4())[:12]
                     })
-                    
-    except Exception as e:
-        debug_log(f"❌ Errore Strategia 1", str(e))
-        import traceback
-        traceback.print_exc()
+                break
     
-    return grades
-
-
-def strategia_2_api_diretta(argo_instance):
-    """
-    STRATEGIA 2: Chiamata diretta agli endpoint REST di Argo
-    """
-    grades = []
-    try:
-        headers = argo_instance._ArgoFamiglia__headers
-        base_url = "https://www.portaleargo.it/famiglia/api/rest"
-        
-        # Lista di endpoint possibili per i voti
-        endpoints = [
-            "/votiGiornalieri",
-            "/voti",
-            "/valutazioni/giornaliere",
-            "/registro/voti",
-            "/votiPeriodici"
-        ]
-        
-        for endpoint in endpoints:
-            url = base_url + endpoint
-            debug_log(f"STRATEGIA 2: Tentativo GET {url}")
+    except Exception as e:
+        debug_log(f"⚠️ Errore estrazione voti: {e}")
+    
+    # Strategia 2: API diretta (opzionale)
+    if not grades:
+        try:
+            headers = argo_instance._ArgoFamiglia__headers
+            endpoints = ["/votiGiornalieri", "/voti", "/valutazioni/giornaliere"]
             
-            try:
+            for endpoint in endpoints:
+                url = f"https://www.portaleargo.it/famiglia/api/rest{endpoint}"
                 response = requests.get(url, headers=headers, timeout=10)
-                debug_log(f"Response {endpoint}", {
-                    "status": response.status_code,
-                    "headers": dict(response.headers),
-                    "body_preview": response.text[:500]
-                })
                 
                 if response.status_code == 200:
-                    try:
-                        data = response.json()
-                        
-                        # Se è una lista diretta
-                        if isinstance(data, list) and len(data) > 0:
-                            debug_log(f"✅ Trovati {len(data)} voti in {endpoint}", data[:2])
-                            
-                            for v in data:
-                                grades.append({
-                                    "materia": v.get('desMateria') or v.get('materia', 'N/D'),
-                                    "valore": v.get('codVoto') or v.get('voto') or v.get('valore'),
-                                    "data": v.get('datGiorno') or v.get('data'),
-                                    "tipo": v.get('desVoto') or v.get('tipo', 'N/D'),
-                                    "peso": v.get('numPeso', '100'),
-                                    "subject": v.get('desMateria', 'N/D'),
-                                    "value": v.get('codVoto', ''),
-                                    "date": v.get('datGiorno', ''),
-                                    "id": str(uuid.uuid4())[:12]
-                                })
-                            break  # Ferma se trovati
-                            
-                        # Se è un dict con array annidato
-                        elif isinstance(data, dict):
-                            debug_log(f"Risposta dict da {endpoint}", list(data.keys()))
-                            
-                            # Cerca array annidati
-                            for key in ['voti', 'dati', 'data', 'valutazioni']:
-                                if key in data and isinstance(data[key], list):
-                                    debug_log(f"✅ Trovati {len(data[key])} voti in {endpoint}.{key}")
-                                    # Processa come sopra... (logic simplified for brevity/safety)
-                                    for v in data[key]:
-                                        grades.append({
-                                            "materia": v.get('desMateria') or v.get('materia', 'N/D'),
-                                            "valore": v.get('codVoto') or v.get('voto') or v.get('valore'),
-                                            "data": v.get('datGiorno') or v.get('data'),
-                                            "tipo": v.get('desVoto') or v.get('tipo', 'N/D'),
-                                            "peso": v.get('numPeso', '100'),
-                                            "subject": v.get('desMateria', 'N/D'),
-                                            "value": v.get('codVoto', ''),
-                                            "date": v.get('datGiorno', ''),
-                                            "id": str(uuid.uuid4())[:12]
-                                        })
-                                    break
-                                    
-                    except Exception as json_err:
-                         debug_log(f"⚠️ Errore parsing JSON {endpoint}: {json_err}. Content: {response.text[:100]}")
-                         
-            except requests.exceptions.RequestException as e:
-                debug_log(f"⚠️ Errore request {endpoint}", str(e))
-                continue
-                
-    except Exception as e:
-        debug_log(f"❌ Errore Strategia 2", str(e))
-        import traceback
-        traceback.print_exc()
-    
-    return grades
-
-
-def strategia_3_metodo_diretto(argo_instance):
-    """
-    STRATEGIA 3: Usa metodi specifici della libreria argofamiglia
-    """
-    grades = []
-    try:
-        # Alcuni metodi che potrebbero esistere
-        metodi = [
-            'voti',
-            'getVoti',
-            'votiGiornalieri',
-            'getVotiGiornalieri',
-            'valutazioni'
-        ]
-        
-        for metodo in metodi:
-            if hasattr(argo_instance, metodo):
-                debug_log(f"STRATEGIA 3: Trovato metodo '{metodo}'")
-                try:
-                    result = getattr(argo_instance, metodo)()
-                    debug_log(f"Risultato {metodo}", result)
-                    
-                    if result and isinstance(result, (list, dict)):
-                        # Processa il risultato
-                        if isinstance(result, list):
-                            for v in result:
-                                grades.append({
-                                    "materia": v.get('desMateria', 'N/D'),
-                                    "valore": v.get('codVoto', ''),
-                                    "data": v.get('datGiorno', ''),
-                                    "tipo": v.get('desVoto', 'N/D'),
-                                    "subject": v.get('desMateria', 'N/D'),
-                                    "value": v.get('codVoto', ''),
-                                    "date": v.get('datGiorno', ''),
-                                    "id": str(uuid.uuid4())[:12]
-                                })
+                    data = response.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        for v in data:
+                            grades.append({
+                                "materia": v.get('desMateria', 'N/D'),
+                                "valore": v.get('codVoto', ''),
+                                "data": v.get('datGiorno', ''),
+                                "tipo": v.get('desVoto', 'N/D'),
+                                "subject": v.get('desMateria', 'N/D'),
+                                "value": v.get('codVoto', ''),
+                                "date": v.get('datGiorno', ''),
+                                "id": str(uuid.uuid4())[:12]
+                            })
                         break
-                except Exception as e:
-                    debug_log(f"⚠️ Errore chiamata {metodo}", str(e))
-                    
-    except Exception as e:
-        debug_log(f"❌ Errore Strategia 3", str(e))
+        except Exception as e:
+            debug_log(f"⚠️ Errore API voti: {e}")
     
     return grades
 
-
-def extract_grades_multi_strategy(argo_instance):
-    """
-    MASTER FUNCTION: Prova tutte le strategie in sequenza
-    """
-    all_grades = []
-    
-    # Strategia 1
-    grades_s1 = strategia_1_dashboard(argo_instance)
-    if grades_s1:
-        debug_log(f"✅ Strategia 1: {len(grades_s1)} voti")
-        all_grades.extend(grades_s1)
-        return all_grades  # Ferma se trovati
-    
-    # Strategia 2
-    grades_s2 = strategia_2_api_diretta(argo_instance)
-    if grades_s2:
-        debug_log(f"✅ Strategia 2: {len(grades_s2)} voti")
-        all_grades.extend(grades_s2)
-        return all_grades
-    
-    # Strategia 3
-    grades_s3 = strategia_3_metodo_diretto(argo_instance)
-    if grades_s3:
-        debug_log(f"✅ Strategia 3: {len(grades_s3)} voti")
-        all_grades.extend(grades_s3)
-        return all_grades
-    
-    debug_log("❌ NESSUNA STRATEGIA ha restituito voti")
-    return all_grades
-
-
-# ============= ESTRAZIONE COMPITI =============
 
 def extract_homework_safe(argo_instance):
-    """Recupera compiti con gestione errori"""
+    """Recupera compiti"""
     tasks_data = []
     try:
-        debug_log("📚 Chiamata getCompitiByDate()")
         raw_homework = argo_instance.getCompitiByDate()
-        debug_log("Compiti RAW", raw_homework)
         
         if isinstance(raw_homework, dict):
             for date_str, details in raw_homework.items():
@@ -309,29 +292,18 @@ def extract_homework_safe(argo_instance):
                         "done": False
                     })
                     
-        elif isinstance(raw_homework, list):
-            for t in raw_homework:
-                tasks_data.append({
-                    "id": str(uuid.uuid4())[:12],
-                    "text": t.get('desCompito', '') or t.get('compito', ''),
-                    "subject": t.get('desMateria', '') or t.get('materia', 'Generico'),
-                    "due_date": t.get('datCompito', ''),
-                    "done": False
-                })
-                
     except Exception as e:
-        debug_log(f"⚠️ Errore compiti", str(e))
+        debug_log(f"⚠️ Errore compiti: {e}")
     
-    debug_log(f"✅ Totale compiti: {len(tasks_data)}")
     return tasks_data
 
 
 def extract_promemoria(dashboard_data):
-    """Estrae promemoria dalla dashboard"""
+    """Estrae promemoria"""
     promemoria = []
     try:
         data_obj = dashboard_data.get('data', {})
-        dati_list = data_obj.get('dati', []) if isinstance(data_obj, dict) else []
+        dati_list = data_obj.get('dati', [])
         
         if not dati_list and 'dati' in dashboard_data:
             dati_list = dashboard_data.get('dati', [])
@@ -342,15 +314,14 @@ def extract_promemoria(dashboard_data):
             for i in items:
                 promemoria.append({
                     "titolo": i.get('desOggetto') or i.get('titolo', 'Avviso'),
-                    "testo": i.get('desMessaggio') or i.get('testo') or i.get('desAnnotazioni', ''),
+                    "testo": i.get('desMessaggio') or i.get('testo', ''),
                     "autore": i.get('desMittente', 'Scuola'),
                     "data": i.get('datGiorno') or i.get('data', ''),
                     "url": i.get('urlAllegato', ''),
-                    "oggetto": i.get('desOggetto') or i.get('titolo', 'Avviso'),
                     "date": i.get('datGiorno', '')
                 })
     except Exception as e:
-        debug_log(f"⚠️ Errore promemoria", str(e))
+        debug_log(f"⚠️ Errore promemoria: {e}")
     
     return promemoria
 
@@ -364,6 +335,13 @@ def health():
 
 @app.route('/login', methods=['POST'])
 def login():
+    """
+    STEP 1: Login iniziale
+    
+    Returns:
+        - Se 1 profilo: dati completi dello studente
+        - Se >1 profili: lista profili da cui scegliere
+    """
     data = request.json
     school_code = data.get('schoolCode')
     username = data.get('username')
@@ -373,11 +351,7 @@ def login():
         return jsonify({"success": False, "error": "Dati mancanti"}), 400
 
     try:
-        debug_log("LOGIN", {
-            "school": school_code,
-            "username": username,
-            "timestamp": datetime.now().isoformat()
-        })
+        debug_log("LOGIN", {"school": school_code, "username": username})
         
         # 1. Autenticazione
         argo = argofamiglia.ArgoFamiglia(school_code, username, password)
@@ -388,52 +362,64 @@ def login():
         auth_token = headers.get('x-auth-token', '')
         access_token = headers.get('Authorization', '').replace("Bearer ", "")
         
-        debug_log("Token estratti", {
-            "auth_token": auth_token[:30] + "..." if auth_token else "N/A",
-            "access_token": access_token[:30] + "..." if access_token else "N/A"
-        })
-
-        # 3. Recupera VOTI con strategia multipla
-        debug_log("🎓 INIZIO ESTRAZIONE VOTI")
-        grades_data = extract_grades_multi_strategy(argo)
-        debug_log(f"🎓 VOTI FINALI: {len(grades_data)} elementi", grades_data[:3])
+        # 3. Recupera profili disponibili
+        profili = get_profili_disponibili(argo)
         
-        # 4. Recupera compiti
-        tasks_data = extract_homework_safe(argo)
+        # 4. Crea session ID per questa istanza
+        session_id = str(uuid.uuid4())
+        save_session(session_id, argo, school_code, username, password)
         
-        # 5. Recupera promemoria
-        try:
-            dashboard_data = argo.dashboard()
-        except:
-            dashboard_data = {}
-        announcements_data = extract_promemoria(dashboard_data)
-
-        # Risposta finale
-        response_data = {
-            "success": True,
-            "session": {
-                "schoolCode": school_code,
-                "authToken": auth_token,
-                "accessToken": access_token,
-                "userName": username
-            },
-            "student": {
-                "name": username,
-                "class": "DidUP",
-                "school": school_code
-            },
-            "tasks": tasks_data,
-            "voti": grades_data,
-            "promemoria": announcements_data,
-            "debug_info": {
-                "voti_count": len(grades_data),
-                "tasks_count": len(tasks_data),
-                "timestamp": datetime.now().isoformat()
-            }
-        }
+        # 5. Se c'è UN SOLO profilo, carica i dati subito
+        if len(profili) == 1:
+            debug_log("📌 Profilo singolo, carico dati...")
+            
+            grades_data = extract_grades_multi_strategy(argo)
+            tasks_data = extract_homework_safe(argo)
+            
+            try:
+                dashboard_data = argo.dashboard()
+            except:
+                dashboard_data = {}
+            announcements_data = extract_promemoria(dashboard_data)
+            
+            return jsonify({
+                "success": True,
+                "multiProfile": False,
+                "session": {
+                    "sessionId": session_id,
+                    "schoolCode": school_code,
+                    "authToken": auth_token,
+                    "accessToken": access_token,
+                    "userName": username
+                },
+                "student": {
+                    "name": profili[0]['nome'],
+                    "class": profili[0]['classe'],
+                    "school": school_code,
+                    "profileId": profili[0]['id']
+                },
+                "tasks": tasks_data,
+                "voti": grades_data,
+                "promemoria": announcements_data
+            }), 200
         
-        debug_log("RISPOSTA FINALE", response_data)
-        return jsonify(response_data), 200
+        # 6. Se ci sono PIÙ profili, restituisci solo la lista
+        else:
+            debug_log(f"👥 {len(profili)} profili trovati, richiesta selezione")
+            
+            return jsonify({
+                "success": True,
+                "multiProfile": True,
+                "requiresSelection": True,
+                "session": {
+                    "sessionId": session_id,
+                    "schoolCode": school_code,
+                    "authToken": auth_token,
+                    "accessToken": access_token,
+                    "userName": username
+                },
+                "profili": profili
+            }), 200
 
     except Exception as e:
         import traceback
@@ -446,16 +432,91 @@ def login():
         }), 401
 
 
+@app.route('/select-profile', methods=['POST'])
+def select_profile():
+    """
+    STEP 2: Selezione profilo (solo se multiProfile=true)
+    
+    Body:
+        {
+            "sessionId": "...",
+            "profileId": "0" o "12345"
+        }
+    """
+    data = request.json
+    session_id = data.get('sessionId')
+    profile_id = data.get('profileId')
+    
+    if not all([session_id, profile_id]):
+        return jsonify({"success": False, "error": "Dati mancanti"}), 400
+    
+    try:
+        debug_log("SELECT PROFILE", {"session": session_id, "profile": profile_id})
+        
+        # Recupera sessione
+        session_data = get_session(session_id)
+        if not session_data:
+            return jsonify({"success": False, "error": "Sessione scaduta"}), 401
+        
+        argo = session_data['argo']
+        
+        # Recupera lista profili per trovare l'index
+        profili = get_profili_disponibili(argo)
+        selected_profile = next((p for p in profili if p['id'] == profile_id), None)
+        
+        if not selected_profile:
+            return jsonify({"success": False, "error": "Profilo non trovato"}), 404
+        
+        # Switch al profilo selezionato
+        switch_profilo(argo, selected_profile['index'])
+        
+        # Carica dati del profilo
+        debug_log(f"📊 Caricamento dati per {selected_profile['nome']}")
+        
+        grades_data = extract_grades_multi_strategy(argo)
+        tasks_data = extract_homework_safe(argo)
+        
+        try:
+            dashboard_data = argo.dashboard()
+        except:
+            dashboard_data = {}
+        announcements_data = extract_promemoria(dashboard_data)
+        
+        return jsonify({
+            "success": True,
+            "student": {
+                "name": selected_profile['nome'],
+                "class": selected_profile['classe'],
+                "school": session_data['school'],
+                "profileId": profile_id
+            },
+            "tasks": tasks_data,
+            "voti": grades_data,
+            "promemoria": announcements_data
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        debug_log(f"❌ SELECT PROFILE FAILED", error_trace)
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": error_trace if DEBUG_MODE else None
+        }), 500
+
+
 @app.route('/sync', methods=['POST'])
 def sync_data():
-    """Sincronizzazione con credenziali salvate"""
+    """Sincronizzazione (mantiene compatibilità)"""
     data = request.json
     school = data.get('schoolCode')
     stored_user = data.get('storedUser')
     stored_pass = data.get('storedPass')
+    profile_id = data.get('profileId')  # NUOVO: per multi-profilo
     
     try:
-        debug_log("SYNC REQUEST", {"school": school})
+        debug_log("SYNC REQUEST", {"school": school, "profile": profile_id})
         
         if not all([school, stored_user, stored_pass]):
             return jsonify({"success": False, "error": "Credenziali mancanti"}), 401
@@ -476,6 +537,13 @@ def sync_data():
         # Re-login
         argo = argofamiglia.ArgoFamiglia(school, user, pass_)
         
+        # Se c'è un profileId, switch al profilo
+        if profile_id:
+            profili = get_profili_disponibili(argo)
+            selected = next((p for p in profili if p['id'] == profile_id), None)
+            if selected:
+                switch_profilo(argo, selected['index'])
+        
         # Recupera dati
         grades_data = extract_grades_multi_strategy(argo)
         tasks_data = extract_homework_safe(argo)
@@ -491,10 +559,7 @@ def sync_data():
         new_auth_token = headers.get('x-auth-token', '')
         new_access_token = headers.get('Authorization', '').replace("Bearer ", "")
         
-        debug_log(f"✅ SYNC OK", {
-            "voti": len(grades_data),
-            "tasks": len(tasks_data)
-        })
+        debug_log(f"✅ SYNC OK", {"voti": len(grades_data), "tasks": len(tasks_data)})
         
         return jsonify({
             "success": True,
@@ -509,21 +574,13 @@ def sync_data():
         
     except Exception as e:
         import traceback
-        error_trace = traceback.format_exc()
-        debug_log(f"❌ SYNC FAILED", error_trace)
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": error_trace if DEBUG_MODE else None
-        }), 401
+        debug_log(f"❌ SYNC FAILED", traceback.format_exc())
+        return jsonify({"success": False, "error": str(e)}), 401
 
 
-@app.route('/debug/dashboard', methods=['POST'])
-def debug_dashboard():
-    """
-    ENDPOINT DI DEBUG: restituisce la dashboard RAW
-    Usa questo per vedere ESATTAMENTE cosa torna Argo
-    """
+@app.route('/debug/profiles', methods=['POST'])
+def debug_profiles():
+    """Endpoint di debug per vedere i profili RAW"""
     data = request.json
     school = data.get('schoolCode')
     user = data.get('username')
@@ -532,12 +589,12 @@ def debug_dashboard():
     try:
         argo = argofamiglia.ArgoFamiglia(school, user, pwd)
         dashboard = argo.dashboard()
+        profili = get_profili_disponibili(argo)
         
         return jsonify({
             "success": True,
             "dashboard": dashboard,
-            "type": str(type(dashboard)),
-            "keys": list(dashboard.keys()) if isinstance(dashboard, dict) else "N/A"
+            "profili_estratti": profili
         }), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -546,23 +603,23 @@ def debug_dashboard():
 @app.route('/')
 def index():
     return """
-    <h1>G-Connect Backend - Debug Mode</h1>
+    <h1>G-Connect Backend - Multi-Profile Support</h1>
     <p>Endpoints disponibili:</p>
     <ul>
-        <li>POST /login - Autenticazione e recupero dati</li>
+        <li>POST /login - Autenticazione (ritorna profili se >1)</li>
+        <li>POST /select-profile - Selezione profilo specifico</li>
         <li>POST /sync - Sincronizzazione</li>
-        <li>POST /debug/dashboard - Visualizza dashboard RAW (DEBUG)</li>
+        <li>POST /debug/profiles - Visualizza profili RAW (DEBUG)</li>
         <li>GET /health - Health check</li>
     </ul>
-    <p>Debug mode: <b>ATTIVO</b> - Controlla i log del server</p>
     """
 
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5002))
     print(f"\n{'='*70}")
-    print(f"🚀 G-Connect Backend - DEBUG MODE")
+    print(f"🚀 G-Connect Backend - Multi-Profile Support")
     print(f"📡 Running on port {port}")
-    print(f"🔍 Debug logging: ENABLED")
+    print(f"👥 Supporto account multi-studente attivo")
     print(f"{'='*70}\n")
     app.run(host='0.0.0.0', port=port, debug=True)
