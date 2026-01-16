@@ -17,71 +17,59 @@ CORS(app, origins=[
 # ============= HELPER FUNCTIONS =============
 
 def extract_grades_from_dashboard(dashboard_data):
-    """
-    Estrae i voti dalla struttura nidificata di Argo con ricerca approfondita.
-    """
     grades = []
     try:
         if not dashboard_data:
+            print("⚠️ Dashboard completamente vuota")
             return grades
         
-        # Debug: stampiamo le chiavi principali per vederle nei log di Render
-        print(f"🔍 DEBUG Dashboard Keys: {list(dashboard_data.keys())}")
+        # --- INVESTIGAZIONE ---
+        data_content = dashboard_data.get('data', {})
+        dati_list = data_content.get('dati', [])
         
-        # Cerchiamo la lista 'dati' ovunque sia
-        data_obj = dashboard_data.get('data', {})
-        # Gestisce sia se 'data' è un dict sia se è direttamente la lista (casi rari)
-        dati_list = data_obj.get('dati', []) if isinstance(data_obj, dict) else []
-        
-        # Fallback: se 'dati' è al primo livello
-        if not dati_list and 'dati' in dashboard_data:
-            dati_list = dashboard_data.get('dati', [])
-
         if not dati_list:
-            print("⚠️ Nessuna lista 'dati' trovata nella dashboard")
-            return grades
+            # Se dati_list è vuoto, stampiamo le chiavi di 'data' per capire la struttura
+            print(f"🔍 DEBUG: Chiavi in 'data': {list(data_content.keys())}")
+            # Fallback per casi in cui 'dati' è direttamente in dashboard_data
+            if 'dati' in dashboard_data:
+                 dati_list = dashboard_data.get('dati', [])
+                 print(f"🔍 DEBUG: Trovato 'dati' nella radice: {len(dati_list)} elementi")
+            else:
+                 return grades
 
-        # Itera su tutti i blocchi dati (di solito c'è solo un elemento per studente, ma meglio essere sicuri)
-        for blocco in dati_list:
-            # 1. Prova a cercare i voti giornalieri
-            voti_g = blocco.get('votiGiornalieri', [])
-            # 2. Prova a cercare i voti periodici (scrutinio)
-            voti_p = blocco.get('votiPeriodici', [])
-            
-            # Unisci entrambe le liste
-            tutti_i_voti = voti_g + voti_p
-            
-            if tutti_i_voti:
-                print(f"✅ Trovati {len(tutti_i_voti)} voti in questo blocco dati")
-
-            for v in tutti_i_voti:
-                try:
-                    # Estrazione sicura dei campi
-                    valore = v.get('codVoto') or v.get('voto') or v.get('codCodice', '')
+        main_data = dati_list[0] if dati_list else {}
+        if main_data:
+            print(f"🔍 DEBUG: Chiavi trovate in 'dati[0]': {list(main_data.keys())}")
+        
+        # Proviamo tutte le varianti conosciute
+        voti_keys = ['votiGiornalieri', 'votiPeriodici', 'votiScrutinio', 'voti_giornalieri']
+        
+        for key in voti_keys:
+            voti_raw = main_data.get(key, [])
+            if voti_raw:
+                print(f"✅ Trovati voti nella chiave: {key} (Totale: {len(voti_raw)})")
+                for v in voti_raw:
+                    valore = v.get('codVoto') or v.get('voto')
                     materia = v.get('desMateria', 'N/D')
-                    data_voto = v.get('datGiorno') or v.get('data', '')
                     
                     grades.append({
                         "materia": materia,
                         "valore": valore,
-                        "voto": valore, # Alias
-                        "data": data_voto,
-                        "date": data_voto, # Alias
+                        "data": v.get('datGiorno') or v.get('data'),
                         "tipo": v.get('desVoto', 'N/D'),
-                        "peso": v.get('numPeso', '100'),
-                        "commento": v.get('desCommento', ''),
-                        # Campi extra per compatibilità frontend
+                        # Campi extra per compatibilità frontend esistente
                         "subject": materia,
-                        "value": valore
+                        "value": valore,
+                        "voto": valore,
+                        "date": v.get('datGiorno', ''),
+                        "peso": v.get('numPeso', '100') 
                     })
-                except Exception as e:
-                    print(f"⚠️ Errore parsing singolo voto: {e}")
         
-        print(f"📊 Voti estratti totali: {len(grades)}")
     except Exception as e:
-        print(f"❌ Errore estrazione voti: {e}")
+        print(f"❌ Errore critico estrazione: {e}")
         import traceback
         traceback.print_exc()
+    
     return grades
 
 def extract_promemoria(dashboard_data):
