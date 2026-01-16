@@ -161,6 +161,49 @@ def extract_homework_safe(argo_instance):
     return tasks_data
 
 
+def fetch_voti_v2(argo_instance):
+    """
+    Tenta di scaricare i voti direttamente dall'endpoint REST dedicato.
+    Questo bypassa il problema del dashboard vuoto.
+    """
+    grades = []
+    try:
+        import requests
+        headers = argo_instance._ArgoFamiglia__headers
+        # Endpoint standard per i voti giornalieri
+        url = "https://www.portaleargo.it/famiglia/api/rest/voti"
+        print(f"🌍 Richiesta diretta a: {url}")
+        
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"📥 Risposta diretta /voti: {type(data)} - {len(data) if isinstance(data, list) else 'dict'}")
+            
+            # Se è una lista (comportamento standard REST)
+            if isinstance(data, list):
+                for v in data:
+                    grades.append({
+                        "materia": v.get('desMateria', 'N/D'),
+                        "valore": v.get('codVoto', ''),
+                        "data": v.get('datGiorno', ''),
+                        "tipo": v.get('desVoto', 'N/D'),
+                        "peso": v.get('numPeso', '100'),
+                        "subject": v.get('desMateria', 'N/D'),
+                        "value": v.get('codVoto', ''),
+                        "date": v.get('datGiorno', '')
+                    })
+            # Se è un dizionario (struttura diversa)
+            elif isinstance(data, dict):
+                 print(f"🔍 Chiavi risposta /voti: {list(data.keys())}")
+                 # Logica di fallback se necessario
+        else:
+            print(f"⚠️ Errore endpoint /voti: {response.status_code}")
+            
+    except Exception as e:
+        print(f"❌ Errore fetch_voti_v2: {e}")
+        
+    return grades
+
 # ============= ROUTES =============
 
 @app.route('/health', methods=['GET'])
@@ -194,20 +237,27 @@ def login():
         # 3. Recupera compiti (PRIORITÀ: questo è per il calendario)
         tasks_data = extract_homework_safe(argo)
         
-        # 4. Recupera dashboard per voti e annunci
-        print("📊 Recupero dashboard...")
+        # 4. Recupera voti (STRATEGIA COMBINATA)
+        print("📊 Recupero voti (Metodo 1: Dashboard)...")
         try:
             dashboard_data = argo.dashboard()
-            print("✅ Dashboard recuperata")
         except Exception as e:
-            print(f"⚠️ Errore dashboard (non bloccante): {e}")
+            print(f"⚠️ Errore dashboard: {e}")
             dashboard_data = {}
 
-        # 5. Estrai voti e annunci dalla dashboard (non da metodi inesistenti!)
-        grades_data = extract_grades_from_dashboard(dashboard_data)
+        grades_dashboard = extract_grades_from_dashboard(dashboard_data)
+        
+        print("🌍 Recupero voti (Metodo 2: API Diretta)...")
+        grades_direct = fetch_voti_v2(argo)
+        
+        # Unisci i risultati (evitando duplicati se possibile, ma per ora uniamo tutto)
+        grades_data = grades_dashboard + grades_direct
+        print(f"📊 Voti totali: {len(grades_data)} (Dash: {len(grades_dashboard)}, API: {len(grades_direct)})")
+
+        # 5. Recupera annunci
         announcements_data = extract_promemoria(dashboard_data)
 
-        print(f"✅ Login completato! Tasks: {len(tasks_data)}, Voti: {len(grades_data)}, Annunci: {len(announcements_data)}")
+        print(f"✅ Login completato! Tasks: {len(tasks_data)}, Voti: {len(grades_data)}")
 
         return jsonify({
             "success": True,
