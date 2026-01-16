@@ -39,41 +39,71 @@ def extract_grades_from_dashboard(dashboard_data):
         
         main_data = dati[0] if dati else {}
         
+        # ⭐ DEBUG DETTAGLIATO: stampa tutte le chiavi disponibili
+        print(f"🔍 Chiavi disponibili in main_data: {list(main_data.keys())}")
+        
+        # Cerca voti in tutte le possibili posizioni
+        possible_voti_keys = ['votiGiornalieri', 'votiPeriodici', 'voti', 'valutazioni', 
+                              'Voti', 'VotiGiornalieri', 'valutazioniGiornaliere']
+        
+        for key in possible_voti_keys:
+            if key in main_data and main_data[key]:
+                print(f"✅ Trovata chiave voti: '{key}' con {len(main_data[key])} elementi")
+                if isinstance(main_data[key], list) and len(main_data[key]) > 0:
+                    # Stampa il primo elemento per debug
+                    print(f"🔍 Esempio primo voto: {main_data[key][0]}")
+        
         # Cerca voti giornalieri
         voti_giornalieri = main_data.get('votiGiornalieri', [])
         if voti_giornalieri:
-            print(f"✅ Trovati {len(voti_giornalieri)} voti giornalieri")
+            print(f"✅ Estraendo {len(voti_giornalieri)} voti giornalieri")
             for v in voti_giornalieri:
+                # Log del singolo voto per debug
+                voto_val = v.get('codVoto', v.get('voto', v.get('codCodice', '')))
+                print(f"  📊 Voto: {v.get('desMateria', '?')} = {voto_val}")
                 grades.append({
                     "materia": v.get('desMateria', 'N/D'),
-                    "valore": v.get('codVoto', ''),
+                    "valore": voto_val,
+                    "voto": voto_val,  # Campo aggiuntivo per compatibilità
                     "data": v.get('datGiorno', ''),
-                    "tipo": v.get('desVoto', 'N/D'),
+                    "tipo": v.get('desVoto', v.get('desProva', 'N/D')),
                     "peso": v.get('numPeso', '100'),
+                    "commento": v.get('desCommento', ''),
                     # Compatibilità frontend
                     "subject": v.get('desMateria', 'N/D'),
-                    "value": v.get('codVoto', ''),
+                    "value": voto_val,
                     "date": v.get('datGiorno', '')
                 })
         
         # Cerca anche voti periodici
         voti_periodici = main_data.get('votiPeriodici', [])
         if voti_periodici:
-            print(f"✅ Trovati {len(voti_periodici)} voti periodici")
+            print(f"✅ Estraendo {len(voti_periodici)} voti periodici")
             for v in voti_periodici:
+                voto_val = v.get('codVoto', v.get('voto', v.get('codCodice', '')))
                 grades.append({
                     "materia": v.get('desMateria', 'N/D'),
-                    "valore": v.get('codVoto', ''),
+                    "valore": voto_val,
+                    "voto": voto_val,
                     "data": v.get('datGiorno', ''),
                     "tipo": v.get('desVoto', 'Periodico'),
                     "peso": v.get('numPeso', '100'),
+                    "commento": v.get('desCommento', ''),
                     "subject": v.get('desMateria', 'N/D'),
-                    "value": v.get('codVoto', ''),
+                    "value": voto_val,
                     "date": v.get('datGiorno', '')
                 })
                 
         if not grades:
-            print(f"⚠️ Nessun voto trovato. Chiavi main_data: {list(main_data.keys())}")
+            print(f"⚠️ Nessun voto trovato dopo la ricerca.")
+            # Stampa TUTTE le chiavi per debug approfondito
+            for key, val in main_data.items():
+                if isinstance(val, list):
+                    print(f"  📋 {key}: lista con {len(val)} elementi")
+                elif isinstance(val, dict):
+                    print(f"  📋 {key}: dict con chiavi {list(val.keys())[:5]}...")
+                else:
+                    print(f"  📋 {key}: {type(val).__name__}")
             
     except Exception as e:
         print(f"⚠️ Errore estrazione voti (non bloccante): {e}")
