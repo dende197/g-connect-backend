@@ -124,6 +124,7 @@
             from {
                 transform: rotate(0deg);
             }
+
             to {
                 transform: rotate(360deg);
             }
@@ -330,28 +331,57 @@
     </nav>
 
     <script>
-        // ⭐ Funzione universale per leggere le date di Argo
+        // ⭐ Funzione universale per leggere le date di Argo (MIGLIORATA V2)
         function parseArgoDate(dateString) {
-            if (!dateString) return new Date(0); // Fallback per date invalide
+            if (!dateString) return new Date(0);
 
-            // Try parsing as YYYY-MM-DD (e.g., from API or ISO)
-            if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                return new Date(dateString + 'T00:00:00');
+            // Se è già un oggetto Date, verificarlo e restituirlo
+            if (dateString instanceof Date) {
+                return isNaN(dateString.getTime()) ? new Date(0) : dateString;
             }
 
-            // Try parsing as DD/MM/YYYY (e.g., from Argo HTML)
-            if (typeof dateString === 'string' && dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-                const [day, month, year] = dateString.split('/');
-                return new Date(`${year}-${month}-${day}T00:00:00`);
+            const s = dateString.toString().trim();
+
+            // Caso 1: Formato ISO standard (es: 2025-01-20 o 2025-01-20T...)
+            // Questo è il formato che arriva dal nostro backend aggiornato
+            if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
+                const datePart = s.substring(0, 10);
+                const d = new Date(datePart + 'T12:00:00'); // Usa mezzogiorno per evitare problemi fuso orario
+                if (!isNaN(d.getTime())) {
+                    console.log(`📅 Parsed ISO date: ${s} → ${d.toLocaleDateString('it-IT')}`);
+                    return d;
+                }
             }
 
-            // Fallback for other formats or if it's already a Date object
-            try {
-                const date = new Date(dateString);
-                if (!isNaN(date.getTime())) return date;
-            } catch (e) { }
+            // Caso 2: Formato Italiano (es: 20/01/2025)
+            if (s.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+                const [day, month, year] = s.split('/');
+                const d = new Date(`${year}-${month}-${day}T12:00:00`);
+                if (!isNaN(d.getTime())) {
+                    console.log(`📅 Parsed IT date: ${s} → ${d.toLocaleDateString('it-IT')}`);
+                    return d;
+                }
+            }
 
-            return new Date();
+            // Caso 3: Formato Italiano alternativo (es: 20-01-2025)
+            if (s.match(/^\d{2}-\d{2}-\d{4}/)) {
+                const [day, month, year] = s.split('-');
+                const d = new Date(`${year}-${month}-${day}T12:00:00`);
+                if (!isNaN(d.getTime())) {
+                    console.log(`📅 Parsed IT-dash date: ${s} → ${d.toLocaleDateString('it-IT')}`);
+                    return d;
+                }
+            }
+
+            // Tentativo generico finale
+            const d = new Date(s);
+            if (!isNaN(d.getTime())) {
+                console.log(`📅 Parsed generic date: ${s} → ${d.toLocaleDateString('it-IT')}`);
+                return d;
+            }
+
+            console.warn(`⚠️ Could not parse date: ${s}`);
+            return new Date(0);
         }
 
         // ⭐ Calcola la media matematica dai voti di Argo
@@ -460,7 +490,7 @@
 
             if (isLoggedIn && savedSession) {
                 console.log("✅ Sessione valida trovata!");
-                
+
                 // ⭐ Carica tasks con done persistito e ricostruisci dateObj
                 const cachedTasks = localStorage.getItem('argo_tasks');
                 if (cachedTasks) {
@@ -480,7 +510,7 @@
                         state.tasks = [];
                     }
                 }
-                
+
                 // ⭐ Carica user da localStorage
                 const cachedUser = localStorage.getItem('argo_user');
                 if (cachedUser) {
@@ -494,7 +524,7 @@
                     state.user = savedSession.student;
                     localStorage.setItem('argo_user', JSON.stringify(state.user));
                 }
-                
+
                 // ⭐ Carica voti e promemoria da localStorage
                 const cachedVoti = localStorage.getItem('argo_voti');
                 if (cachedVoti) {
@@ -506,7 +536,7 @@
                         state.voti = [];
                     }
                 }
-                
+
                 const cachedProm = localStorage.getItem('argo_promemoria');
                 if (cachedProm) {
                     try {
@@ -517,7 +547,7 @@
                         state.promemoria = [];
                     }
                 }
-                
+
                 state.isLoggedIn = true;
                 state.didup.connected = true;
                 state.view = 'home';
@@ -546,7 +576,7 @@
             if (state.syncing) return;
             state.syncing = true;
             render();
-            
+
             // ⭐ Usa la sessione passata o carica quella salvata (come nel codice vecchio)
             if (!sessionData) sessionData = sessionManager.load();
             if (!sessionData) {
@@ -557,10 +587,10 @@
 
             try {
                 console.log("📤 Invio richiesta sync con sessione salvata");
-                
+
                 const response = await fetch(`${API_BASE_URL}/sync`, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
@@ -579,10 +609,10 @@
                     promemoriaCount: data.promemoria?.length || data.announcements?.length || 0,
                     error: data.error
                 });
-                
+
                 // ⭐ DEBUG: Mostra dettagli completi in console
                 if (data.tasks && data.tasks.length > 0) console.log("📋 Tasks ricevuti:", data.tasks);
-                
+
                 // ⭐ DEBUG CRITICO per voti
                 console.log("🎓 DEBUG VOTI - data.voti:", data.voti);
                 console.log("🎓 DEBUG VOTI - tipo:", typeof data.voti, "è array?", Array.isArray(data.voti));
@@ -590,7 +620,7 @@
                     console.log("🎓 DEBUG VOTI - lunghezza:", data.voti.length);
                     console.log("🎓 DEBUG VOTI - primo elemento:", data.voti[0]);
                 }
-                
+
                 if (data.promemoria && data.promemoria.length > 0) console.log("📋 Promemoria ricevuti:", data.promemoria);
                 if (data.announcements && data.announcements.length > 0) console.log("📋 Announcements ricevuti:", data.announcements);
 
@@ -605,7 +635,7 @@
                         return;
                     }
                     updateTasks(data.tasks, true);
-                    
+
                     // ⭐ CRITICO: Aggiorna voti e salva SEMPRE
                     if (data.voti !== undefined) {
                         state.voti = Array.isArray(data.voti) ? data.voti : [];
@@ -615,7 +645,7 @@
                             console.warn("⚠️ Array voti vuoto - il backend potrebbe non recuperare i voti da DidUP");
                         }
                     }
-                    
+
                     // ⭐ CRITICO: Aggiorna promemoria e salva SEMPRE
                     const promemoriaData = data.promemoria || data.announcements;
                     if (promemoriaData !== undefined) {
@@ -626,7 +656,7 @@
                             console.warn("⚠️ Array promemoria vuoto - il backend potrebbe non recuperare i promemoria da DidUP");
                         }
                     }
-                    
+
                     state.lastSync = new Date().toLocaleTimeString();
                     state.isOffline = false;
                     state.didup.connected = true;
@@ -672,7 +702,7 @@
 
                 const response = await fetch(`${API_BASE_URL}/login`, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
@@ -703,14 +733,14 @@
 
                     // ⭐ Carica TUTTI i dati
                     if (data.tasks) updateTasks(data.tasks, true);
-                    
+
                     // ⭐ CRITICO: Carica voti
                     if (data.voti !== undefined) {
                         state.voti = Array.isArray(data.voti) ? data.voti : [];
                         localStorage.setItem('argo_voti', JSON.stringify(state.voti));
                         console.log("✅ Voti caricati nel silent login:", state.voti.length);
                     }
-                    
+
                     // ⭐ CRITICO: Carica promemoria
                     const promemoriaData = data.promemoria || data.announcements;
                     if (promemoriaData !== undefined) {
@@ -718,7 +748,7 @@
                         localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
                         console.log("✅ Promemoria caricati nel silent login:", state.promemoria.length);
                     }
-                    
+
                     if (data.student) {
                         state.user = data.student;
                         localStorage.setItem('argo_user', JSON.stringify(state.user));
@@ -761,7 +791,12 @@
 
 
         function updateTasks(newTasks, shouldRender = false) {
-            if (!newTasks) return;
+            if (!newTasks) {
+                console.warn("⚠️ updateTasks: no tasks provided");
+                return;
+            }
+
+            console.log(`📥 updateTasks: Processing ${newTasks.length} tasks...`);
 
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -770,34 +805,50 @@
             const localTasks = JSON.parse(localStorage.getItem('argo_tasks') || '[]');
 
             const formatted = newTasks.map(t => {
-                // ⭐ Gerarchia Affidabilità Date: Consegna > Prova > Pubblicazione
-                let rawDate = t.datCompito || t.due_date || t.dataProva || t.datGiorno || t.date;
+                // ⭐ Priorità: due_date è il campo principale che arriva dal backend aggiornato
+                let rawDate = t.due_date || t.datCompito || t.dataConsegna || t.datGiorno || t.date || t.datScadenza || t.data;
+
+                // Debug visivo nella console
+                const taskText = t.text || t.desCompito || "Nessun testo";
+                console.log(`📝 Task: "${taskText.substring(0, 40)}..." - Raw date: ${rawDate}`);
+
                 let dateObj = parseArgoDate(rawDate);
-                let isoDate = dateObj.toISOString().split('T')[0];
+                let isoDate = dateObj && !isNaN(dateObj.getTime()) ? dateObj.toISOString().split('T')[0] : null;
 
                 // ⭐ Cerca match per preservare done
-                const match = localTasks.find(l => 
-                    (l.id === t.id) || 
+                const match = localTasks.find(l =>
+                    (l.id === t.id) ||
                     (l.text === (t.text || t.desCompito) && l.subject === (t.subject || t.materia))
                 );
+
+                const hasValidDate = dateObj && !isNaN(dateObj.getTime()) && dateObj.getTime() > 0;
 
                 return {
                     id: t.id || Math.random().toString(36).substr(2, 9),
                     text: t.text || t.desCompito || "Nessuna descrizione",
                     subject: t.subject || t.materia || 'Generico',
-                    due_date: isoDate,
+                    due_date: isoDate || rawDate,
                     display_date: rawDate,
                     dateObj: dateObj,
-                    hasValidDate: !isNaN(dateObj.getTime()) && dateObj.getTime() > 0,
+                    hasValidDate: hasValidDate,
                     done: match ? match.done : (t.done || false)
                 };
             });
 
-            // ⭐ Filtra e Ordina - SOLO quelli con data valida e non scaduti
-            state.tasks = formatted
-                .filter(t => t.hasValidDate && t.dateObj >= today)
-                .sort((a, b) => a.dateObj - b.dateObj);
+            // Conta quanti hanno date valide
+            const validCount = formatted.filter(t => t.hasValidDate).length;
+            console.log(`✅ Formatted tasks: ${formatted.length} total, ${validCount} with valid dates`);
 
+            // Ordina per data (tasks senza data valida vanno in fondo)
+            state.tasks = formatted
+                .filter(t => t.hasValidDate || t.text) // Manteniamo tutti i task con testo
+                .sort((a, b) => {
+                    if (!a.hasValidDate) return 1;
+                    if (!b.hasValidDate) return -1;
+                    return a.dateObj - b.dateObj;
+                });
+
+            console.log(`💾 Saving ${state.tasks.length} tasks to state`);
             saveTasks();
             if (shouldRender) render();
         }
@@ -828,17 +879,17 @@
 
         function logout() {
             if (confirm('Sei sicuro di voler disconnettere? Dovrai effettuare nuovamente il login.')) {
-            sessionManager.clear();
-            state.isLoggedIn = false;
+                sessionManager.clear();
+                state.isLoggedIn = false;
                 state.didup.connected = false;
-            state.user = { name: 'Andrea', class: '5B' };
-            state.tasks = [];
+                state.user = { name: 'Andrea', class: '5B' };
+                state.tasks = [];
                 state.voti = [];
                 state.promemoria = [];
                 state.isOffline = false;
                 state.lastSync = null;
-            state.view = 'login';
-            render();
+                state.view = 'login';
+                render();
                 console.log('✅ Logout completato');
             }
         }
@@ -847,7 +898,7 @@
             // Se c'è una sessione salvata ma l'utente vuole rifare login, mostra il form
             const savedSession = sessionManager.load();
             const hasSession = savedSession && sessionManager.isLoggedIn();
-            
+
             return `
             <div class="view" style="height: 100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding: 24px;">
                 <h1 style="margin-bottom:40px;">📚 G-Connect</h1>
@@ -1161,25 +1212,6 @@
             </div>`;
         }
 
-        function renderChat() {
-            const msgs = state.messages[state.currentChatUser] || [];
-            return `
-            <div class="view" style="display:flex; flex-direction:column; height:100vh; padding:0;">
-                <div style="padding:20px; padding-top:60px; background:rgba(28,28,30,0.9); display:flex; align-items:center; gap:16px; border-bottom:1px solid rgba(255,255,255,0.1);">
-                    <button onclick="navigate('search')" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;"><i class="ph ph-arrow-left"></i></button>
-                    <h2>${state.currentChatUser}</h2>
-                </div>
-                <div id="chat-history" style="flex:1; overflow-y:auto; padding:20px;">
-                    ${msgs.map(m => `<div class="message-bubble ${m.me ? 'msg-me' : 'msg-other'}">${m.text}</div>`).join('')}
-                </div>
-                <div style="padding:20px; padding-bottom: 40px; background:black; display:flex; gap:10px; border-top:1px solid rgba(255,255,255,0.1);">
-                    <input id="msg-input" placeholder="Messaggio..." style="margin-bottom:0;">
-                    <button onclick="sendMessage()" style="background:var(--blue); width:50px; border-radius:50%; border:none; color:white; cursor:pointer;">
-                        <i class="ph-fill ph-paper-plane-right"></i>
-                    </button>
-                </div>
-            </div>`;
-        }
 
         function renderPlanner() {
             setTimeout(() => {
@@ -1190,7 +1222,7 @@
                     if (existingCalendar) {
                         existingCalendar.destroy();
                     }
-                    
+
                     const calendar = new FullCalendar.Calendar(calendarEl, {
                         initialView: 'dayGridMonth',
                         locale: 'it',
@@ -1209,7 +1241,7 @@
                                     subject: t.subject
                                 }
                             })),
-                        eventClick: function(info) {
+                        eventClick: function (info) {
                             const event = info.event;
                             modalContainer.innerHTML = `
                                 <div class="modal-overlay" onclick="closeModal(event)">
@@ -1244,7 +1276,7 @@
                                 const clickedDate = new Date(info.dateStr);
                                 return taskDate.toDateString() === clickedDate.toDateString();
                             });
-                            
+
                             if (tasksForDay.length > 0) {
                                 const tasksList = tasksForDay.map(t => `• ${t.subject}: ${t.text}`).join('\\n');
                                 alert(`Compiti per ${info.dateStr}:\\n\\n${tasksList}`);
@@ -1292,32 +1324,32 @@
                 <h3>Scadenze</h3>
                 <div id="tasks-list">
                     ${state.tasks.map(t => {
-                        const dueDate = t.dateObj && !isNaN(t.dateObj.getTime()) ? t.dateObj : null;
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const daysUntil = dueDate ? Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
-                        let dateLabel = '';
-                        let dateColor = 'var(--text-secondary)';
-                        
-                        if (dueDate) {
-                            if (daysUntil === 0) {
-                                dateLabel = 'OGGI';
-                                dateColor = 'var(--red)';
-                            } else if (daysUntil === 1) {
-                                dateLabel = 'DOMANI';
-                                dateColor = 'var(--orange)';
-                            } else if (daysUntil < 0) {
-                                dateLabel = 'SCADUTO';
-                                dateColor = 'var(--red)';
-                            } else {
-                                dateLabel = dueDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-                                dateColor = daysUntil <= 3 ? 'var(--orange)' : 'var(--blue)';
-                            }
-                        } else {
-                            dateLabel = t.display_date || 'Data non disponibile';
-                        }
-                        
-                        return `
+                const dueDate = t.dateObj && !isNaN(t.dateObj.getTime()) ? t.dateObj : null;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const daysUntil = dueDate ? Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
+                let dateLabel = '';
+                let dateColor = 'var(--text-secondary)';
+
+                if (dueDate) {
+                    if (daysUntil === 0) {
+                        dateLabel = 'OGGI';
+                        dateColor = 'var(--red)';
+                    } else if (daysUntil === 1) {
+                        dateLabel = 'DOMANI';
+                        dateColor = 'var(--orange)';
+                    } else if (daysUntil < 0) {
+                        dateLabel = 'SCADUTO';
+                        dateColor = 'var(--red)';
+                    } else {
+                        dateLabel = dueDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+                        dateColor = daysUntil <= 3 ? 'var(--orange)' : 'var(--blue)';
+                    }
+                } else {
+                    dateLabel = t.display_date || 'Data non disponibile';
+                }
+
+                return `
                         <div class="card" style="display:flex; align-items:center; gap:15px; background: rgba(255,255,255,0.03); border-left: 3px solid ${t.done ? 'var(--green)' : dateColor};">
                             <div style="width: 40px; height: 40px; border-radius: 10px; background: ${t.done ? 'rgba(48, 209, 88, 0.2)' : 'rgba(10, 132, 255, 0.2)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                                 ${t.done ? '<i class="ph-fill ph-check" style="color: var(--green); font-size: 20px;"></i>' : '<i class="ph ph-calendar" style="color: var(--blue); font-size: 18px;"></i>'}
@@ -1336,10 +1368,45 @@
                             </button>
                         </div>
                     `;
-                    }).join('')}
-                    ${state.tasks.length === 0 ? '<div style="text-align:center; padding: 40px; opacity: 0.5;"><i class="ph ph-check-circle" style="font-size: 48px; color: var(--green); margin-bottom: 12px; display: block;"></i>Finito tutto! 🎉<br><span style="font-size: 12px; color: var(--text-secondary);">Non hai compiti in scadenza</span></div>' : ''}
+            }).join('')}
                 </div>
-            </div>`;
+            `;
+        }
+
+        function renderChat() {
+            const contact = state.currentChatUser || 'Alessandro Russo';
+            const msgs = state.messages[contact] || [];
+
+            setTimeout(() => {
+                const el = document.getElementById('chat-messages');
+                if (el) el.scrollTop = el.scrollHeight;
+            }, 100);
+
+            return `
+                <div class="view" style="display: flex; flex-direction: column; height: 100vh; padding: 0;">
+                    <div style="padding: 20px; background: rgba(28,28,30,0.8); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 16px;">
+                        <button onclick="navigate('feed')" style="background: none; border: none; color: white;"><i class="ph ph-arrow-left" style="font-size: 24px;"></i></button>
+                        <div style="width: 36px; height: 36px; background: var(--indigo); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700;">${contact[0]}</div>
+                        <div>
+                            <div style="font-weight: 600;">${contact}</div>
+                            <div style="font-size: 11px; color: var(--green);">Online</div>
+                        </div>
+                    </div>
+                    
+                    <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px;">
+                        ${msgs.map(m => `
+                            <div class="message-bubble ${m.me ? 'msg-me' : 'msg-other'}">${m.text}</div>
+                        `).join('')}
+                    </div>
+                    
+                    <div style="padding: 20px; padding-bottom: 40px; background: var(--bg-color); display: flex; gap: 10px;">
+                        <input id="msg-input" placeholder="Scrivi un messaggio..." style="margin-bottom: 0;">
+                        <button onclick="sendMessage()" style="width: 48px; height: 48px; background: var(--blue); border-radius: 14px; border: none; color: white; display: flex; align-items: center; justify-content: center;">
+                            <i class="ph-fill ph-paper-plane-right" style="font-size: 20px;"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
         }
 
         function selectDay(day) {
@@ -1367,13 +1434,13 @@
             console.log("🎓 renderVoti chiamato - state.voti:", state.voti);
             console.log("🎓 renderVoti chiamato - state.grades:", state.grades);
             console.log("🎓 renderVoti chiamato - localStorage argo_voti:", localStorage.getItem('argo_voti'));
-            
+
             // ⭐ Prova prima voti, poi grades
-            const votiData = (state.voti && state.voti.length > 0) ? state.voti : 
-                            ((state.grades && state.grades.length > 0) ? state.grades : []);
-            
+            const votiData = (state.voti && state.voti.length > 0) ? state.voti :
+                ((state.grades && state.grades.length > 0) ? state.grades : []);
+
             console.log("🎓 votiData finale:", votiData);
-            
+
             if (votiData.length === 0) {
                 return `
                     <div style="text-align:center; padding: 40px; color: var(--text-secondary);">
@@ -1435,9 +1502,9 @@
 
         function showBachecaModal() {
             // ⭐ Prova prima promemoria, poi announcements
-            const dataBacheca = state.promemoria && state.promemoria.length > 0 ? state.promemoria : 
-                               (state.announcements && state.announcements.length > 0 ? state.announcements : []);
-            
+            const dataBacheca = state.promemoria && state.promemoria.length > 0 ? state.promemoria :
+                (state.announcements && state.announcements.length > 0 ? state.announcements : []);
+
             console.log("📢 Rendering bacheca - state.promemoria:", state.promemoria?.length || 0, "state.announcements:", state.announcements?.length || 0);
 
             modalContainer.innerHTML = `
@@ -1463,7 +1530,7 @@
                         const oggetto = item.oggetto || item.titolo || item.title || 'Avviso';
                         const testo = item.testo || item.text || item.descrizione || item.description || '';
                         const url = item.url || item.allegato || null;
-                        
+
                         return `
                                 <div class="card" style="margin-bottom:0; padding:16px; border-left: 4px solid var(--orange); background: rgba(255, 159, 10, 0.05);">
                                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -1486,66 +1553,33 @@
             </div>`;
         }
 
-        function renderProfile() {
-            return `
-            <div class="view">
-                <h1>Profilo</h1>
-                <div style="margin-top:20px;">
-                    <div class="card">
-                        <div style="font-size: 14px; color:var(--text-secondary); margin-bottom:8px;">Utente Collegato</div>
-                        <div style="font-size:18px; font-weight:700; margin-bottom:16px;">${state.user.name || 'Non specificato'}</div>
-                        <div style="font-size:14px; color: var(--text-secondary); margin-bottom:12px;">Classe: ${state.user.class || 'Non specificata'}</div>
-                        ${state.lastSync ? `<div style="font-size:12px; color: var(--text-secondary); display:flex; align-items:center; gap:6px;">
-                            <i class="ph ph-clock" style="font-size:14px;"></i>
-                            Ultima sincronizzazione: ${state.lastSync}
-                        </div>` : ''}
-                    </div>
-                    <div class="card" style="margin-top:16px;">
-                        <div style="font-size: 14px; color:var(--text-secondary); margin-bottom:12px; font-weight:600;">Stato Connessione</div>
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                            <div style="width:12px; height:12px; border-radius:50%; background:${state.didup.connected ? 'var(--green)' : 'var(--red)'};"></div>
-                            <span>DidUP: ${state.didup.connected ? 'Connesso' : 'Non connesso'}</span>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <div style="width:12px; height:12px; border-radius:50%; background:${state.isOffline ? 'var(--red)' : 'var(--green)'};"></div>
-                            <span>Server: ${state.isOffline ? 'Offline' : 'Online'}</span>
-                        </div>
-                    </div>
-                    <button class="btn-primary" onclick="logout()" style="background:var(--red); margin-top:20px; cursor:pointer;">Esci e Disconnetti</button>
-                    <button onclick="openArgoLogin()" style="background:var(--blue); width:100%; padding:16px; border-radius:14px; font-weight:600; font-size:16px; cursor:pointer; border:none; color:white; margin-top:12px;">
-                        <i class="ph ph-arrow-clockwise"></i> Riconnetti DidUP
-                    </button>
-                </div>
-            </div>`;
-        }
-
         // --- CORE UI MODALS & ACTIONS ---
 
         function openNewPostModal() {
             modalContainer.innerHTML = `
-            <div class="modal-overlay" onclick="closeModal(event)">
-                <div class="modal-content">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
-                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue); cursor:pointer;">Annulla</button>
-                        <b>Nuovo Post</b>
-                        <button onclick="publishPost()" style="background:none; border:none; color:var(--blue); font-weight:700; cursor:pointer;">Pubblica</button>
-                    </div>
-                    <textarea id="new-post-text" rows="5" placeholder="Scrivi qualcosa..."></textarea>
-                    
-                    <div style="margin-bottom: 20px;">
-                         <label style="display:flex; align-items:center; gap:10px; margin-bottom: 10px; cursor:pointer;">
-                            <input type="checkbox" id="post-anon-toggle" style="width:20px; height:20px;">
-                            <span>Pubblica in Anonimo</span>
-                        </label>
-                         <label style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.1); padding:10px; border-radius:12px; cursor:pointer;">
-                            <i class="ph ph-camera" style="font-size:20px;"></i>
-                            <span>Aggiungi Foto</span>
-                            <input type="file" id="post-image-input" accept="image/*" style="display:none;" onchange="handleImagePreview(this)">
-                        </label>
-                        <div id="image-preview" style="margin-top:10px;"></div>
+                <div class="modal-overlay" onclick="closeModal(event)">
+                    <div class="modal-content">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2>Nuovo Post</h2>
+                            <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px;">Chiudi</button>
+                        </div>
+                        <textarea id="post-text" placeholder="Cosa sta succedendo?" style="height: 120px; font-size: 18px;"></textarea>
+                        
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                            <div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary);">
+                                <i class="ph ph-image" style="font-size: 24px;"></i>
+                                <span style="font-size: 14px;">Aggiungi foto</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="text-align: right; color: var(--text-secondary); font-size: 13px;">Anonimo</span>
+                                <input type="checkbox" id="post-anon" style="width: auto; margin: 0;">
+                            </div>
+                        </div>
+                        
+                        <button class="btn-primary" onclick="publishPost()">Pubblica</button>
                     </div>
                 </div>
-            </div>`;
+            `;
         }
 
         function openArgoLogin() {
@@ -1610,24 +1644,22 @@
 
         function openNewItemModal() {
             modalContainer.innerHTML = `
-            <div class="modal-overlay" onclick="closeModal(event)">
-                <div class="modal-content">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
-                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue); cursor:pointer;">Annulla</button>
-                        <b>Vendi Libro</b>
-                        <button onclick="publishItem()" style="background:none; border:none; color:var(--green); font-weight:700; cursor:pointer;">Metti in vendita</button>
+                <div class="modal-overlay" onclick="closeModal(event)">
+                    <div class="modal-content">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2>Vendi un oggetto</h2>
+                            <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px;">Chiudi</button>
+                        </div>
+                        <input id="item-title" placeholder="Cosa vendi? (es. Libro Matematica)">
+                        <input id="item-price" placeholder="Prezzo (es. 15€)">
+                        <div style="width: 100%; height: 150px; border: 2px dashed rgba(255,255,255,0.1); border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); margin-bottom: 20px;">
+                            <i class="ph ph-camera" style="font-size: 32px;"></i>
+                            <span style="font-size: 14px; margin-top: 8px;">Carica foto</span>
+                        </div>
+                        <button class="btn-primary" onclick="publishItem()">Metti in vendita</button>
                     </div>
-                    <input id="item-title" placeholder="Titolo Libro">
-                    <input id="item-price" placeholder="Prezzo (es. 15€)">
-                    
-                    <label style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.1); padding:16px; border-radius:12px; cursor:pointer; margin-bottom:20px;">
-                        <i class="ph ph-camera" style="font-size:24px;"></i>
-                        <span>Scatta/Carica Foto</span>
-                        <input type="file" id="item-image-input" accept="image/*" capture="environment" style="display:none;" onchange="handleImagePreview(this)">
-                    </label>
-                    <div id="image-preview" style="margin-top:10px;"></div>
                 </div>
-            </div>`;
+            `;
         }
 
         function handleImagePreview(input) {
@@ -1675,8 +1707,8 @@
                         promemoria: data.promemoria?.length || data.announcements?.length || 0,
                         student: data.student
                     });
-                    
-                    // ⭐ CRITICO: Salva sessione con credenziali codificate (come nel codice vecchio che funzionava)
+
+                    // ⭐ CRITICO: Salva sessione con credenziali codificate (as in the old working code)
                     if (data.session) {
                         data.session.storedUser = btoa(unescape(encodeURIComponent(user)));
                         data.session.storedPass = btoa(unescape(encodeURIComponent(pass)));
@@ -1684,7 +1716,7 @@
                         sessionManager.save(data.session);
                         console.log("💾 Sessione salvata con credenziali");
                     } else {
-                        // ⭐ Se non c'è sessione dal backend, crea una con le credenziali
+                        // ⭐ If no session from backend, create one with credentials
                         sessionManager.save({
                             schoolCode: school,
                             storedUser: btoa(unescape(encodeURIComponent(user))),
@@ -1692,26 +1724,26 @@
                         });
                         console.log("💾 Sessione minima creata con credenziali");
                     }
-                    
+
                     // ⭐ Salva user
                     if (data.student) {
                         state.user = data.student;
                         localStorage.setItem('argo_user', JSON.stringify(state.user));
                         console.log("💾 User salvato:", state.user.name);
                     }
-                    
+
                     // ⭐ Carica compiti con updateTasks per preservare date
                     if (data.tasks && data.tasks.length > 0) {
                         updateTasks(data.tasks, false);
                         console.log("✅ Compiti caricati:", state.tasks.length);
                     }
-                    
+
                     // ⭐ CRITICO: Carica voti e salva SEMPRE
                     console.log("🎓 LOGIN - Controllo voti in data:", data);
                     console.log("🎓 LOGIN - data.voti:", data.voti);
                     console.log("🎓 LOGIN - typeof data.voti:", typeof data.voti);
                     console.log("🎓 LOGIN - Array.isArray(data.voti):", Array.isArray(data.voti));
-                    
+
                     if (data.voti !== undefined) {
                         state.voti = Array.isArray(data.voti) ? data.voti : [];
                         localStorage.setItem('argo_voti', JSON.stringify(state.voti));
@@ -1727,7 +1759,7 @@
                         console.error("❌ Chiavi disponibili in data:", Object.keys(data));
                         console.error("❌ Risposta completa:", data);
                     }
-                    
+
                     // ⭐ CRITICO: Carica promemoria e salva SEMPRE
                     const promemoriaData = data.promemoria || data.announcements;
                     if (promemoriaData !== undefined) {
@@ -1763,21 +1795,17 @@
         }
 
         function publishPost() {
-            const text = document.getElementById('new-post-text').value;
-            const isAnon = document.getElementById('post-anon-toggle').checked;
-            const imgPreview = document.querySelector('#image-preview img');
-
-            if (text) {
+            const text = document.getElementById('post-text').value;
+            const anon = document.getElementById('post-anon').checked;
+            if (text.trim()) {
                 state.posts.unshift({
                     id: Date.now(),
-                    author: isAnon ? "Studente" : state.user.name,
-                    class: isAnon ? "5B" : state.user.class,
+                    author: anon ? 'Studente' : state.user.name,
+                    class: anon ? 'Anonimo' : state.user.class,
                     text: text,
                     likes: 0,
                     liked: false,
-                    anon: isAnon,
-                    image: imgPreview ? imgPreview.src : null,
-                    comments: []
+                    anon: anon
                 });
                 closeModal();
                 render();
@@ -1787,14 +1815,13 @@
         function publishItem() {
             const title = document.getElementById('item-title').value;
             const price = document.getElementById('item-price').value;
-            const imgPreview = document.querySelector('#image-preview img');
-
+            // No image handling in this simplified version, but could be added
             if (title && price) {
                 state.marketItems.unshift({
                     id: Date.now(),
                     title: title,
                     price: price,
-                    image: imgPreview ? imgPreview.src : null,
+                    image: null, // Placeholder for image
                     seller: state.user.name
                 });
                 closeModal();
@@ -1802,38 +1829,20 @@
             }
         }
 
-        function toggleLike(id) {
-            const p = state.posts.find(x => x.id === id);
-            if (p) {
-                p.liked = !p.liked;
-                p.likes += p.liked ? 1 : -1;
-                render();
-            }
-        }
-
-        function closeModal(e) {
-            if (!e || e.target.classList.contains('modal-overlay')) {
-                modalContainer.innerHTML = '';
-            }
-        }
-
         function openChat(u) {
             state.currentChatUser = u;
-            if (!state.messages[u]) state.messages[u] = [];
-            navigate('chat');
+            state.view = 'chat';
+            render();
         }
 
         function sendMessage() {
             const input = document.getElementById('msg-input');
-            const txt = input.value;
-            if (txt) {
-                state.messages[state.currentChatUser].push({ text: txt, me: true });
+            const contact = state.currentChatUser;
+            if (input.value.trim()) {
+                if (!state.messages[contact]) state.messages[contact] = [];
+                state.messages[contact].push({ text: input.value, me: true });
                 input.value = '';
                 render();
-                setTimeout(() => {
-                    const history = document.getElementById('chat-history');
-                    if (history) history.scrollTop = history.scrollHeight;
-                }, 10);
             }
         }
 
@@ -1844,9 +1853,6 @@
             if (t) {
                 t.done = !t.done;
                 saveTasks();
-                if (state.reminders.find(x => x.id === id)) {
-                localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
-                }
                 render();
             }
         }
@@ -1864,60 +1870,8 @@
             }
         }
 
-        function updateFeedSearch(value) {
-            state.feed.search = value;
-            render();
-        }
-
-        function setFeedClass(c) {
-            state.feed.classFilter = c;
-            render();
-        }
-
-        // ⭐ Funzione di test per verificare la connessione backend
-        async function testBackendConnection() {
-            const statusEl = document.getElementById('server-status');
-            if (statusEl) {
-                statusEl.innerHTML = '<span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span> Test in corso...';
-                statusEl.style.color = "var(--orange)";
-            }
-            
-            try {
-                console.log("🔍 Test connessione backend...");
-                
-                // Test 1: Health check
-                const healthRes = await fetch(`${API_BASE_URL}/health`, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
-                });
-                console.log("✅ Health check:", healthRes.status, healthRes.ok);
-                
-                // Test 2: Verifica formato risposta (se disponibile)
-                if (healthRes.ok) {
-                    const healthData = await healthRes.json().catch(() => ({}));
-                    console.log("📋 Health response:", healthData);
-                }
-                
-                if (statusEl) {
-                    statusEl.innerHTML = '<span style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></span> Backend raggiungibile';
-                    statusEl.style.color = "var(--green)";
-                }
-                
-                alert("✅ Backend raggiungibile! Controlla la console per i dettagli.");
-            } catch (e) {
-                console.error("❌ Test fallito:", e);
-                if (statusEl) {
-                    statusEl.innerHTML = '<span style="width: 8px; height: 8px; background: var(--red); border-radius: 50%;"></span> Backend non raggiungibile';
-                    statusEl.style.color = "var(--red)";
-                }
-                alert("❌ Backend non raggiungibile: " + e.message + "\n\nVerifica:\n- URL backend corretto: " + API_BASE_URL + "\n- Server online\n- CORS configurato");
-            }
-        }
-
         // Init - render will be called by DOMContentLoaded
     </script>
 </body>
-
-</html>
 
 </html>
