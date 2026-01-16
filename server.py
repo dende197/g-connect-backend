@@ -18,148 +18,104 @@ CORS(app, origins=[
 
 def extract_grades_from_dashboard(dashboard_data):
     """
-    Estrae i voti in modo sicuro dalla dashboard.
-    NON chiama metodi inesistenti come voti() o bacheca().
+    Estrae i voti dalla struttura nidificata di Argo con ricerca approfondita.
     """
     grades = []
     try:
-        if not dashboard_data or 'data' not in dashboard_data:
-            print("⚠️ Dashboard vuota o senza 'data'")
-            return grades
-            
-        dati = dashboard_data.get('data', {}).get('dati', [])
-        if not dati:
-            print("⚠️ Nessun 'dati' nella dashboard")
-            # Debug: mostra chiavi disponibili
-            print(f"📋 Chiavi dashboard: {list(dashboard_data.keys())}")
-            data_content = dashboard_data.get('data', {})
-            if data_content:
-                print(f"📋 Chiavi in data: {list(data_content.keys())}")
+        if not dashboard_data:
             return grades
         
-        main_data = dati[0] if dati else {}
+        # Debug: stampiamo le chiavi principali per vederle nei log di Render
+        print(f"🔍 DEBUG Dashboard Keys: {list(dashboard_data.keys())}")
         
-        # ⭐ DEBUG DETTAGLIATO: stampa tutte le chiavi disponibili
-        print(f"🔍 Chiavi disponibili in main_data: {list(main_data.keys())}")
+        # Cerchiamo la lista 'dati' ovunque sia
+        data_obj = dashboard_data.get('data', {})
+        # Gestisce sia se 'data' è un dict sia se è direttamente la lista (casi rari)
+        dati_list = data_obj.get('dati', []) if isinstance(data_obj, dict) else []
         
-        # Cerca voti in tutte le possibili posizioni
-        possible_voti_keys = ['votiGiornalieri', 'votiPeriodici', 'voti', 'valutazioni', 
-                              'Voti', 'VotiGiornalieri', 'valutazioniGiornaliere']
-        
-        for key in possible_voti_keys:
-            if key in main_data and main_data[key]:
-                print(f"✅ Trovata chiave voti: '{key}' con {len(main_data[key])} elementi")
-                if isinstance(main_data[key], list) and len(main_data[key]) > 0:
-                    # Stampa il primo elemento per debug
-                    print(f"🔍 Esempio primo voto: {main_data[key][0]}")
-        
-        # Cerca voti giornalieri
-        voti_giornalieri = main_data.get('votiGiornalieri', [])
-        if voti_giornalieri:
-            print(f"✅ Estraendo {len(voti_giornalieri)} voti giornalieri")
-            for v in voti_giornalieri:
-                # Log del singolo voto per debug
-                voto_val = v.get('codVoto', v.get('voto', v.get('codCodice', '')))
-                print(f"  📊 Voto: {v.get('desMateria', '?')} = {voto_val}")
-                grades.append({
-                    "materia": v.get('desMateria', 'N/D'),
-                    "valore": voto_val,
-                    "voto": voto_val,  # Campo aggiuntivo per compatibilità
-                    "data": v.get('datGiorno', ''),
-                    "tipo": v.get('desVoto', v.get('desProva', 'N/D')),
-                    "peso": v.get('numPeso', '100'),
-                    "commento": v.get('desCommento', ''),
-                    # Compatibilità frontend
-                    "subject": v.get('desMateria', 'N/D'),
-                    "value": voto_val,
-                    "date": v.get('datGiorno', '')
-                })
-        
-        # Cerca anche voti periodici
-        voti_periodici = main_data.get('votiPeriodici', [])
-        if voti_periodici:
-            print(f"✅ Estraendo {len(voti_periodici)} voti periodici")
-            for v in voti_periodici:
-                voto_val = v.get('codVoto', v.get('voto', v.get('codCodice', '')))
-                grades.append({
-                    "materia": v.get('desMateria', 'N/D'),
-                    "valore": voto_val,
-                    "voto": voto_val,
-                    "data": v.get('datGiorno', ''),
-                    "tipo": v.get('desVoto', 'Periodico'),
-                    "peso": v.get('numPeso', '100'),
-                    "commento": v.get('desCommento', ''),
-                    "subject": v.get('desMateria', 'N/D'),
-                    "value": voto_val,
-                    "date": v.get('datGiorno', '')
-                })
-                
-        if not grades:
-            print(f"⚠️ Nessun voto trovato dopo la ricerca.")
-            # Stampa TUTTE le chiavi per debug approfondito
-            for key, val in main_data.items():
-                if isinstance(val, list):
-                    print(f"  📋 {key}: lista con {len(val)} elementi")
-                elif isinstance(val, dict):
-                    print(f"  📋 {key}: dict con chiavi {list(val.keys())[:5]}...")
-                else:
-                    print(f"  📋 {key}: {type(val).__name__}")
+        # Fallback: se 'dati' è al primo livello
+        if not dati_list and 'dati' in dashboard_data:
+            dati_list = dashboard_data.get('dati', [])
+
+        if not dati_list:
+            print("⚠️ Nessuna lista 'dati' trovata nella dashboard")
+            return grades
+
+        # Itera su tutti i blocchi dati (di solito c'è solo un elemento per studente, ma meglio essere sicuri)
+        for blocco in dati_list:
+            # 1. Prova a cercare i voti giornalieri
+            voti_g = blocco.get('votiGiornalieri', [])
+            # 2. Prova a cercare i voti periodici (scrutinio)
+            voti_p = blocco.get('votiPeriodici', [])
             
+            # Unisci entrambe le liste
+            tutti_i_voti = voti_g + voti_p
+            
+            if tutti_i_voti:
+                print(f"✅ Trovati {len(tutti_i_voti)} voti in questo blocco dati")
+
+            for v in tutti_i_voti:
+                try:
+                    # Estrazione sicura dei campi
+                    valore = v.get('codVoto') or v.get('voto') or v.get('codCodice', '')
+                    materia = v.get('desMateria', 'N/D')
+                    data_voto = v.get('datGiorno') or v.get('data', '')
+                    
+                    grades.append({
+                        "materia": materia,
+                        "valore": valore,
+                        "voto": valore, # Alias
+                        "data": data_voto,
+                        "date": data_voto, # Alias
+                        "tipo": v.get('desVoto', 'N/D'),
+                        "peso": v.get('numPeso', '100'),
+                        "commento": v.get('desCommento', ''),
+                        # Campi extra per compatibilità frontend
+                        "subject": materia,
+                        "value": valore
+                    })
+                except Exception as e:
+                    print(f"⚠️ Errore parsing singolo voto: {e}")
+        
+        print(f"📊 Voti estratti totali: {len(grades)}")
     except Exception as e:
-        print(f"⚠️ Errore estrazione voti (non bloccante): {e}")
-    
+        print(f"❌ Errore estrazione voti: {e}")
+        import traceback
+        traceback.print_exc()
     return grades
 
-
-def extract_announcements_from_dashboard(dashboard_data):
+def extract_promemoria(dashboard_data):
     """
-    Estrae annunci/bacheca dalla dashboard in modo sicuro.
+    Estrae promemoria e avvisi dalla bacheca.
     """
-    announcements = []
+    promemoria = []
     try:
-        if not dashboard_data or 'data' not in dashboard_data:
-            return announcements
+        # Logica di navigazione simile a extract_grades
+        data_obj = dashboard_data.get('data', {})
+        dati_list = data_obj.get('dati', []) if isinstance(data_obj, dict) else []
+        
+        if not dati_list and 'dati' in dashboard_data:
+            dati_list = dashboard_data.get('dati', [])
+
+        for blocco in dati_list:
+            # Cerca in bachecaAlunno E promemoria
+            items = blocco.get('bachecaAlunno', []) + blocco.get('promemoria', [])
             
-        dati = dashboard_data.get('data', {}).get('dati', [])
-        if not dati:
-            return announcements
-        
-        main_data = dati[0] if dati else {}
-        
-        # Controlla bacheca alunno
-        bacheca = main_data.get('bachecaAlunno', [])
-        if bacheca:
-            print(f"✅ Trovati {len(bacheca)} messaggi in bacheca")
-            for b in bacheca:
-                announcements.append({
-                    "oggetto": b.get('desOggetto', ''),
-                    "testo": b.get('desMessaggio', ''),
-                    "autore": b.get('desMittente', ''),
-                    "data": b.get('datGiorno', ''),
-                    "url": b.get('urlAllegato', ''),
-                    "title": b.get('desOggetto', ''),
-                    "date": b.get('datGiorno', '')
+            for i in items:
+                promemoria.append({
+                    "titolo": i.get('desOggetto') or i.get('titolo', 'Avviso'),
+                    "testo": i.get('desMessaggio') or i.get('testo') or i.get('desAnnotazioni', ''),
+                    "autore": i.get('desMittente', 'Scuola'),
+                    "data": i.get('datGiorno') or i.get('data', ''),
+                    "url": i.get('urlAllegato', ''),
+                    # Alias per compatibilità
+                    "oggetto": i.get('desOggetto') or i.get('titolo', 'Avviso'),
+                    "date": i.get('datGiorno', '')
                 })
-        
-        # Controlla promemoria
-        promemoria = main_data.get('promemoria', [])
-        if promemoria:
-            print(f"✅ Trovati {len(promemoria)} promemoria")
-            for p in promemoria:
-                announcements.append({
-                    "oggetto": p.get('desAnnotazioni', '') or p.get('titolo', ''),
-                    "testo": p.get('desAnnotazioni', ''),
-                    "autore": p.get('desMittente', 'Scuola'),
-                    "data": p.get('datGiorno', ''),
-                    "url": '',
-                    "title": p.get('desAnnotazioni', ''),
-                    "date": p.get('datGiorno', '')
-                })
-                
     except Exception as e:
-        print(f"⚠️ Errore estrazione annunci (non bloccante): {e}")
-    
-    return announcements
+         print(f"⚠️ Errore estrazione promemoria: {e}")
+         
+    return promemoria
 
 
 def extract_homework_safe(argo_instance):
@@ -261,7 +217,7 @@ def login():
 
         # 5. Estrai voti e annunci dalla dashboard (non da metodi inesistenti!)
         grades_data = extract_grades_from_dashboard(dashboard_data)
-        announcements_data = extract_announcements_from_dashboard(dashboard_data)
+        announcements_data = extract_promemoria(dashboard_data)
 
         print(f"✅ Login completato! Tasks: {len(tasks_data)}, Voti: {len(grades_data)}, Annunci: {len(announcements_data)}")
 
