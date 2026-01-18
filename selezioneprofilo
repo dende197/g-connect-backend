@@ -1,0 +1,79 @@
+import requests
+import argofamiglia
+import json
+
+# --- CONFIGURAZIONE TEST ---
+SCUOLA = "IL_TUO_CODICE_SCUOLA"
+UTENTE = "IL_TUO_USERNAME"
+PASSWORD = "LA_TUA_PASSWORD"
+
+def test_multiprofilo():
+    print("🔄 Tentativo di login...")
+    try:
+        # 1. Inizializziamo la libreria
+        argo = argofamiglia.ArgoFamiglia(SCUOLA, UTENTE, PASSWORD)
+        
+        # 2. Recuperiamo gli Header che contengono il Token di sessione
+        # Nota: usiamo l'attributo privato della libreria per accedere ai dati di connessione
+        headers = argo._ArgoFamiglia__headers
+        
+        print("✅ Login effettuato. Recupero profili in corso...")
+
+        # 3. Chiamata API per ottenere le schede (i figli e gli anni scolastici)
+        # Questo è l'endpoint che abbiamo scoperto dal reverse engineering
+        url_schede = "https://www.portaleargo.it/famiglia/api/rest/schede"
+        res = requests.get(url_schede, headers=headers)
+        
+        if res.status_code != 200:
+            print(f"❌ Errore API: {res.status_code}")
+            return
+
+        schede = res.json()
+        
+        # --- VISUALIZZAZIONE ---
+        print("\n" + "="*50)
+        print("📁 PROFILI TROVATI SUL TUO ACCOUNT:")
+        print("="*50)
+
+        # Cicliamo tra i profili (Francesco, Maddalena, Fabio)
+        for i, scheda in enumerate(schede):
+            nome = scheda.get('alunno', {}).get('desNominativo', 'Sconosciuto')
+            classe = scheda.get('desClasse', 'N/D')
+            anno = scheda.get('desAnnoScolastico', 'N/D')
+            
+            # Questi sono i parametri VITALI per cambiare profilo
+            prg_alunno = scheda.get('prgAlunno')
+            prg_scheda = scheda.get('prgScheda')
+            prg_scuola = scheda.get('prgScuola')
+
+            print(f"[{i}] 👤 {nome}")
+            print(f"    🏫 Classe: {classe} ({anno})")
+            print(f"    🔑 ID Tecnico: Alunno={prg_alunno} | Scheda={prg_scheda}")
+            print("-" * 30)
+
+        # 4. TEST DI "SWITCH" (Cambio Profilo)
+        # Proviamo a simulare di voler vedere i voti del SECONDO figlio (indice 1)
+        if len(schede) > 1:
+            print(f"\n🚀 TEST: Provo a 'switchare' sul profilo di {schede[1]['alunno']['desNominativo']}...")
+            
+            # Per cambiare profilo, Argo vuole che aggiungiamo questi header specifici
+            headers['x-prg-alunno'] = str(schede[1]['prgAlunno'])
+            headers['x-prg-scheda'] = str(schede[1]['prgScheda'])
+            headers['x-prg-scuola'] = str(schede[1]['prgScuola'])
+
+            # Ora facciamo una richiesta voti con questi nuovi header
+            # Se funziona, riceveremo i voti del secondo figlio!
+            url_voti = "https://www.portaleargo.it/famiglia/api/rest/voti"
+            res_voti = requests.get(url_voti, headers=headers)
+            
+            if res_voti.status_code == 200:
+                print("✅ SWITCH RIUSCITO! Ho ricevuto i dati del profilo selezionato.")
+                # print(res_voti.json()) # Decommenta per vedere i dati raw
+            else:
+                print(f"⚠️ Errore durante lo switch: {res_voti.status_code}")
+
+    except Exception as e:
+        print(f"❌ Errore critico: {e}")
+
+if __name__ == "__main__":
+    test_multiprofilo()
