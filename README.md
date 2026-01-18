@@ -5,6 +5,7 @@
 ## ✨ Caratteristiche
 - **Design Premium**: Interfaccia stile iOS/Glassmorphism.
 - **Argo Integration**: Login sicuro e sincronizzazione Compiti.
+- **Multi-Profile Support**: Selezione profilo per account con più studenti.
 - **Planner**: Gestione attività scolastiche.
 - **Social Feed**: Bacheca per la classe/istituto (simulata).
 - **Market**: Mercatino libri usati (simulato).
@@ -40,3 +41,15 @@ Il progetto è pronto per il deploy cloud.
 - **Frontend**: HTML5, Vanilla JS, CSS3 (No Frameworks).
 - **Backend**: Python, Flask.
 - **Argo API**: Libreria `argofamiglia`.
+
+## 👥 Multi-Profile Support
+L'app supporta account con più profili studente. Quando un utente ha accesso a più studenti:
+1. Dopo il login, viene mostrato un modal con la lista dei profili disponibili
+2. L'utente seleziona il profilo desiderato
+3. L'app carica i dati (voti, compiti, promemoria) specifici per quello studente
+4. La sessione viene salvata con il profilo selezionato
+
+### API Endpoint
+- `POST /login-v2`: Endpoint principale con supporto multi-profilo
+  - **CASO A**: Senza `selectedProfileIndex` → Restituisce lista profili se più di uno
+  - **CASO B**: Con `selectedProfileIndex` → Carica dati per il profilo specifico
