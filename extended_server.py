@@ -23,13 +23,15 @@ def get_available_students(argo_instance):
             debug_log(f"✅ Ricevute {len(schede)} schede", schede)
             profiles = []
             for idx, s in enumerate(schede):
-                nome_completo = s.get('alunno', {}).get('desNome', 'Sconosciuto') + " " + s.get('alunno', {}).get('desCognome', '')
+                nome = s.get('alunno', {}).get('desNome', '') or 'Sconosciuto'
+                cognome = s.get('alunno', {}).get('desCognome', '') or ''
+                nome_completo = (nome + " " + cognome).strip() or 'Studente'
                 profiles.append({
                     "id": idx, 
                     "prgAlunno": s.get('prgAlunno'),
                     "prgScheda": s.get('prgScheda'),
-                    "name": nome_completo.strip(),
-                    "nome": s.get('alunno', {}).get('desNome', 'Sconosciuto'),
+                    "name": nome_completo,
+                    "nome": nome,
                     "cognome": s.get('alunno', {}).get('desCognome', ''),
                     "classe": s.get('desClasse', ''),
                     "school": s.get('desScuola', ''),

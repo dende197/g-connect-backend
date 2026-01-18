@@ -1804,7 +1804,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <div style="font-size: 18px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
-                                ${profile.name || (profile.nome + ' ' + profile.cognome) || 'Studente'}
+                                ${profile.name || ((profile.nome || '') + ' ' + (profile.cognome || '')).trim() || 'Studente'}
                             </div>
                             <div style="font-size: 14px; color: var(--text-secondary);">
                                 ${profile.classe || 'N/D'} - ${profile.school || profile.scuola || 'N/D'}

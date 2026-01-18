@@ -200,12 +200,12 @@ def login_v2():
                 return jsonify({"success": False, "error": "Indice profilo deve essere un numero"}), 400
         elif len(profiles) > 0:
             current_profile = profiles[0]
-            switch_student_context(argo, current_profile)
             debug_log(f"✅ Profilo unico selezionato automaticamente: {current_profile.get('name', 'N/D')}")
         else:
             debug_log("❌ Nessun profilo disponibile")
             return jsonify({"success": False, "error": "Nessun profilo disponibile"}), 404
         
+        # Apply student context switch if profile was selected
         if current_profile:
             switch_student_context(argo, current_profile)
 
