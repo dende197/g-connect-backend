@@ -43,25 +43,33 @@ def fix_date_timezone(date_str):
 def get_available_students(argo_instance):
     """Recupera la lista dei figli (schede) disponibili"""
     try:
+        debug_log("📥 Recupero profili studenti...")
         url = "https://www.portaleargo.it/famiglia/api/rest/schede"
         headers = argo_instance._ArgoFamiglia__headers
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             schede = response.json()
+            debug_log(f"✅ Ricevute {len(schede)} schede", schede)
             profiles = []
             for idx, s in enumerate(schede):
+                nome = s.get('alunno', {}).get('desNome', '') or 'Sconosciuto'
+                cognome = s.get('alunno', {}).get('desCognome', '') or ''
+                nome_completo = (nome + " " + cognome).strip() or 'Studente'
                 profiles.append({
                     "id": idx,
                     "prgAlunno": s.get('prgAlunno'),
                     "prgScheda": s.get('prgScheda'),
-                    "name": s.get('alunno', {}).get('desNome', 'Sconosciuto') + " " + s.get('alunno', {}).get('desCognome', ''),
-                    "nome": s.get('alunno', {}).get('desNome', 'Sconosciuto'),
+                    "name": nome_completo,
+                    "nome": nome,
                     "cognome": s.get('alunno', {}).get('desCognome', ''),
                     "classe": s.get('desClasse', ''),
                     "school": s.get('desScuola', ''),
                     "codMin": s.get('codMin', '')
                 })
+            debug_log(f"✅ {len(profiles)} profili processati")
             return profiles
+        else:
+            debug_log(f"❌ Errore HTTP {response.status_code} recupero profili")
     except Exception as e:
         debug_log("❌ Errore recupero profili", str(e))
     return []
@@ -69,10 +77,11 @@ def get_available_students(argo_instance):
 def switch_student_context(argo_instance, profile_data):
     """Seleziona il profilo attivo negli headers"""
     try:
+        debug_log(f"🔄 Switch al profilo: {profile_data.get('name', 'N/D')}")
         argo_instance._ArgoFamiglia__headers['x-cod-min'] = profile_data['codMin']
         argo_instance._ArgoFamiglia__headers['x-prg-alunno'] = str(profile_data['prgAlunno'])
         argo_instance._ArgoFamiglia__headers['x-prg-scheda'] = str(profile_data['prgScheda'])
-        debug_log(f"✅ Profilo impostato su: {profile_data['name']}")
+        debug_log(f"✅ Profilo impostato su: {profile_data.get('name', profile_data.get('nome', 'N/D'))}")
     except Exception as e:
         debug_log("❌ Errore switch profilo", str(e))
 
