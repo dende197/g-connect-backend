@@ -1816,7 +1816,7 @@
             
             modalContainer.innerHTML = `
                 <div class="modal-overlay" onclick="closeModal(event)">
-                    <div class="modal-content" style="max-height: 80vh; overflow-y: auto;">
+                    <div class="modal-content" style="max-height: 80vh; overflow-y: auto;" onclick="event.stopPropagation()">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
                             <h2 style="margin: 0;">Seleziona Profilo</h2>
                             <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px; cursor: pointer;">Annulla</button>
@@ -1870,6 +1870,15 @@
             
             // Clean up temporary credentials
             delete window._tempLoginCredentials;
+        }
+
+        function closeModal(event) {
+            // If event is passed and clicked element is not the overlay, don't close
+            if (event && event.target.className !== 'modal-overlay') {
+                return;
+            }
+            const modalContainer = document.getElementById('modals');
+            modalContainer.innerHTML = '';
         }
 
         function publishPost() {
