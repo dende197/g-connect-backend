@@ -1804,7 +1804,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <div style="font-size: 18px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
-                                ${profile.name || profile.nome + ' ' + profile.cognome}
+                                ${profile.name || (profile.nome + ' ' + profile.cognome) || 'Studente'}
                             </div>
                             <div style="font-size: 14px; color: var(--text-secondary);">
                                 ${profile.classe || 'N/D'} - ${profile.school || profile.scuola || 'N/D'}
@@ -1834,9 +1834,11 @@
             };
 
             // Prevent closing on background click during selection
+            // Intentionally prevent default backdrop close behavior to ensure user explicitly
+            // chooses a profile or clicks Cancel
             modal.onclick = (e) => {
                 if (e.target === modal) {
-                    // Don't close automatically - user must click Cancel or select a profile
+                    e.stopPropagation();
                 }
             };
 
@@ -1848,15 +1850,19 @@
             
             // Disable all profile cards and show loading
             const profileList = modal.querySelector('#profileList');
-            const cards = profileList.querySelectorAll('div');
-            cards.forEach(card => {
+            const cards = profileList.children; // Get direct children (profile cards)
+            
+            // Disable all cards
+            Array.from(cards).forEach(card => {
                 card.style.pointerEvents = 'none';
                 card.style.opacity = '0.5';
             });
 
             // Add loading spinner to the selected card
-            const selectedCard = cards[index];
-            selectedCard.innerHTML += '<div style="text-align: center; margin-top: 10px;"><span style="color: var(--blue);">Caricamento...</span></div>';
+            if (cards[index]) {
+                const selectedCard = cards[index];
+                selectedCard.innerHTML += '<div style="text-align: center; margin-top: 10px;"><span style="color: var(--blue);">Caricamento...</span></div>';
+            }
 
             try {
                 const response = await fetch(`${API_BASE_URL}/login-v2`, {
@@ -1895,7 +1901,7 @@
                 alert("❌ Errore nella selezione del profilo: " + e.message);
                 
                 // Re-enable cards
-                cards.forEach(card => {
+                Array.from(cards).forEach(card => {
                     card.style.pointerEvents = 'auto';
                     card.style.opacity = '1';
                 });
