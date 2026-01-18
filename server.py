@@ -149,7 +149,7 @@ def login_v2():
     school = data.get('schoolCode')
     user = data.get('username')
     pwd = data.get('password')
-    selected_index = data.get('profileIndex') # Corretto nome per compatibilità frontend
+    selected_index = data.get('selectedProfileIndex') or data.get('profileIndex')  # Accept both for compatibility
 
     if not all([school, user, pwd]):
         return jsonify({"success": False, "error": "Dati mancanti"}), 400
