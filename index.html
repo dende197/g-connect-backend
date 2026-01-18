@@ -1,6 +1,11 @@
+<!-- NOTE: This file contains stub/example code for multi-profile selection.
+     The actual implementation is in web/index.html
+     This file is kept for reference but is not actively used in the application. -->
+
 function performArgoSync() {
-    // Check for multi_profile response
-    fetch('/api/login-v2')
+    // Example: Check for multi_profile response
+    // In the actual implementation (web/index.html), this calls API_BASE_URL + '/login-v2'
+    fetch(`${API_BASE_URL}/login-v2`)
         .then(response => response.json())
         .then(data => {
             if (data.multi_profile) {

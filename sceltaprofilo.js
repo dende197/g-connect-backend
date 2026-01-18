@@ -1,3 +1,7 @@
+// NOTE: This file contains example code for multi-profile selection.
+// The actual implementation has been integrated into web/index.html
+// This file is kept for reference but is not actively used.
+
 // Funzione che "comanda" il login
 async function eseguiLoginSicuro() {
     const dati = {
@@ -6,8 +10,9 @@ async function eseguiLoginSicuro() {
         password: document.getElementById('password').value
     };
 
-    // 1. Chiamata al server (usando la rotta v2 che abbiamo creato nell'extended_server)
-    const response = await fetch('https://tuo-server.com/login-v2', {
+    // NOTA: Usa API_BASE_URL invece di URL hardcoded
+    // const API_BASE_URL = "https://your-server.com"; // Define this in your app
+    const response = await fetch(`${API_BASE_URL}/login-v2`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dati)
@@ -41,7 +46,7 @@ function generaCardFigli(lista, credenziali) {
         
         // Quando clicchi la card, rifà il login mandando l'ID del figlio
         card.onclick = async () => {
-            const res = await fetch('https://tuo-server.com/login-v2', {
+            const res = await fetch(`${API_BASE_URL}/login-v2`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
