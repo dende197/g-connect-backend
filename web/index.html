@@ -1672,7 +1672,7 @@
             }
         }
 
-        async function performArgoSync() {
+        async function performArgoSync(selectedProfileIndex = null) {
             const btn = document.getElementById('login-btn');
             const school = document.getElementById('argo-school').value;
             const user = document.getElementById('argo-user').value;
@@ -1687,10 +1687,16 @@
             btn.disabled = true;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/login`, {
+                // Build request body
+                const requestBody = { schoolCode: school, username: user, password: pass };
+                if (selectedProfileIndex !== null) {
+                    requestBody.selectedProfileIndex = selectedProfileIndex;
+                }
+
+                const response = await fetch(`${API_BASE_URL}/login-v2`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ schoolCode: school, username: user, password: pass })
+                    body: JSON.stringify(requestBody)
                 });
 
                 const data = await response.json();
@@ -1700,6 +1706,14 @@
                 }
 
                 if (data.success) {
+                    // Check for multi-profile case
+                    if (data.multi_profile === true) {
+                        console.log("🔄 Multi-profile detected, showing profile selection...");
+                        btn.innerText = "Accedi";
+                        btn.disabled = false;
+                        showProfileSelectionModal(data.profiles, school, user, pass);
+                        return;
+                    }
                     console.log("✅ Login OK, saving...");
                     console.log("📥 Dati ricevuti dal login:", {
                         tasks: data.tasks?.length || 0,
@@ -1792,6 +1806,70 @@
                 btn.innerText = "Accedi";
                 btn.disabled = false;
             }
+        }
+
+        function showProfileSelectionModal(profiles, school, user, pass) {
+            const modalContainer = document.getElementById('modals');
+            
+            // Store credentials temporarily for profile selection
+            window._tempLoginCredentials = { school, user, pass };
+            
+            modalContainer.innerHTML = `
+                <div class="modal-overlay" onclick="closeModal(event)">
+                    <div class="modal-content" style="max-height: 80vh; overflow-y: auto;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                            <h2 style="margin: 0;">Seleziona Profilo</h2>
+                            <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px; cursor: pointer;">Annulla</button>
+                        </div>
+                        <p style="color: var(--text-secondary); margin-bottom: 20px;">Sono stati trovati più profili associati a questo account. Seleziona quello che vuoi utilizzare:</p>
+                        <div id="profile-list" style="display: flex; flex-direction: column; gap: 12px;">
+                            ${profiles.map((profile, index) => `
+                                <div class="card" onclick="selectProfile(${index})" 
+                                     style="margin-bottom: 0; cursor: pointer; transition: transform 0.1s, background 0.2s;" 
+                                     onmouseenter="this.style.background='var(--surface-highlight)'" 
+                                     onmouseleave="this.style.background='var(--surface-color)'"
+                                     onmousedown="this.style.transform='scale(0.98)'" 
+                                     onmouseup="this.style.transform='scale(1)'">
+                                    <div style="display: flex; align-items: center; gap: 16px;">
+                                        <div style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, var(--blue), var(--purple)); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px;">
+                                            ${profile.nome ? profile.nome[0] : 'S'}
+                                        </div>
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 700; font-size: 17px; margin-bottom: 4px;">${profile.name || profile.nome + ' ' + profile.cognome}</div>
+                                            <div style="font-size: 14px; color: var(--text-secondary);">${profile.classe || 'N/D'}</div>
+                                            ${profile.scuola ? `<div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">${profile.scuola}</div>` : ''}
+                                        </div>
+                                        <i class="ph-bold ph-caret-right" style="font-size: 20px; color: var(--text-secondary);"></i>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function selectProfile(profileIndex) {
+            console.log(`🎯 Selected profile index: ${profileIndex}`);
+            closeModal();
+            
+            // Retrieve stored credentials
+            const { school, user, pass } = window._tempLoginCredentials || {};
+            if (!school || !user || !pass) {
+                alert("❌ Errore: credenziali non trovate. Riprova il login.");
+                return;
+            }
+            
+            // Store credentials back to form fields temporarily for re-login
+            document.getElementById('argo-school').value = school;
+            document.getElementById('argo-user').value = user;
+            document.getElementById('argo-pass').value = pass;
+            
+            // Re-call performArgoSync with the selected profile index
+            await performArgoSync(profileIndex);
+            
+            // Clean up temporary credentials
+            delete window._tempLoginCredentials;
         }
 
         function publishPost() {

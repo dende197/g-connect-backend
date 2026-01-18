@@ -21,12 +21,15 @@ def get_available_students(argo_instance):
             schede = response.json()
             profiles = []
             for idx, s in enumerate(schede):
+                nome = s.get('alunno', {}).get('desNome', 'Sconosciuto')
+                cognome = s.get('alunno', {}).get('desCognome', '')
                 profiles.append({
                     "id": idx, 
                     "prgAlunno": s.get('prgAlunno'),
                     "prgScheda": s.get('prgScheda'),
-                    "nome": s.get('alunno', {}).get('desNome', 'Sconosciuto'),
-                    "cognome": s.get('alunno', {}).get('desCognome', ''),
+                    "nome": nome,
+                    "cognome": cognome,
+                    "name": f"{nome} {cognome}".strip(),  # Combined name for frontend convenience
                     "classe": s.get('desClasse', ''),
                     "scuola": s.get('desScuola', ''),
                     "codMin": s.get('codMin', '')
@@ -95,7 +98,7 @@ def login_v2():
             "success": True,
             "multi_profile": False,
             "student": {
-                "name": target_profile['nome'],
+                "name": target_profile.get('name', target_profile['nome']),
                 "class": target_profile['classe'],
                 "school": school_code
             },
