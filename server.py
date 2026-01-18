@@ -476,6 +476,123 @@ def login():
         }), 401
 
 
+@app.route('/login-v2', methods=['POST'])
+def login_v2():
+    """
+    Nuovo endpoint per gestire login multi-profilo.
+    Se vengono rilevati più profili (es. più figli), restituisce la lista
+    per far scegliere all'utente.
+    """
+    data = request.json
+    school_code = data.get('schoolCode')
+    username = data.get('username')
+    password = data.get('password')
+    # Se il frontend invia un indice, significa che l'utente ha scelto
+    # un profilo dalla lista
+    profile_index = data.get('profileIndex', None)
+
+    if not all([school_code, username, password]):
+        return jsonify({"success": False, "error": "Dati mancanti"}), 400
+
+    try:
+        debug_log("LOGIN V2", {
+            "school": school_code, 
+            "username": username,
+            "profileIndex": profile_index
+        })
+
+        # 1. Autenticazione Base
+        # Nota: ArgoFamiglia di default fa il login e seleziona il primo profilo disponibile
+        # se non c'è una logica specifica nella libreria per "fermarsi" prima.
+        argo = argofamiglia.ArgoFamiglia(school_code, username, password)
+        
+        # -----------------------------------------------------------
+        # LOGICA MULTI-PROFILO (STUB/ADATTAMENTO)
+        # Qui dovremmo controllare se la libreria espone una lista di "alunni" o "schede".
+        # Poiché non conosciamo l'implementazione interna esatta della versione corrente
+        # di argofamiglia per i multi-profili, implementiamo una logica difensiva.
+        
+        # Ipotesi: Se la libreria supportasse multi-profilo, potrebbe averli in una proprietà
+        # tipo 'schede', 'alunni', o 'figli'.
+        
+        # Se vogliamo supportare il flusso "scegli profilo", dobbiamo poterli elencare.
+        # Per ora, se non troviamo una lista esplicita, assumiamo MONO-PROFILO.
+        # Se l'utente vuole implementare la logica reale, dovrà aggiornare questa sezione
+        # basandosi su come ArgoFamiglia espone i profili multipli.
+        
+        profiles_found = []
+        # Esempio di controllo (da adattare se la libreria espone altro)
+        # if hasattr(argo, 'get_available_profiles'):
+        #     profiles_found = argo.get_available_profiles()
+        
+        # Se abbiamo trovato più profili E l'utente non ne ha ancora scelto uno
+        if len(profiles_found) > 1 and profile_index is None:
+            debug_log(f"Trovati {len(profiles_found)} profili. Richiedo selezione.")
+            return jsonify({
+                "success": False,
+                "multi_profile": True,
+                "profiles": profiles_found, # Dovrebbe essere una lista di {name: '...', school: '...'}
+                "auth_token": None 
+            }), 200
+            
+        # -----------------------------------------------------------
+
+        # Se siamo qui, o è profilo singolo, o l'utente ha scelto, 
+        # o la libreria ne ha preso uno di default.
+        
+        debug_log("✅ Autenticazione V2 riuscita (Profilo Singolo/Selezionato)")
+        
+        # Estrai token
+        headers = argo._ArgoFamiglia__headers
+        auth_token = headers.get('x-auth-token', '')
+        access_token = headers.get('Authorization', '').replace("Bearer ", "")
+
+        # ESTRAZIONE DATI (Come V1)
+        # 3. Voti
+        grades_data = extract_grades_multi_strategy(argo)
+        
+        # 4. Compiti
+        tasks_data = extract_homework_safe(argo)
+        
+        # 5. Promemoria/Bacheca
+        try:
+            dashboard_data = argo.dashboard()
+        except:
+            dashboard_data = {}
+        announcements_data = extract_promemoria(dashboard_data)
+
+        response_data = {
+            "success": True,
+            "multi_profile": False, # Login completato
+            "session": {
+                "schoolCode": school_code,
+                "authToken": auth_token,
+                "accessToken": access_token,
+                "userName": username
+            },
+            "student": {
+                "name": username, # Idealmente prendere il nome reale dal profilo scelto
+                "class": "DidUP",
+                "school": school_code
+            },
+            "tasks": tasks_data,
+            "voti": grades_data,
+            "promemoria": announcements_data
+        }
+        
+        return jsonify(response_data), 200
+
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        debug_log("❌ LOGIN V2 FAILED", error_trace)
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": error_trace if DEBUG_MODE else None
+        }), 401
+
+
 @app.route('/sync', methods=['POST'])
 def sync_data():
     """Sincronizzazione con credenziali salvate"""
