@@ -5,7 +5,7 @@ import uuid
 import os
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -31,6 +31,30 @@ def debug_log(message, data=None):
             else:
                 print(str(data)[:2000])
         print(f"{'='*60}\n")
+
+# ============= FIX TIMEZONE =============
+
+def fix_date_timezone(date_str):
+    """
+    Corregge il problema delle date sfasate di un giorno.
+    DidUP restituisce date che potrebbero essere interpretate come UTC,
+    causando uno spostamento di -1 giorno quando convertite in locale.
+    """
+    if not date_str:
+        return date_str
+    
+    try:
+        # Se la data è in formato YYYY-MM-DD, aggiunge un giorno
+        # per compensare il timezone
+        if len(date_str) == 10 and date_str.count('-') == 2:
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            # Aggiungi 1 giorno per compensare il fuso orario
+            fixed_date = date_obj + timedelta(days=1)
+            return fixed_date.strftime('%Y-%m-%d')
+    except:
+        pass
+    
+    return date_str
 
 # ============= STRATEGIE ESTRAZIONE VOTI =============
 
@@ -295,6 +319,9 @@ def extract_homework_safe(argo_instance):
         
         if isinstance(raw_homework, dict):
             for date_str, details in raw_homework.items():
+                # FIX TIMEZONE: Correggi la data
+                fixed_date = fix_date_timezone(date_str)
+                
                 compiti_list = details.get('compiti', [])
                 materie_list = details.get('materie', [])
                 
@@ -304,18 +331,21 @@ def extract_homework_safe(argo_instance):
                         "id": str(uuid.uuid4())[:12],
                         "text": desc,
                         "subject": mat,
-                        "due_date": date_str,
+                        "due_date": fixed_date,  # Usa data corretta
                         "materia": mat,
                         "done": False
                     })
                     
         elif isinstance(raw_homework, list):
             for t in raw_homework:
+                date_s = t.get('datCompito', '')
+                fixed_date = fix_date_timezone(date_s)
+                
                 tasks_data.append({
                     "id": str(uuid.uuid4())[:12],
                     "text": t.get('desCompito', '') or t.get('compito', ''),
                     "subject": t.get('desMateria', '') or t.get('materia', 'Generico'),
-                    "due_date": t.get('datCompito', ''),
+                    "due_date": fixed_date,
                     "done": False
                 })
                 
