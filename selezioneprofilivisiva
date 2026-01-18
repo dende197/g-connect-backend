@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Selezione Profilo Argo</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; display: flex; flex-direction: column; align-items: center; padding: 50px; }
+        
+        #loading { display: none; color: #007bff; font-weight: bold; }
+
+        /* Contenitore delle schede */
+        .profile-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+
+        /* La singola scheda (creata dal Javascript) */
+        .profile-card {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 15px;
+            padding: 25px;
+            width: 220px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .profile-card:hover {
+            transform: translateY(-10px);
+            border-color: #007bff;
+            box-shadow: 0 10px 15px rgba(0,0,0,0.15);
+        }
+
+        .profile-card img { width: 70px; margin-bottom: 15px; }
+        .profile-name { font-weight: bold; font-size: 1.2em; color: #333; margin-bottom: 5px; }
+        .profile-info { color: #777; font-size: 0.9em; }
+
+        .btn-test { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h1>G-Connect Multi-Profilo</h1>
+    <p>Clicca il pulsante per simulare il login e caricare i figli collegati.</p>
+    
+    <button class="btn-test" onclick="caricaProfili()">Simula Caricamento Profili</button>
+    
+    <div id="loading">⏳ Interrogazione server in corso...</div>
+
+    <div class="profile-container" id="container-profili"></div>
+
+    <script>
+        // 1. Questa funzione contatta il tuo server Python
+        async function caricaProfili() {
+            const container = document.getElementById('container-profili');
+            const loader = document.getElementById('loading');
+            
+            container.innerHTML = ''; // Svuota i test precedenti
+            loader.style.display = 'block';
+
+            try {
+                // Sostituisci con l'URL del tuo server Render/Railway
+                const URL_SERVER = "https://tuo-server-python.com/get_profiles"; 
+                
+                // Inviamo i dati di login (per ora simulati o presi da un form)
+                const response = await fetch(URL_SERVER, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schoolCode: "SG12345",
+                        username: "tuo_user",
+                        password: "tua_password"
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // 2. Il "Cameriere" (JS) riceve la lista e disegna le schede
+                    disegnaSchede(data.profiles);
+                } else {
+                    alert("Errore: " + data.error);
+                }
+            } catch (error) {
+                console.error("Errore di connessione:", error);
+                // TEST: Se il server è spento, mostriamo dei dati finti per vedere se la grafica funziona
+                console.log("Visualizzo dati di test locali...");
+                const profiliTest = [
+                    { nome: "SCOLA FRANCESCO", classe: "4D SCIENTIFICO", id: "101" },
+                    { nome: "SCOLA MADDALENA", classe: "2D SCIENTIFICO", id: "102" },
+                    { nome: "SCOLA FABIO", classe: "1D SCIENTIFICO", id: "103" }
+                ];
+                disegnaSchede(profiliTest);
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        // 3. Funzione che trasforma i dati in HTML visivo
+        function disegnaSchede(listaFigli) {
+            const container = document.getElementById('container-profili');
+            
+            listaFigli.forEach(figlio => {
+                const card = document.createElement('div');
+                card.className = 'profile-card';
+                
+                // Quando clicchi, il JS "ricorda" l'ID e chiede i voti
+                card.onclick = () => selezionaFiglio(figlio.id, figlio.nome);
+
+                card.innerHTML = `
+                    <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
+                    <div class="profile-name">${figlio.nome}</div>
+                    <div class="profile-info">${figlio.classe}</div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+
+        function selezionaFiglio(id, nome) {
+            alert("Hai scelto: " + nome + "\nID Tecnico: " + id + "\n\nAdesso il server caricherà solo i suoi voti!");
+            // Qui andrà la chiamata per caricare i voti reali
+        }
+    </script>
+</body>
+</html>
