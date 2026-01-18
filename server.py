@@ -310,12 +310,16 @@ def extract_homework_safe(argo_instance):
                     })
                     
         elif isinstance(raw_homework, list):
+            # Fallback per formato lista
+            debug_log(f"📋 Formato lista: {len(raw_homework)} compiti")
             for t in raw_homework:
                 tasks_data.append({
                     "id": str(uuid.uuid4())[:12],
                     "text": t.get('desCompito', '') or t.get('compito', ''),
                     "subject": t.get('desMateria', '') or t.get('materia', 'Generico'),
-                    "due_date": t.get('datCompito', ''),
+                    "due_date": t.get('datCompito', '') or t.get('dataConsegna', ''),
+                    "datCompito": t.get('datCompito', ''),
+                    "materia": t.get('desMateria', 'Generico'),
                     "done": False
                 })
                 
