@@ -1687,7 +1687,7 @@
             btn.disabled = true;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/login`, {
+                const response = await fetch(`${API_BASE_URL}/login-v2`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ schoolCode: school, username: user, password: pass })
@@ -1700,86 +1700,19 @@
                 }
 
                 if (data.success) {
-                    console.log("✅ Login OK, saving...");
-                    console.log("📥 Dati ricevuti dal login:", {
-                        tasks: data.tasks?.length || 0,
-                        voti: data.voti?.length || 0,
-                        promemoria: data.promemoria?.length || data.announcements?.length || 0,
-                        student: data.student
-                    });
-
-                    // ⭐ CRITICO: Salva sessione con credenziali codificate (as in the old working code)
-                    if (data.session) {
-                        data.session.storedUser = btoa(unescape(encodeURIComponent(user)));
-                        data.session.storedPass = btoa(unescape(encodeURIComponent(pass)));
-                        data.session.schoolCode = school;
-                        sessionManager.save(data.session);
-                        console.log("💾 Sessione salvata con credenziali");
-                    } else {
-                        // ⭐ If no session from backend, create one with credentials
-                        sessionManager.save({
-                            schoolCode: school,
-                            storedUser: btoa(unescape(encodeURIComponent(user))),
-                            storedPass: btoa(unescape(encodeURIComponent(pass)))
-                        });
-                        console.log("💾 Sessione minima creata con credenziali");
+                    // Check if multi-profile response
+                    if (data.multi_profile === true) {
+                        console.log("👥 Multi-profile detected, showing selection modal");
+                        const credentials = { schoolCode: school, username: user, password: pass };
+                        showProfileSelectionModal(data.profiles, credentials);
+                        btn.innerText = "Accedi";
+                        btn.disabled = false;
+                        return;
                     }
-
-                    // ⭐ Salva user
-                    if (data.student) {
-                        state.user = data.student;
-                        localStorage.setItem('argo_user', JSON.stringify(state.user));
-                        console.log("💾 User salvato:", state.user.name);
-                    }
-
-                    // ⭐ Carica compiti con updateTasks per preservare date
-                    if (data.tasks && data.tasks.length > 0) {
-                        updateTasks(data.tasks, false);
-                        console.log("✅ Compiti caricati:", state.tasks.length);
-                    }
-
-                    // ⭐ CRITICO: Carica voti e salva SEMPRE
-                    console.log("🎓 LOGIN - Controllo voti in data:", data);
-                    console.log("🎓 LOGIN - data.voti:", data.voti);
-                    console.log("🎓 LOGIN - typeof data.voti:", typeof data.voti);
-                    console.log("🎓 LOGIN - Array.isArray(data.voti):", Array.isArray(data.voti));
-
-                    if (data.voti !== undefined) {
-                        state.voti = Array.isArray(data.voti) ? data.voti : [];
-                        localStorage.setItem('argo_voti', JSON.stringify(state.voti));
-                        console.log("✅ Voti caricati e salvati:", state.voti.length);
-                        console.log("✅ Voti salvati - contenuto completo:", JSON.stringify(state.voti));
-                        if (state.voti.length === 0) {
-                            console.warn("⚠️ ATTENZIONE: Array voti vuoto - il backend NON sta recuperando i voti da DidUP");
-                        } else {
-                            console.log("✅ Primo voto esempio:", state.voti[0]);
-                        }
-                    } else {
-                        console.error("❌ ERRORE CRITICO: Campo 'voti' non presente nella risposta del login!");
-                        console.error("❌ Chiavi disponibili in data:", Object.keys(data));
-                        console.error("❌ Risposta completa:", data);
-                    }
-
-                    // ⭐ CRITICO: Carica promemoria e salva SEMPRE
-                    const promemoriaData = data.promemoria || data.announcements;
-                    if (promemoriaData !== undefined) {
-                        state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
-                        localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
-                        console.log("✅ Promemoria caricati e salvati:", state.promemoria.length);
-                        if (state.promemoria.length === 0) {
-                            console.warn("⚠️ ATTENZIONE: Array promemoria vuoto - il backend NON sta recuperando i promemoria da DidUP");
-                        }
-                    } else {
-                        console.warn("⚠️ ATTENZIONE: Campo 'promemoria'/'announcements' non presente nella risposta del login");
-                    }
-
-                    state.isLoggedIn = true;
-                    state.didup.connected = true;
-                    state.isOffline = false;
-                    state.lastSync = new Date().toLocaleTimeString();
-                    updateOfflineBadge();
-
-                    closeModal();
+                    
+                    // Single profile or profile already selected - process normally
+                    console.log("✅ Login OK, processing...");
+                    processLoginResponse(data, user, pass, school);
                     alert(`✅ Benvenuto ${data.student?.name || user}! Dati sincronizzati.`);
                     render();
                 } else {
@@ -1792,6 +1725,264 @@
                 btn.innerText = "Accedi";
                 btn.disabled = false;
             }
+        }
+
+        function showProfileSelectionModal(profiles, credentials) {
+            console.log("🎭 Showing profile selection modal", profiles);
+            
+            // Close the login modal first
+            closeModal();
+            
+            // Create or get the profile selection modal
+            let modal = document.getElementById('profileSelectionModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'profileSelectionModal';
+                modal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.8);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                    backdrop-filter: blur(10px);
+                `;
+                document.body.appendChild(modal);
+            }
+
+            // Create modal content
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: var(--surface-color);
+                border-radius: var(--radius-L);
+                padding: 24px;
+                max-width: 500px;
+                width: 90%;
+                max-height: 80vh;
+                overflow-y: auto;
+            `;
+
+            modalContent.innerHTML = `
+                <h2 style="margin: 0 0 16px 0; color: var(--text-primary); font-size: 24px;">Seleziona Profilo</h2>
+                <p style="margin: 0 0 24px 0; color: var(--text-secondary);">Sono stati trovati più profili. Seleziona quello da utilizzare:</p>
+                <div id="profileList"></div>
+                <button id="cancelProfileSelection" style="
+                    width: 100%;
+                    padding: 14px;
+                    margin-top: 16px;
+                    background: transparent;
+                    border: 1px solid rgba(255,255,255,0.2);
+                    border-radius: 12px;
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    font-size: 16px;
+                ">Annulla</button>
+            `;
+
+            modal.innerHTML = '';
+            modal.appendChild(modalContent);
+
+            // Add profile cards
+            const profileList = modalContent.querySelector('#profileList');
+            profiles.forEach((profile, index) => {
+                const card = document.createElement('div');
+                card.style.cssText = `
+                    background: var(--surface-highlight);
+                    padding: 16px;
+                    border-radius: 12px;
+                    margin-bottom: 12px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    border: 2px solid transparent;
+                `;
+                
+                card.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-size: 18px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                                ${profile.name || profile.nome + ' ' + profile.cognome}
+                            </div>
+                            <div style="font-size: 14px; color: var(--text-secondary);">
+                                ${profile.classe || 'N/D'} - ${profile.school || profile.scuola || 'N/D'}
+                            </div>
+                        </div>
+                        <i class="ph-bold ph-caret-right" style="font-size: 24px; color: var(--blue);"></i>
+                    </div>
+                `;
+                
+                card.onmouseover = () => {
+                    card.style.borderColor = 'var(--blue)';
+                    card.style.background = 'rgba(10, 132, 255, 0.1)';
+                };
+                card.onmouseout = () => {
+                    card.style.borderColor = 'transparent';
+                    card.style.background = 'var(--surface-highlight)';
+                };
+                
+                card.onclick = () => selectProfile(index, credentials, modal);
+                profileList.appendChild(card);
+            });
+
+            // Cancel button
+            modalContent.querySelector('#cancelProfileSelection').onclick = () => {
+                modal.remove();
+                showLoginModal();
+            };
+
+            // Prevent closing on background click during selection
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    // Don't close automatically - user must click Cancel or select a profile
+                }
+            };
+
+            modal.style.display = 'flex';
+        }
+
+        async function selectProfile(index, credentials, modal) {
+            console.log("🎯 Selecting profile with index:", index);
+            
+            // Disable all profile cards and show loading
+            const profileList = modal.querySelector('#profileList');
+            const cards = profileList.querySelectorAll('div');
+            cards.forEach(card => {
+                card.style.pointerEvents = 'none';
+                card.style.opacity = '0.5';
+            });
+
+            // Add loading spinner to the selected card
+            const selectedCard = cards[index];
+            selectedCard.innerHTML += '<div style="text-align: center; margin-top: 10px;"><span style="color: var(--blue);">Caricamento...</span></div>';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/login-v2`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schoolCode: credentials.schoolCode,
+                        username: credentials.username,
+                        password: credentials.password,
+                        selectedProfileIndex: index
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Errore Server");
+                }
+
+                if (data.success && data.multi_profile === false) {
+                    console.log("✅ Profile selected successfully, processing data...");
+                    
+                    // Process the login response (same as regular login)
+                    processLoginResponse(data, credentials.username, credentials.password, credentials.schoolCode);
+                    
+                    // Close the profile modal
+                    modal.remove();
+                    
+                    alert(`✅ Benvenuto ${data.student?.name || credentials.username}! Dati sincronizzati.`);
+                    render();
+                } else {
+                    throw new Error("Risposta non valida dal server");
+                }
+            } catch (e) {
+                console.error("❌ Error selecting profile:", e);
+                alert("❌ Errore nella selezione del profilo: " + e.message);
+                
+                // Re-enable cards
+                cards.forEach(card => {
+                    card.style.pointerEvents = 'auto';
+                    card.style.opacity = '1';
+                });
+            }
+        }
+
+        function processLoginResponse(data, user, pass, school) {
+            console.log("📥 Processing login response");
+            console.log("📥 Dati ricevuti dal login:", {
+                tasks: data.tasks?.length || 0,
+                voti: data.voti?.length || 0,
+                promemoria: data.promemoria?.length || data.announcements?.length || 0,
+                student: data.student
+            });
+
+            // ⭐ CRITICO: Salva sessione con credenziali codificate (as in the old working code)
+            if (data.session) {
+                data.session.storedUser = btoa(unescape(encodeURIComponent(user)));
+                data.session.storedPass = btoa(unescape(encodeURIComponent(pass)));
+                data.session.schoolCode = school;
+                sessionManager.save(data.session);
+                console.log("💾 Sessione salvata con credenziali");
+            } else {
+                // ⭐ If no session from backend, create one with credentials
+                sessionManager.save({
+                    schoolCode: school,
+                    storedUser: btoa(unescape(encodeURIComponent(user))),
+                    storedPass: btoa(unescape(encodeURIComponent(pass)))
+                });
+                console.log("💾 Sessione minima creata con credenziali");
+            }
+
+            // ⭐ Salva user
+            if (data.student) {
+                state.user = data.student;
+                localStorage.setItem('argo_user', JSON.stringify(state.user));
+                console.log("💾 User salvato:", state.user.name);
+            }
+
+            // ⭐ Carica compiti con updateTasks per preservare date
+            if (data.tasks && data.tasks.length > 0) {
+                updateTasks(data.tasks, false);
+                console.log("✅ Compiti caricati:", state.tasks.length);
+            }
+
+            // ⭐ CRITICO: Carica voti e salva SEMPRE
+            console.log("🎓 LOGIN - Controllo voti in data:", data);
+            console.log("🎓 LOGIN - data.voti:", data.voti);
+            console.log("🎓 LOGIN - typeof data.voti:", typeof data.voti);
+            console.log("🎓 LOGIN - Array.isArray(data.voti):", Array.isArray(data.voti));
+
+            if (data.voti !== undefined) {
+                state.voti = Array.isArray(data.voti) ? data.voti : [];
+                localStorage.setItem('argo_voti', JSON.stringify(state.voti));
+                console.log("✅ Voti caricati e salvati:", state.voti.length);
+                console.log("✅ Voti salvati - contenuto completo:", JSON.stringify(state.voti));
+                if (state.voti.length === 0) {
+                    console.warn("⚠️ ATTENZIONE: Array voti vuoto - il backend NON sta recuperando i voti da DidUP");
+                } else {
+                    console.log("✅ Primo voto esempio:", state.voti[0]);
+                }
+            } else {
+                console.error("❌ ERRORE CRITICO: Campo 'voti' non presente nella risposta del login!");
+                console.error("❌ Chiavi disponibili in data:", Object.keys(data));
+                console.error("❌ Risposta completa:", data);
+            }
+
+            // ⭐ CRITICO: Carica promemoria e salva SEMPRE
+            const promemoriaData = data.promemoria || data.announcements;
+            if (promemoriaData !== undefined) {
+                state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
+                localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
+                console.log("✅ Promemoria caricati e salvati:", state.promemoria.length);
+                if (state.promemoria.length === 0) {
+                    console.warn("⚠️ ATTENZIONE: Array promemoria vuoto - il backend NON sta recuperando i promemoria da DidUP");
+                }
+            } else {
+                console.warn("⚠️ ATTENZIONE: Campo 'promemoria'/'announcements' non presente nella risposta del login");
+            }
+
+            state.isLoggedIn = true;
+            state.didup.connected = true;
+            state.isOffline = false;
+            state.lastSync = new Date().toLocaleTimeString();
+            updateOfflineBadge();
+
+            closeModal();
         }
 
         function publishPost() {
