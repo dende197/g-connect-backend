@@ -5,7 +5,7 @@ import uuid
 import os
 import json
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -32,54 +32,19 @@ def debug_log(message, data=None):
                 print(str(data)[:2000])
         print(f"{'='*60}\n")
 
-# ============= FIX TIMEZONE =============
-
-def fix_date_timezone(date_str):
-    """
-    Corregge il problema delle date sfasate di un giorno.
-    DidUP restituisce date che potrebbero essere interpretate come UTC,
-    causando uno spostamento di -1 giorno quando convertite in locale.
-    """
-    if not date_str:
-        return date_str
-    
-    try:
-        # Se la data è in formato YYYY-MM-DD, aggiunge un giorno
-        # per compensare il timezone
-        if len(date_str) == 10 and date_str.count('-') == 2:
-            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-            # Aggiungi 1 giorno per compensare il fuso orario
-            fixed_date = date_obj + timedelta(days=1)
-            return fixed_date.strftime('%Y-%m-%d')
-    except:
-        pass
-    
-    return date_str
-
 # ============= STRATEGIE ESTRAZIONE VOTI =============
 
-def strategia_1_dashboard(argo_instance):
+def strategia_1_dashboard_cached(dashboard_data):
     """
-    STRATEGIA 1: Usa il metodo dashboard() della libreria
+    STRATEGIA 1: Usa la dashboard già caricata (evita chiamate multiple)
     """
     grades = []
     try:
-        debug_log("STRATEGIA 1: Chiamata dashboard()")
-        dashboard_data = argo_instance.dashboard()
-        
-        debug_log("Dashboard RAW Response", dashboard_data)
+        debug_log("STRATEGIA 1: Analisi dashboard cache")
         
         if not dashboard_data:
             debug_log("⚠️ Dashboard vuota")
             return grades
-        
-        # Salva la risposta completa per analisi
-        try:
-            with open('/tmp/dashboard_debug.json', 'w') as f:
-                json.dump(dashboard_data, f, indent=2, default=str)
-            debug_log("✅ Dashboard salvata in /tmp/dashboard_debug.json")
-        except:
-            pass # Ignore write errors on read-only systems
         
         # Naviga nella struttura
         data_obj = dashboard_data.get('data', {})
@@ -118,20 +83,20 @@ def strategia_1_dashboard(argo_instance):
                 for v in voti_raw:
                     valore = v.get('codVoto') or v.get('voto') or v.get('valore')
                     materia = v.get('desMateria') or v.get('materia', 'N/D')
-                    data_voto = v.get('datGiorno') or v.get('data') or v.get('dataVoto')
                     
                     grades.append({
                         "materia": materia,
                         "valore": valore,
-                        "data": data_voto,
+                        "data": v.get('datGiorno') or v.get('data') or v.get('dataVoto'),
                         "tipo": v.get('desVoto') or v.get('tipo', 'N/D'),
                         "peso": v.get('numPeso', '100'),
                         # Alias per frontend
                         "subject": materia,
                         "value": valore,
-                        "date": data_voto,
+                        "date": v.get('datGiorno', ''),
                         "id": str(uuid.uuid4())[:12]
                     })
+                break  # Esci dopo aver trovato i voti
                     
     except Exception as e:
         debug_log(f"❌ Errore Strategia 1", str(e))
@@ -180,16 +145,15 @@ def strategia_2_api_diretta(argo_instance):
                             debug_log(f"✅ Trovati {len(data)} voti in {endpoint}", data[:2])
                             
                             for v in data:
-                                data_voto = v.get('datGiorno') or v.get('data')
                                 grades.append({
                                     "materia": v.get('desMateria') or v.get('materia', 'N/D'),
                                     "valore": v.get('codVoto') or v.get('voto') or v.get('valore'),
-                                    "data": data_voto,
+                                    "data": v.get('datGiorno') or v.get('data'),
                                     "tipo": v.get('desVoto') or v.get('tipo', 'N/D'),
                                     "peso": v.get('numPeso', '100'),
                                     "subject": v.get('desMateria', 'N/D'),
                                     "value": v.get('codVoto', ''),
-                                    "date": data_voto,
+                                    "date": v.get('datGiorno', ''),
                                     "id": str(uuid.uuid4())[:12]
                                 })
                             break  # Ferma se trovati
@@ -203,16 +167,15 @@ def strategia_2_api_diretta(argo_instance):
                                 if key in data and isinstance(data[key], list):
                                     debug_log(f"✅ Trovati {len(data[key])} voti in {endpoint}.{key}")
                                     for v in data[key]:
-                                        data_voto = v.get('datGiorno') or v.get('data')
                                         grades.append({
                                             "materia": v.get('desMateria') or v.get('materia', 'N/D'),
                                             "valore": v.get('codVoto') or v.get('voto') or v.get('valore'),
-                                            "data": data_voto,
+                                            "data": v.get('datGiorno') or v.get('data'),
                                             "tipo": v.get('desVoto') or v.get('tipo', 'N/D'),
                                             "peso": v.get('numPeso', '100'),
                                             "subject": v.get('desMateria', 'N/D'),
                                             "value": v.get('codVoto', ''),
-                                            "date": data_voto,
+                                            "date": v.get('datGiorno', ''),
                                             "id": str(uuid.uuid4())[:12]
                                         })
                                     break
@@ -258,15 +221,14 @@ def strategia_3_metodo_diretto(argo_instance):
                         # Processa il risultato
                         if isinstance(result, list):
                             for v in result:
-                                data_voto = v.get('datGiorno', '')
                                 grades.append({
                                     "materia": v.get('desMateria', 'N/D'),
                                     "valore": v.get('codVoto', ''),
-                                    "data": data_voto,
+                                    "data": v.get('datGiorno', ''),
                                     "tipo": v.get('desVoto', 'N/D'),
                                     "subject": v.get('desMateria', 'N/D'),
                                     "value": v.get('codVoto', ''),
-                                    "date": data_voto,
+                                    "date": v.get('datGiorno', ''),
                                     "id": str(uuid.uuid4())[:12]
                                 })
                         break
@@ -279,41 +241,10 @@ def strategia_3_metodo_diretto(argo_instance):
     return grades
 
 
-def extract_grades_multi_strategy(argo_instance):
-    """
-    MASTER FUNCTION: Prova tutte le strategie in sequenza
-    """
-    all_grades = []
-    
-    # Strategia 1
-    grades_s1 = strategia_1_dashboard(argo_instance)
-    if grades_s1:
-        debug_log(f"✅ Strategia 1: {len(grades_s1)} voti")
-        all_grades.extend(grades_s1)
-        return all_grades  # Ferma se trovati
-    
-    # Strategia 2
-    grades_s2 = strategia_2_api_diretta(argo_instance)
-    if grades_s2:
-        debug_log(f"✅ Strategia 2: {len(grades_s2)} voti")
-        all_grades.extend(grades_s2)
-        return all_grades
-    
-    # Strategia 3
-    grades_s3 = strategia_3_metodo_diretto(argo_instance)
-    if grades_s3:
-        debug_log(f"✅ Strategia 3: {len(grades_s3)} voti")
-        all_grades.extend(grades_s3)
-        return all_grades
-    
-    debug_log("❌ NESSUNA STRATEGIA ha restituito voti")
-    return all_grades
-
-
 # ============= ESTRAZIONE COMPITI =============
 
 def extract_homework_safe(argo_instance):
-    """Recupera compiti con gestione errori e fix timezone"""
+    """Recupera compiti con gestione errori"""
     tasks_data = []
     try:
         debug_log("📚 Chiamata getCompitiByDate()")
@@ -322,10 +253,6 @@ def extract_homework_safe(argo_instance):
         
         if isinstance(raw_homework, dict):
             for date_str, details in raw_homework.items():
-                # FIX TIMEZONE: Correggi la data
-                fixed_date = fix_date_timezone(date_str)
-                debug_log(f"📅 Data originale: {date_str} → Corretta: {fixed_date}")
-                
                 compiti_list = details.get('compiti', [])
                 materie_list = details.get('materie', [])
                 
@@ -335,23 +262,20 @@ def extract_homework_safe(argo_instance):
                         "id": str(uuid.uuid4())[:12],
                         "text": desc,
                         "subject": mat,
-                        "due_date": fixed_date,  # Usa la data corretta
-                        "datCompito": fixed_date,
+                        "due_date": date_str,
+                        "datCompito": date_str,
                         "materia": mat,
                         "done": False
                     })
                     
         elif isinstance(raw_homework, list):
             for t in raw_homework:
-                date_str = t.get('datCompito', '') or t.get('dataConsegna', '')
-                fixed_date = fix_date_timezone(date_str)
-                
                 tasks_data.append({
                     "id": str(uuid.uuid4())[:12],
                     "text": t.get('desCompito', '') or t.get('compito', ''),
                     "subject": t.get('desMateria', '') or t.get('materia', 'Generico'),
-                    "due_date": fixed_date,
-                    "datCompito": fixed_date,
+                    "due_date": t.get('datCompito', ''),
+                    "datCompito": t.get('datCompito', ''),
                     "materia": t.get('desMateria', 'Generico'),
                     "done": False
                 })
@@ -437,16 +361,31 @@ def login():
         tasks_data = extract_homework_safe(argo)
         debug_log(f"📚 COMPITI FINALI: {len(tasks_data)} elementi")
         
-        # 4. POI recupera VOTI
-        debug_log("🎓 INIZIO ESTRAZIONE VOTI")
-        grades_data = extract_grades_multi_strategy(argo)
-        debug_log(f"🎓 VOTI FINALI: {len(grades_data)} elementi", grades_data[:3])
-        
-        # 5. Recupera promemoria (opzionale)
+        # 4. Recupera dashboard (una volta sola)
+        debug_log("📊 Recupero Dashboard")
         try:
             dashboard_data = argo.dashboard()
-        except:
+            debug_log("✅ Dashboard recuperata")
+        except Exception as e:
+            debug_log(f"⚠️ Errore dashboard: {e}")
             dashboard_data = {}
+        
+        # 5. POI recupera VOTI dalla dashboard già caricata
+        debug_log("🎓 INIZIO ESTRAZIONE VOTI")
+        grades_data = strategia_1_dashboard_cached(dashboard_data)
+        
+        # Se strategia 1 fallisce, prova le altre
+        if not grades_data:
+            debug_log("⚠️ Strategia 1 fallita, provo strategia 2")
+            grades_data = strategia_2_api_diretta(argo)
+        
+        if not grades_data:
+            debug_log("⚠️ Strategia 2 fallita, provo strategia 3")
+            grades_data = strategia_3_metodo_diretto(argo)
+            
+        debug_log(f"🎓 VOTI FINALI: {len(grades_data)} elementi", grades_data[:3])
+        
+        # 6. Recupera promemoria dalla dashboard già caricata
         announcements_data = extract_promemoria(dashboard_data)
 
         # Risposta finale
@@ -464,7 +403,7 @@ def login():
                 "school": school_code
             },
             "tasks": tasks_data,
-            "voti": grades_data,  # ASSICURATI CHE SIA QUI
+            "voti": grades_data,
             "promemoria": announcements_data,
             "debug_info": {
                 "voti_count": len(grades_data),
@@ -473,9 +412,9 @@ def login():
             }
         }
         
-        debug_log("RISPOSTA FINALE - VOTI", {
+        debug_log("RISPOSTA FINALE - CONTROLLO VOTI", {
             "voti_count": len(response_data['voti']),
-            "voti_sample": response_data['voti'][:2] if response_data['voti'] else []
+            "voti_sample": response_data['voti'][:2] if response_data['voti'] else "VUOTO!"
         })
         
         return jsonify(response_data), 200
@@ -521,14 +460,22 @@ def sync_data():
         # Re-login
         argo = argofamiglia.ArgoFamiglia(school, user, pass_)
         
-        # Recupera dati (COMPITI PRIMA!)
+        # Recupera COMPITI PRIMA
         tasks_data = extract_homework_safe(argo)
-        grades_data = extract_grades_multi_strategy(argo)
         
+        # Recupera dashboard
         try:
             dashboard_data = argo.dashboard()
         except:
             dashboard_data = {}
+        
+        # POI voti
+        grades_data = strategia_1_dashboard_cached(dashboard_data)
+        if not grades_data:
+            grades_data = strategia_2_api_diretta(argo)
+        if not grades_data:
+            grades_data = strategia_3_metodo_diretto(argo)
+            
         announcements_data = extract_promemoria(dashboard_data)
         
         # Nuovi token
@@ -544,7 +491,7 @@ def sync_data():
         sync_response = {
             "success": True,
             "tasks": tasks_data,
-            "voti": grades_data,  # ASSICURATI CHE SIA QUI
+            "voti": grades_data,
             "promemoria": announcements_data,
             "new_tokens": {
                 "authToken": new_auth_token,
@@ -552,9 +499,9 @@ def sync_data():
             }
         }
         
-        debug_log("SYNC RESPONSE - VOTI", {
+        debug_log("SYNC RESPONSE - CONTROLLO VOTI", {
             "voti_count": len(sync_response['voti']),
-            "voti_sample": sync_response['voti'][:2] if sync_response['voti'] else []
+            "voti_sample": sync_response['voti'][:2] if sync_response['voti'] else "VUOTO!"
         })
         
         return jsonify(sync_response), 200
@@ -598,7 +545,7 @@ def debug_dashboard():
 @app.route('/')
 def index():
     return """
-    <h1>G-Connect Backend - Debug Mode</h1>
+    <h1>G-Connect Backend - Debug Mode FIXED</h1>
     <p>Endpoints disponibili:</p>
     <ul>
         <li>POST /login - Autenticazione e recupero dati</li>
@@ -606,12 +553,12 @@ def index():
         <li>POST /debug/dashboard - Visualizza dashboard RAW (DEBUG)</li>
         <li>GET /health - Health check</li>
     </ul>
-    <p>Debug mode: <b>ATTIVO</b> - Controlla i log del server</p>
     <p><strong>FIX APPLICATI:</strong></p>
     <ul>
-        <li>✅ Date compiti corrette (timezone fix)</li>
-        <li>✅ Voti ora vengono restituiti correttamente</li>
-        <li>✅ Ordine recupero dati: compiti → voti</li>
+        <li>✅ Ordine corretto: COMPITI → Dashboard → VOTI</li>
+        <li>✅ Dashboard caricata UNA VOLTA e riusata</li>
+        <li>✅ Fallback strategia 2 e 3 se strategia 1 fallisce</li>
+        <li>✅ Logging dettagliato per debug</li>
     </ul>
     """
 
@@ -619,9 +566,9 @@ def index():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5002))
     print(f"\n{'='*70}")
-    print(f"🚀 G-Connect Backend - DEBUG MODE")
+    print(f"🚀 G-Connect Backend - FIXED VERSION")
     print(f"📡 Running on port {port}")
     print(f"🔍 Debug logging: ENABLED")
-    print(f"✅ Timezone fix: ACTIVE (+1 day)")
+    print(f"✅ Ordine corretto: COMPITI → VOTI")
     print(f"{'='*70}\n")
     app.run(host='0.0.0.0', port=port, debug=True)
