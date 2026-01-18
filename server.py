@@ -34,17 +34,28 @@ def debug_log(message, data=None):
 
 # ============= STRATEGIE ESTRAZIONE VOTI =============
 
-def strategia_1_dashboard_cached(dashboard_data):
+def strategia_1_dashboard(argo_instance):
     """
-    STRATEGIA 1: Usa la dashboard già caricata (evita chiamate multiple)
+    STRATEGIA 1: Usa il metodo dashboard() della libreria
     """
     grades = []
     try:
-        debug_log("STRATEGIA 1: Analisi dashboard cache")
+        debug_log("STRATEGIA 1: Chiamata dashboard()")
+        dashboard_data = argo_instance.dashboard()
+        
+        debug_log("Dashboard RAW Response", dashboard_data)
         
         if not dashboard_data:
             debug_log("⚠️ Dashboard vuota")
             return grades
+        
+        # Salva la risposta completa per analisi
+        try:
+            with open('/tmp/dashboard_debug.json', 'w') as f:
+                json.dump(dashboard_data, f, indent=2, default=str)
+            debug_log("✅ Dashboard salvata in /tmp/dashboard_debug.json")
+        except:
+            pass # Ignore write errors on read-only systems
         
         # Naviga nella struttura
         data_obj = dashboard_data.get('data', {})
@@ -96,7 +107,6 @@ def strategia_1_dashboard_cached(dashboard_data):
                         "date": v.get('datGiorno', ''),
                         "id": str(uuid.uuid4())[:12]
                     })
-                break  # Esci dopo aver trovato i voti
                     
     except Exception as e:
         debug_log(f"❌ Errore Strategia 1", str(e))
@@ -166,6 +176,7 @@ def strategia_2_api_diretta(argo_instance):
                             for key in ['voti', 'dati', 'data', 'valutazioni']:
                                 if key in data and isinstance(data[key], list):
                                     debug_log(f"✅ Trovati {len(data[key])} voti in {endpoint}.{key}")
+                                    # Processa come sopra... (logic simplified for brevity/safety)
                                     for v in data[key]:
                                         grades.append({
                                             "materia": v.get('desMateria') or v.get('materia', 'N/D'),
@@ -241,6 +252,37 @@ def strategia_3_metodo_diretto(argo_instance):
     return grades
 
 
+def extract_grades_multi_strategy(argo_instance):
+    """
+    MASTER FUNCTION: Prova tutte le strategie in sequenza
+    """
+    all_grades = []
+    
+    # Strategia 1
+    grades_s1 = strategia_1_dashboard(argo_instance)
+    if grades_s1:
+        debug_log(f"✅ Strategia 1: {len(grades_s1)} voti")
+        all_grades.extend(grades_s1)
+        return all_grades  # Ferma se trovati
+    
+    # Strategia 2
+    grades_s2 = strategia_2_api_diretta(argo_instance)
+    if grades_s2:
+        debug_log(f"✅ Strategia 2: {len(grades_s2)} voti")
+        all_grades.extend(grades_s2)
+        return all_grades
+    
+    # Strategia 3
+    grades_s3 = strategia_3_metodo_diretto(argo_instance)
+    if grades_s3:
+        debug_log(f"✅ Strategia 3: {len(grades_s3)} voti")
+        all_grades.extend(grades_s3)
+        return all_grades
+    
+    debug_log("❌ NESSUNA STRATEGIA ha restituito voti")
+    return all_grades
+
+
 # ============= ESTRAZIONE COMPITI =============
 
 def extract_homework_safe(argo_instance):
@@ -263,7 +305,6 @@ def extract_homework_safe(argo_instance):
                         "text": desc,
                         "subject": mat,
                         "due_date": date_str,
-                        "datCompito": date_str,
                         "materia": mat,
                         "done": False
                     })
@@ -275,15 +316,11 @@ def extract_homework_safe(argo_instance):
                     "text": t.get('desCompito', '') or t.get('compito', ''),
                     "subject": t.get('desMateria', '') or t.get('materia', 'Generico'),
                     "due_date": t.get('datCompito', ''),
-                    "datCompito": t.get('datCompito', ''),
-                    "materia": t.get('desMateria', 'Generico'),
                     "done": False
                 })
                 
     except Exception as e:
         debug_log(f"⚠️ Errore compiti", str(e))
-        import traceback
-        traceback.print_exc()
     
     debug_log(f"✅ Totale compiti: {len(tasks_data)}")
     return tasks_data
@@ -356,36 +393,19 @@ def login():
             "access_token": access_token[:30] + "..." if access_token else "N/A"
         })
 
-        # 3. Recupera COMPITI PRIMA (ordine importante!)
-        debug_log("📚 INIZIO ESTRAZIONE COMPITI")
-        tasks_data = extract_homework_safe(argo)
-        debug_log(f"📚 COMPITI FINALI: {len(tasks_data)} elementi")
-        
-        # 4. Recupera dashboard (una volta sola)
-        debug_log("📊 Recupero Dashboard")
-        try:
-            dashboard_data = argo.dashboard()
-            debug_log("✅ Dashboard recuperata")
-        except Exception as e:
-            debug_log(f"⚠️ Errore dashboard: {e}")
-            dashboard_data = {}
-        
-        # 5. POI recupera VOTI dalla dashboard già caricata
+        # 3. Recupera VOTI con strategia multipla
         debug_log("🎓 INIZIO ESTRAZIONE VOTI")
-        grades_data = strategia_1_dashboard_cached(dashboard_data)
-        
-        # Se strategia 1 fallisce, prova le altre
-        if not grades_data:
-            debug_log("⚠️ Strategia 1 fallita, provo strategia 2")
-            grades_data = strategia_2_api_diretta(argo)
-        
-        if not grades_data:
-            debug_log("⚠️ Strategia 2 fallita, provo strategia 3")
-            grades_data = strategia_3_metodo_diretto(argo)
-            
+        grades_data = extract_grades_multi_strategy(argo)
         debug_log(f"🎓 VOTI FINALI: {len(grades_data)} elementi", grades_data[:3])
         
-        # 6. Recupera promemoria dalla dashboard già caricata
+        # 4. Recupera compiti
+        tasks_data = extract_homework_safe(argo)
+        
+        # 5. Recupera promemoria
+        try:
+            dashboard_data = argo.dashboard()
+        except:
+            dashboard_data = {}
         announcements_data = extract_promemoria(dashboard_data)
 
         # Risposta finale
@@ -412,11 +432,7 @@ def login():
             }
         }
         
-        debug_log("RISPOSTA FINALE - CONTROLLO VOTI", {
-            "voti_count": len(response_data['voti']),
-            "voti_sample": response_data['voti'][:2] if response_data['voti'] else "VUOTO!"
-        })
-        
+        debug_log("RISPOSTA FINALE", response_data)
         return jsonify(response_data), 200
 
     except Exception as e:
@@ -460,22 +476,14 @@ def sync_data():
         # Re-login
         argo = argofamiglia.ArgoFamiglia(school, user, pass_)
         
-        # Recupera COMPITI PRIMA
+        # Recupera dati
+        grades_data = extract_grades_multi_strategy(argo)
         tasks_data = extract_homework_safe(argo)
         
-        # Recupera dashboard
         try:
             dashboard_data = argo.dashboard()
         except:
             dashboard_data = {}
-        
-        # POI voti
-        grades_data = strategia_1_dashboard_cached(dashboard_data)
-        if not grades_data:
-            grades_data = strategia_2_api_diretta(argo)
-        if not grades_data:
-            grades_data = strategia_3_metodo_diretto(argo)
-            
         announcements_data = extract_promemoria(dashboard_data)
         
         # Nuovi token
@@ -488,7 +496,7 @@ def sync_data():
             "tasks": len(tasks_data)
         })
         
-        sync_response = {
+        return jsonify({
             "success": True,
             "tasks": tasks_data,
             "voti": grades_data,
@@ -497,14 +505,7 @@ def sync_data():
                 "authToken": new_auth_token,
                 "accessToken": new_access_token
             }
-        }
-        
-        debug_log("SYNC RESPONSE - CONTROLLO VOTI", {
-            "voti_count": len(sync_response['voti']),
-            "voti_sample": sync_response['voti'][:2] if sync_response['voti'] else "VUOTO!"
-        })
-        
-        return jsonify(sync_response), 200
+        }), 200
         
     except Exception as e:
         import traceback
@@ -545,7 +546,7 @@ def debug_dashboard():
 @app.route('/')
 def index():
     return """
-    <h1>G-Connect Backend - Debug Mode FIXED</h1>
+    <h1>G-Connect Backend - Debug Mode</h1>
     <p>Endpoints disponibili:</p>
     <ul>
         <li>POST /login - Autenticazione e recupero dati</li>
@@ -553,22 +554,15 @@ def index():
         <li>POST /debug/dashboard - Visualizza dashboard RAW (DEBUG)</li>
         <li>GET /health - Health check</li>
     </ul>
-    <p><strong>FIX APPLICATI:</strong></p>
-    <ul>
-        <li>✅ Ordine corretto: COMPITI → Dashboard → VOTI</li>
-        <li>✅ Dashboard caricata UNA VOLTA e riusata</li>
-        <li>✅ Fallback strategia 2 e 3 se strategia 1 fallisce</li>
-        <li>✅ Logging dettagliato per debug</li>
-    </ul>
+    <p>Debug mode: <b>ATTIVO</b> - Controlla i log del server</p>
     """
 
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5002))
     print(f"\n{'='*70}")
-    print(f"🚀 G-Connect Backend - FIXED VERSION")
+    print(f"🚀 G-Connect Backend - DEBUG MODE")
     print(f"📡 Running on port {port}")
     print(f"🔍 Debug logging: ENABLED")
-    print(f"✅ Ordine corretto: COMPITI → VOTI")
     print(f"{'='*70}\n")
     app.run(host='0.0.0.0', port=port, debug=True)
