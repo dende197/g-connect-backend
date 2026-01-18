@@ -327,9 +327,12 @@ def extract_homework_safe(argo_instance):
 
 
 def extract_promemoria(dashboard_data):
-    """Estrae promemoria dalla dashboard"""
+    """
+    Estrae promemoria e avvisi dalla bacheca.
+    """
     promemoria = []
     try:
+        # Logica di navigazione simile a extract_grades
         data_obj = dashboard_data.get('data', {})
         dati_list = data_obj.get('dati', []) if isinstance(data_obj, dict) else []
         
@@ -337,6 +340,7 @@ def extract_promemoria(dashboard_data):
             dati_list = dashboard_data.get('dati', [])
 
         for blocco in dati_list:
+            # Cerca in bachecaAlunno E promemoria
             items = blocco.get('bachecaAlunno', []) + blocco.get('promemoria', [])
             
             for i in items:
@@ -346,12 +350,13 @@ def extract_promemoria(dashboard_data):
                     "autore": i.get('desMittente', 'Scuola'),
                     "data": i.get('datGiorno') or i.get('data', ''),
                     "url": i.get('urlAllegato', ''),
+                    # Alias per compatibilità
                     "oggetto": i.get('desOggetto') or i.get('titolo', 'Avviso'),
                     "date": i.get('datGiorno', '')
                 })
     except Exception as e:
-        debug_log(f"⚠️ Errore promemoria", str(e))
-    
+         debug_log(f"⚠️ Errore estrazione promemoria: {e}")
+         
     return promemoria
 
 
