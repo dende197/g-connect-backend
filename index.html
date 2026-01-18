@@ -1,38 +1,30 @@
 function performArgoSync() {
-    // Existing code...
-
-    // After receiving a response from the login endpoint
-    if (response.multi_profile) {
-        showProfileSelectionModal(response.profiles);
-    } else {
-        // Continue with login flow
-    }
+    // Check for multi_profile response
+    fetch('/api/login-v2')
+        .then(response => response.json())
+        .then(data => {
+            if (data.multi_profile) {
+                // Show the profile selection modal
+                showProfileSelectionModal(data.profiles);
+            } else {
+                // Proceed with the normal flow
+                initiateArgoSync(data.credentials);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
 }
 
 function showProfileSelectionModal(profiles) {
-    // Code to create and display the modal with the profiles
-    // Add event listeners to handle user selection
-    const modal = document.getElementById('profileSelectionModal');
+    // Implementation to display the modal and handle selection
+    const modal = document.getElementById('profile-selection-modal');
+    // Populate the modal with profiles
+    // Add event listeners to save credentials
     modal.style.display = 'block';
-
-    // Populate the modal with the profiles
-    const profileList = document.getElementById('profileList');
-    profileList.innerHTML = '';
-
-    profiles.forEach((profile, index) => {
-        const listItem = document.createElement('li');
-        listItem.innerText = profile.name; // Assuming profile has a 'name' property
-        listItem.onclick = () => {
-            // Handle profile selection
-            const selectedProfileIndex = index;
-            modal.style.display = 'none';
-            // Re-call the login endpoint with selectedProfileIndex
-            reCallLoginEndpoint(selectedProfileIndex);
-        };
-        profileList.appendChild(listItem);
-    });
 }
 
-function reCallLoginEndpoint(selectedProfileIndex) {
-    // Code to re-call the login endpoint with selectedProfileIndex
+function initiateArgoSync(credentials) {
+    // Send credentials to the backend and start the sync
+    // Call backend integration here
 }
