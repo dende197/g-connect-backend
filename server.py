@@ -289,9 +289,9 @@ def extract_homework_safe(argo_instance):
     """Recupera compiti con gestione errori"""
     tasks_data = []
     try:
-        debug_log("📚 Chiamata getCompitiByDate()")
+        debug_log("📚 INIZIO Chiamata getCompitiByDate()")
         raw_homework = argo_instance.getCompitiByDate()
-        debug_log("Compiti RAW", raw_homework)
+        debug_log(f"📚 RISULTATO getCompitiByDate() - tipo: {type(raw_homework)}", raw_homework)
         
         if isinstance(raw_homework, dict):
             for date_str, details in raw_homework.items():
@@ -402,13 +402,14 @@ def login():
             "access_token": access_token[:30] + "..." if access_token else "N/A"
         })
 
-        # 3. Recupera VOTI con strategia multipla
+        # 3. Recupera compiti (Priority)
+        # SPOSTATO PRIMA DEI VOTI COME NEL CODICE ORIGINALE
+        tasks_data = extract_homework_safe(argo)
+
+        # 4. Recupera VOTI con strategia multipla
         debug_log("🎓 INIZIO ESTRAZIONE VOTI")
         grades_data = extract_grades_multi_strategy(argo)
         debug_log(f"🎓 VOTI FINALI: {len(grades_data)} elementi", grades_data[:3])
-        
-        # 4. Recupera compiti
-        tasks_data = extract_homework_safe(argo)
         
         # 5. Recupera promemoria
         try:
