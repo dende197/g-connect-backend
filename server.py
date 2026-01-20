@@ -424,28 +424,6 @@ def switch_profile():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 401
 
-@app.route('/forgot-password', methods=['POST'])
-def forgot_password():
-    """Handle forgot password - list all profiles for the email
-    
-    Note: This is a placeholder endpoint. Argo DidUP does not provide a standard
-    forgot password API. In production, this should integrate with your school's
-    password recovery system or redirect users to contact the school administration.
-    """
-    data = request.json
-    email = data.get('email')
-    school = data.get('schoolCode')
-    
-    if not all([email, school]):
-        return jsonify({"success": False, "error": "Email e codice scuola richiesti"}), 400
-    
-    # TODO: Integrate with actual school password recovery system
-    return jsonify({
-        "success": True,
-        "message": "Se l'email è registrata, riceverai istruzioni per il recupero password con la lista dei profili associati.",
-        "info": "Contatta la segreteria scolastica per il recupero password."
-    }), 200
-
 @app.route('/health')
 def health():
     return jsonify({"status": "ok", "version": "MULTI_PROFILE_SUPPORT"}), 200
