@@ -5,7 +5,20 @@ import uuid
 import os
 import json
 import requests
+import secrets
+import re
+import base64
+from hashlib import sha256
 from datetime import datetime
+
+# ============= CONSTANTS =============
+CHALLENGE_URL = "https://auth.portaleargo.it/oauth2/auth"
+LOGIN_URL = "https://www.portaleargo.it/auth/sso/login"
+TOKEN_URL = "https://auth.portaleargo.it/oauth2/token"
+REDIRECT_URI = "it.argosoft.didup.famiglia.new://login-callback"
+CLIENT_ID = "72fd6dea-d0ab-4bb9-8eaa-3ac24c84886c"
+ENDPOINT = "https://www.portaleargo.it/appfamiglia/api/rest/"
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36"
 
 app = Flask(__name__)
 
@@ -31,6 +44,135 @@ def debug_log(message, data=None):
             else:
                 print(str(data)[:2000])
         print(f"{'='*60}\n")
+
+# ============= ADVANCED ARGO CLASS (MULTI-PROFILE) =============
+
+class AdvancedArgo(argofamiglia.ArgoFamiglia):
+    """
+    Estensione di ArgoFamiglia per supportare login manuale e selezione profilo.
+    """
+    def __init__(self, school: str, username: str, password: str, auth_token=None, access_token=None, skip_connect=False):
+        # Bypass __init__ originale per evitare connect automatica se richiesto
+        self._ArgoFamiglia__school = school
+        self._ArgoFamiglia__username = username
+        self._ArgoFamiglia__password = password
+        self._ArgoFamiglia__token = auth_token
+        self._ArgoFamiglia__login_data = {"access_token": access_token} if access_token else None
+        self._ArgoFamiglia__headers = {}
+        
+        if auth_token and access_token:
+            self.set_headers(auth_token, access_token)
+        elif not skip_connect:
+            self.connect()
+
+    def set_headers(self, auth_token, access_token):
+        """Imposta gli header manualmente"""
+        self._ArgoFamiglia__headers = {
+            "Content-Type": "Application/json",
+            "Authorization": "Bearer " + access_token,
+            "Accept": "Application/json",
+            "x-cod-min": self._ArgoFamiglia__school,
+            "x-auth-token": auth_token,
+            "User-Agent": USER_AGENT
+        }
+        self._ArgoFamiglia__token = auth_token
+
+    @staticmethod
+    def raw_login(school, username, password):
+        """
+        Esegue il flow OAuth e restituisce TUTTI i profili disponibili.
+        """
+        try:
+            # 1. Challenge
+            CODE_VERIFIER = secrets.token_hex(64)
+            CODE_CHALLENGE = base64.urlsafe_b64encode(sha256(CODE_VERIFIER.encode()).digest()).decode().replace("=", "")
+            
+            session = requests.Session()
+            
+            params = {
+                "redirect_uri": REDIRECT_URI,
+                "client_id": CLIENT_ID,
+                "response_type": "code",
+                "prompt": "login",
+                "state": secrets.token_urlsafe(32),
+                "scope": "openid offline profile user.roles argo",
+                "code_challenge": CODE_CHALLENGE,
+                "code_challenge_method": "S256"
+            }
+            
+            req = session.get(CHALLENGE_URL, params=params)
+            
+            # Extract challenge
+            challenge_match = re.search(r"login_challenge=([0-9a-f]+)", req.url)
+            if not challenge_match:
+                raise Exception("Login challenge non trovata")
+            login_challenge = challenge_match.group(1)
+            
+            # 2. Login POST
+            login_data = {
+                "challenge": login_challenge,
+                "client_id": CLIENT_ID,
+                "prefill": "true",
+                "famiglia_customer_code": school,
+                "username": username,
+                "password": password,
+                "login": "true"
+            }
+            
+            req = session.post(LOGIN_URL, data=login_data, allow_redirects=False)
+            if "Location" not in req.headers:
+                raise ValueError("Credenziali errate o scuola non valida")
+            
+            # 3. Follow redirect to get code
+            while True:
+                location = req.headers["Location"]
+                if "code=" in location:
+                    break
+                req = session.get(location, allow_redirects=False)
+            
+            code_match = re.search(r"code=([0-9a-zA-Z-_.]+)", location)
+            if not code_match:
+                raise Exception("Auth code non trovato")
+            code = code_match.group(1)
+            
+            # 4. Exchange code for token
+            token_req_data = {
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": REDIRECT_URI,
+                "code_verifier": CODE_VERIFIER,
+                "client_id": CLIENT_ID
+            }
+            
+            tokens = session.post(TOKEN_URL, data=token_req_data).json()
+            access_token = tokens["access_token"]
+            
+            # 5. Call Argo Login API to get Profiles
+            login_headers = {
+                "User-Agent": USER_AGENT,
+                "Content-Type": "Application/json",
+                "Authorization": "Bearer " + access_token,
+                "Accept": "Application/json",
+            }
+            
+            payload = {
+                "clientID": secrets.token_urlsafe(64),
+                "lista-x-auth-token": "[]",
+                "x-auth-token-corrente": "null",
+                "lista-opzioni-notifiche": "{}"
+            }
+            
+            argo_resp = requests.post(ENDPOINT + "login", headers=login_headers, json=payload).json()
+            profiles_data = argo_resp.get("data", [])
+            
+            return {
+                "access_token": access_token,
+                "profiles": profiles_data
+            }
+            
+        except Exception as e:
+            debug_log("Errore Raw Login", str(e))
+            raise e
 
 # ============= STRATEGIE ESTRAZIONE VOTI =============
 
@@ -349,6 +491,12 @@ def extract_promemoria(dashboard_data):
     return promemoria
 
 
+# ============= HELPERS SESSIONI =============
+
+def create_session(school, user, password, access_token, auth_token):
+    """Crea una sessione ArgoFamiglia usando token esistenti"""
+    return AdvancedArgo(school, user, password, auth_token=auth_token, access_token=access_token)
+
 # ============= ROUTES =============
 
 @app.route('/health', methods=['GET'])
@@ -362,6 +510,8 @@ def login():
     school_code = data.get('schoolCode')
     username = data.get('username')
     password = data.get('password')
+    # Nuovo parametro opzionale per selezione profilo
+    selected_profile_index = data.get('profileIndex') 
 
     if not all([school_code, username, password]):
         return jsonify({"success": False, "error": "Dati mancanti"}), 400
@@ -370,45 +520,84 @@ def login():
         debug_log("LOGIN REQUEST", {
             "school": school_code,
             "username": username,
-            "timestamp": datetime.now().isoformat()
+            "profileIndex": selected_profile_index
         })
         
-        # --- SESSIONE 1: VOTI (Priorità ai voti) ---
-        debug_log("🔐 [1/3] Creazione Sessione per VOTI...")
-        argo_voti = argofamiglia.ArgoFamiglia(school_code, username, password)
+        # 1. Login Avanzato (Ottieni Access Token + Lista Profili)
+        # Se abbiamo già i token (da una chiamata precedente non andata a buon fine o altro) potremmo riusarli,
+        # ma per sicurezza rifacciamo il login master.
         
-        # Estrai token dalla sessione voti (useremo questi per la risposta)
-        headers = argo_voti._ArgoFamiglia__headers
-        auth_token = headers.get('x-auth-token', '')
-        access_token = headers.get('Authorization', '').replace("Bearer ", "")
+        login_result = AdvancedArgo.raw_login(school_code, username, password)
+        access_token = login_result['access_token']
+        profiles = login_result['profiles']
         
-        debug_log("🎓 Recupero VOTI...")
+        if not profiles:
+             return jsonify({"success": False, "error": "Nessun profilo trovato"}), 401
+
+        # 2. Gestione Profili Multipli
+        if len(profiles) > 1 and selected_profile_index is None:
+            # Ritorna lista profili al frontend per scelta utente
+            simplified_profiles = []
+            for idx, p in enumerate(profiles):
+                simplified_profiles.append({
+                    "index": idx,
+                    "name": f"{p.get('alunno', {}).get('desNome', '')} {p.get('alunno', {}).get('desCognome', '')}",
+                    "school": p.get('desScuola', 'Scuola'),
+                    "class": p.get('desClasse', '')
+                })
+            
+            debug_log("⚠️ Rilevati profili multipli", simplified_profiles)
+            return jsonify({
+                "success": False,
+                "status": "MULTIPLE_PROFILES",
+                "profiles": simplified_profiles
+            }), 200
+
+        # 3. Selezione Profilo (default 0 se unico o non specificato)
+        target_index = int(selected_profile_index) if selected_profile_index is not None else 0
+        if target_index >= len(profiles):
+             return jsonify({"success": False, "error": "Indice profilo non valido"}), 400
+             
+        target_profile = profiles[target_index]
+        auth_token = target_profile['token']
+        
+        debug_log(f"✅ Profilo selezionato: Indice {target_index}", target_profile.get('alunno', {}))
+
+        # 4. Strategia Sessioni Isolate (Voti -> Compiti -> Dashboard)
+        # Ora passiamo direttamente i token, SENZA rifare login di rete! --> EFFICIENZA MASSIMA
+        
+        # --- SESSIONE 1: VOTI ---
+        debug_log("🔐 [1/3] Sessione VOTI (Fast Init)...")
+        # Usiamo AdvancedArgo iniettando i token
+        argo_voti = create_session(school_code, username, password, access_token, auth_token)
         grades_data = extract_grades_multi_strategy(argo_voti)
         debug_log(f"✅ Voti recuperati: {len(grades_data)}")
 
-        # --- SESSIONE 2: COMPITI (Nuova sessione pulita) ---
-        debug_log("🔐 [2/3] Creazione Sessione per COMPITI...")
+        # --- SESSIONE 2: COMPITI ---
+        debug_log("🔐 [2/3] Sessione COMPITI (Fast Init)...")
         try:
-            argo_compiti = argofamiglia.ArgoFamiglia(school_code, username, password)
-            debug_log("📚 Recupero COMPITI...")
-            tasks_data = extract_homework_safe(argo_compiti)
+            # Creiamo NUOVA istanza ma usiamo STESSI token validi
+            argo_tasks = create_session(school_code, username, password, access_token, auth_token)
+            tasks_data = extract_homework_safe(argo_tasks)
             debug_log(f"✅ Compiti recuperati: {len(tasks_data)}")
         except Exception as e_tasks:
             debug_log("⚠️ Errore sessione compiti", str(e_tasks))
             tasks_data = []
 
-        # --- SESSIONE 3: MEMO/DASHBOARD (Nuova sessione pulita) ---
-        debug_log("🔐 [3/3] Creazione Sessione per DASHBOARD...")
+        # --- SESSIONE 3: DASHBOARD ---
+        debug_log("🔐 [3/3] Sessione DASHBOARD (Fast Init)...")
         announcements_data = []
         try:
-            argo_dash = argofamiglia.ArgoFamiglia(school_code, username, password)
-            debug_log("📌 Recupero DASHBOARD...")
+            argo_dash = create_session(school_code, username, password, access_token, auth_token)
             dashboard_data = argo_dash.dashboard()
             announcements_data = extract_promemoria(dashboard_data)
-            debug_log(f"✅ Promemoria recuperati: {len(announcements_data)}")
         except Exception as e_dash:
             debug_log("⚠️ Errore sessione dashboard", str(e_dash))
             
+        # Dati studente
+        student_info = target_profile.get('alunno', {})
+        student_name = f"{student_info.get('desNome', '')} {student_info.get('desCognome', '')}".strip() or username
+
         # Risposta finale
         response_data = {
             "success": True,
@@ -416,11 +605,12 @@ def login():
                 "schoolCode": school_code,
                 "authToken": auth_token,
                 "accessToken": access_token,
-                "userName": username
+                "userName": username,
+                "profileIndex": target_index # Salviamo l'indice per il sync futuro
             },
             "student": {
-                "name": username,
-                "class": "DidUP",
+                "name": student_name,
+                "class": target_profile.get('desClasse', 'DidUP'),
                 "school": school_code
             },
             "tasks": tasks_data,
@@ -430,7 +620,7 @@ def login():
                 "voti_count": len(grades_data),
                 "tasks_count": len(tasks_data),
                 "timestamp": datetime.now().isoformat(),
-                "mode": "MULTI_SESSION_ISOLATED"
+                "mode": "MULTI_PROFILE_FAST"
             }
         }
         
@@ -450,14 +640,16 @@ def login():
 
 @app.route('/sync', methods=['POST'])
 def sync_data():
-    """Sincronizzazione con credenziali salvate"""
+    """Sincronizzazione con credenziali salvate e supporto token refresh"""
     data = request.json
     school = data.get('schoolCode')
     stored_user = data.get('storedUser')
     stored_pass = data.get('storedPass')
+    # Se il client ha salvato un indice profilo, lo usiamo
+    profile_index = data.get('profileIndex', 0) 
     
     try:
-        debug_log("SYNC REQUEST", {"school": school})
+        debug_log("SYNC REQUEST", {"school": school, "profileIndex": profile_index})
         
         if not all([school, stored_user, stored_pass]):
             return jsonify({"success": False, "error": "Credenziali mancanti"}), 401
@@ -475,51 +667,66 @@ def sync_data():
         user = decode_cred(stored_user)
         pass_ = decode_cred(stored_pass)
         
-        # --- SESSIONE 1: VOTI ---
-        debug_log("🔐 [1/3] Sync Sessione VOTI...")
-        argo_voti = argofamiglia.ArgoFamiglia(school, user, pass_)
+        # Per il SYNC, rifacciamo il login completo per refreshare tutto
+        # Questo è importante perché token scadono. 
+        # Usiamo raw_login per efficienza e per selezionare il profilo corretto.
+        
+        login_result = AdvancedArgo.raw_login(school, user, pass_)
+        access_token = login_result['access_token']
+        profiles = login_result['profiles']
+        
+        # Selezioniamo il profilo richiesto (o 0)
+        target_idx = int(profile_index)
+        if target_idx >= len(profiles):
+            target_idx = 0 # Fallback
+            
+        target_profile = profiles[target_idx]
+        auth_token = target_profile['token']
+        
+        # --- SESSIONI ISOLATE (Ma veloci con token iniettati) ---
+        
+        # 1. VOTI
+        argo_voti = create_session(school, user, pass_, access_token, auth_token)
         grades_data = extract_grades_multi_strategy(argo_voti)
         
-        # --- SESSIONE 2: COMPITI ---
-        debug_log("🔐 [2/3] Sync Sessione COMPITI...")
+        # 2. COMPITI
         tasks_data = []
         try:
-            argo_tasks = argofamiglia.ArgoFamiglia(school, user, pass_)
+            argo_tasks = create_session(school, user, pass_, access_token, auth_token)
             tasks_data = extract_homework_safe(argo_tasks)
-        except Exception as e:
-            debug_log("⚠️ Errore Sync Compiti", str(e))
+        except:
+            pass
             
-        # --- SESSIONE 3: DASHBOARD ---
-        debug_log("🔐 [3/3] Sync Sessione DASHBOARD...")
+        # 3. DASHBOARD
         announcements_data = []
         try:
-            argo_dash = argofamiglia.ArgoFamiglia(school, user, pass_)
+            argo_dash = create_session(school, user, pass_, access_token, auth_token)
             dashboard_data = argo_dash.dashboard()
             announcements_data = extract_promemoria(dashboard_data)
         except:
              pass
         
-        # Nuovi token (dalla sessione voti o l'ultima valida)
-        headers = argo_voti._ArgoFamiglia__headers
-        new_auth_token = headers.get('x-auth-token', '')
-        new_access_token = headers.get('Authorization', '').replace("Bearer ", "")
-        
-        debug_log(f"✅ SYNC OK", {
-            "voti": len(grades_data),
-            "tasks": len(tasks_data),
-            "mode": "MULTI_SESSION_ISOLATED"
-        })
-        
+        # Return
         return jsonify({
             "success": True,
             "tasks": tasks_data,
             "voti": grades_data,
             "promemoria": announcements_data,
             "new_tokens": {
-                "authToken": new_auth_token,
-                "accessToken": new_access_token
+                "authToken": auth_token,
+                "accessToken": access_token
             }
         }), 200
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        debug_log(f"❌ SYNC FAILED", error_trace)
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": error_trace if DEBUG_MODE else None
+        }), 401
         
     except Exception as e:
         import traceback
