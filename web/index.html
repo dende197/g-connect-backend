@@ -1409,6 +1409,126 @@
             `;
         }
 
+        function renderProfile() {
+            const session = sessionManager.load();
+            const hasMultipleProfiles = session && session.availableProfiles && session.availableProfiles.length > 1;
+            const activeProfile = session?.activeProfile;
+            const activeProfileIndex = session?.activeProfileIndex || 0;
+
+            return `
+                <div class="view" style="padding: 20px; padding-bottom: 100px;">
+                    <h1 style="margin-bottom: 24px;">Profilo Utente</h1>
+                    
+                    <!-- User Info Card -->
+                    <div class="card" style="text-align: center; margin-bottom: 20px;">
+                        <div style="width: 100px; height: 100px; background: linear-gradient(135deg, var(--blue), var(--purple)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 40px; margin: 0 auto 16px auto;">
+                            ${(state.user?.name || 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <h2 style="margin: 0 0 8px 0;">${state.user?.name || 'Utente'}</h2>
+                        <div style="color: var(--text-secondary); font-size: 14px; margin-bottom: 4px;">${state.user?.class || ''}</div>
+                        ${activeProfile ? `
+                            <div style="color: var(--blue); font-size: 12px; margin-top: 8px;">
+                                ${activeProfile.classe || ''} • ${activeProfile.scuola || ''}
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    ${hasMultipleProfiles ? `
+                        <!-- Profile Switcher Card -->
+                        <div class="card" onclick="showProfileSwitcher()" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; background: rgba(10, 132, 255, 0.1); border: 1px solid var(--blue);">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="ph-fill ph-users" style="color: var(--blue); font-size: 24px;"></i>
+                                <div>
+                                    <div style="font-weight: 600; margin-bottom: 2px;">Cambia Profilo</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary);">
+                                        ${session.availableProfiles.length} profili disponibili
+                                    </div>
+                                </div>
+                            </div>
+                            <i class="ph-bold ph-caret-right" style="font-size: 20px; color: var(--blue);"></i>
+                        </div>
+                    ` : ''}
+
+                    <!-- Stats Cards -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                        <div class="card" style="text-align: center; margin-bottom: 0;">
+                            <i class="ph-fill ph-graduation-cap" style="color: var(--green); font-size: 32px; margin-bottom: 8px;"></i>
+                            <div style="font-size: 24px; font-weight: 700; margin-bottom: 4px;">${state.voti.length}</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">Voti</div>
+                        </div>
+                        <div class="card" style="text-align: center; margin-bottom: 0;">
+                            <i class="ph-fill ph-book" style="color: var(--blue); font-size: 32px; margin-bottom: 8px;"></i>
+                            <div style="font-size: 24px; font-weight: 700; margin-bottom: 4px;">${state.tasks.length}</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">Compiti</div>
+                        </div>
+                    </div>
+
+                    <!-- Settings/Actions -->
+                    <h3 style="margin: 24px 0 12px 0;">Impostazioni</h3>
+                    
+                    <div class="card" onclick="openArgoLogin()" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <i class="ph-fill ph-arrow-clockwise" style="color: var(--blue); font-size: 24px;"></i>
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 2px;">Sincronizza Dati</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">
+                                    ${state.lastSync ? `Ultimo aggiornamento: ${state.lastSync}` : 'Mai sincronizzato'}
+                                </div>
+                            </div>
+                        </div>
+                        <i class="ph-bold ph-caret-right" style="font-size: 20px; color: var(--text-secondary);"></i>
+                    </div>
+
+                    <div class="card" onclick="showAboutModal()" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <i class="ph-fill ph-info" style="color: var(--blue); font-size: 24px;"></i>
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 2px;">Informazioni</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Versione 2.0 - Multi-Profile</div>
+                            </div>
+                        </div>
+                        <i class="ph-bold ph-caret-right" style="font-size: 20px; color: var(--text-secondary);"></i>
+                    </div>
+
+                    <div class="card" onclick="logout()" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; background: rgba(255, 69, 58, 0.1); border: 1px solid var(--red);">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <i class="ph-fill ph-sign-out" style="color: var(--red); font-size: 24px;"></i>
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 2px; color: var(--red);">Disconnetti</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Esci dall'applicazione</div>
+                            </div>
+                        </div>
+                        <i class="ph-bold ph-caret-right" style="font-size: 20px; color: var(--red);"></i>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showAboutModal() {
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" onclick="closeModal(event)">
+                <div class="modal-content" style="text-align:center;">
+                    <div style="width:60px; height:60px; background:var(--blue); border-radius:16px; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;">
+                         <i class="ph-fill ph-graduation-cap" style="font-size:30px;"></i>
+                    </div>
+                    <h2 style="margin-bottom:8px;">G-Connect</h2>
+                    <p style="color:var(--text-secondary); margin-bottom:20px; font-size:14px;">
+                        App per studenti con integrazione Argo DidUP
+                    </p>
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: left;">
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Funzionalità:</div>
+                        <ul style="font-size: 14px; color: white; margin: 0; padding-left: 20px;">
+                            <li>Supporto multi-profilo</li>
+                            <li>Sincronizzazione voti e compiti</li>
+                            <li>Gestione promemoria</li>
+                            <li>Calendario integrato</li>
+                        </ul>
+                    </div>
+                    <button onclick="closeModal()" class="btn-primary">Chiudi</button>
+                </div>
+            </div>`;
+        }
+
         function selectDay(day) {
             state.selectedDay = day;
             render();
@@ -1672,7 +1792,7 @@
             }
         }
 
-        async function performArgoSync() {
+        async function performArgoSync(selectedProfileIndex = null) {
             const btn = document.getElementById('login-btn');
             const school = document.getElementById('argo-school').value;
             const user = document.getElementById('argo-user').value;
@@ -1687,10 +1807,21 @@
             btn.disabled = true;
 
             try {
+                const requestBody = { 
+                    schoolCode: school, 
+                    username: user, 
+                    password: pass
+                };
+                
+                // Include selected profile index if provided
+                if (selectedProfileIndex !== null) {
+                    requestBody.selectedProfileIndex = selectedProfileIndex;
+                }
+
                 const response = await fetch(`${API_BASE_URL}/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ schoolCode: school, username: user, password: pass })
+                    body: JSON.stringify(requestBody)
                 });
 
                 const data = await response.json();
@@ -1700,12 +1831,22 @@
                 }
 
                 if (data.success) {
+                    // Check if multiple profiles need selection
+                    if (data.multiProfile && data.profiles && data.profiles.length > 1) {
+                        console.log("🔀 Multiple profiles found, showing selection...");
+                        showProfileSelection(data.profiles, school, user, pass);
+                        btn.innerText = "Accedi";
+                        btn.disabled = false;
+                        return;
+                    }
+
                     console.log("✅ Login OK, saving...");
                     console.log("📥 Dati ricevuti dal login:", {
                         tasks: data.tasks?.length || 0,
                         voti: data.voti?.length || 0,
                         promemoria: data.promemoria?.length || data.announcements?.length || 0,
-                        student: data.student
+                        student: data.student,
+                        profiles: data.profiles?.length || 0
                     });
 
                     // ⭐ CRITICO: Salva sessione con credenziali codificate (as in the old working code)
@@ -1713,14 +1854,25 @@
                         data.session.storedUser = btoa(unescape(encodeURIComponent(user)));
                         data.session.storedPass = btoa(unescape(encodeURIComponent(pass)));
                         data.session.schoolCode = school;
+                        
+                        // Save available profiles and active profile
+                        if (data.profiles) {
+                            data.session.availableProfiles = data.profiles;
+                        }
+                        if (data.session.activeProfile) {
+                            data.session.activeProfileIndex = data.profiles?.findIndex(p => p.id === data.session.activeProfile.id) || 0;
+                        }
+                        
                         sessionManager.save(data.session);
-                        console.log("💾 Sessione salvata con credenziali");
+                        console.log("💾 Sessione salvata con credenziali e profili");
                     } else {
                         // ⭐ If no session from backend, create one with credentials
                         sessionManager.save({
                             schoolCode: school,
                             storedUser: btoa(unescape(encodeURIComponent(user))),
-                            storedPass: btoa(unescape(encodeURIComponent(pass)))
+                            storedPass: btoa(unescape(encodeURIComponent(pass))),
+                            availableProfiles: data.profiles || [],
+                            activeProfile: data.session?.activeProfile
                         });
                         console.log("💾 Sessione minima creata con credenziali");
                     }
@@ -1788,10 +1940,182 @@
                 }
             } catch (e) {
                 alert("❌ Errore:  " + e.message);
+                console.error("❌ Errore performArgoSync:", e);
             } finally {
                 btn.innerText = "Accedi";
                 btn.disabled = false;
             }
+        }
+
+        // Show profile selection modal when multiple profiles are found
+        function showProfileSelection(profiles, school, user, pass) {
+            // Store credentials temporarily in a secure way (not in DOM)
+            window._tempLoginCredentials = { school, user, pass };
+            
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" onclick="event.stopPropagation()">
+                <div class="modal-content" style="text-align:center; max-width: 400px;">
+                    <div style="width:60px; height:60px; background:#106690; border-radius:16px; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;">
+                         <i class="ph-fill ph-users" style="font-size:30px;"></i>
+                    </div>
+                    <h2 style="margin-bottom:8px;">Seleziona Profilo</h2>
+                    <p style="color:var(--text-secondary); margin-bottom:24px; font-size:14px;">Sono stati trovati più profili associati a questo account. Seleziona quello che vuoi utilizzare.</p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                        ${profiles.map((profile, index) => `
+                            <div onclick="selectProfile(${index})" 
+                                 style="background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 16px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px;"
+                                 onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='var(--blue)'"
+                                 onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='rgba(255,255,255,0.1)'">
+                                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, var(--blue), var(--purple)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; flex-shrink: 0;">
+                                    ${(profile.nome || 'U').charAt(0).toUpperCase()}
+                                </div>
+                                <div style="flex: 1; text-align: left;">
+                                    <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px;">
+                                        ${profile.nome || 'Sconosciuto'} ${profile.cognome || ''}
+                                    </div>
+                                    <div style="font-size: 13px; color: var(--text-secondary);">
+                                        ${profile.classe || 'N/A'} • ${profile.scuola || school}
+                                    </div>
+                                </div>
+                                <i class="ph-bold ph-caret-right" style="font-size: 20px; color: var(--text-secondary);"></i>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <button onclick="closeModal(); delete window._tempLoginCredentials;" style="background:none; width:100%; padding: 10px; margin-top:5px; border:none; color:var(--text-secondary); cursor:pointer;">Annulla</button>
+                </div>
+            </div>`;
+        }
+
+        // Handle profile selection
+        async function selectProfile(profileIndex) {
+            console.log(`👤 Profile ${profileIndex} selected`);
+            
+            // Get credentials from temporary storage
+            const creds = window._tempLoginCredentials;
+            if (!creds) {
+                alert("Errore: credenziali non disponibili. Riprova il login.");
+                closeModal();
+                return;
+            }
+            
+            // Clean up temporary storage
+            delete window._tempLoginCredentials;
+            
+            // Temporarily store in the form for the login function
+            document.getElementById('argo-school').value = creds.school;
+            document.getElementById('argo-user').value = creds.user;
+            document.getElementById('argo-pass').value = creds.pass;
+            
+            // Perform login with selected profile
+            await performArgoSync(profileIndex);
+        }
+
+        // Switch between available profiles without re-entering credentials
+        async function switchProfile(profileIndex) {
+            const session = sessionManager.load();
+            if (!session || !session.schoolCode || !session.storedUser || !session.storedPass) {
+                alert("Sessione scaduta. Effettua nuovamente il login.");
+                logout();
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/switch-profile`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schoolCode: session.schoolCode,
+                        storedUser: session.storedUser,
+                        storedPass: session.storedPass,
+                        profileIndex: profileIndex
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || "Errore durante il cambio profilo");
+                }
+
+                console.log("✅ Profile switched successfully");
+
+                // Update session with new active profile
+                session.activeProfile = data.activeProfile;
+                session.activeProfileIndex = profileIndex;
+                sessionManager.save(session);
+
+                // Update user info
+                if (data.student) {
+                    state.user = data.student;
+                    localStorage.setItem('argo_user', JSON.stringify(state.user));
+                }
+
+                // Update tasks, voti, promemoria
+                if (data.tasks) {
+                    updateTasks(data.tasks, false);
+                }
+                if (data.voti) {
+                    state.voti = data.voti;
+                    localStorage.setItem('argo_voti', JSON.stringify(state.voti));
+                }
+                if (data.promemoria) {
+                    state.promemoria = data.promemoria;
+                    localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
+                }
+
+                closeModal();
+                alert(`✅ Profilo cambiato a ${data.student?.name || 'Nuovo profilo'}`);
+                render();
+            } catch (e) {
+                alert("❌ Errore durante il cambio profilo: " + e.message);
+                console.error("❌ Switch profile error:", e);
+            }
+        }
+
+        // Show profile switcher modal (can be called from profile page)
+        function showProfileSwitcher() {
+            const session = sessionManager.load();
+            if (!session || !session.availableProfiles || session.availableProfiles.length <= 1) {
+                alert("Non ci sono altri profili disponibili.");
+                return;
+            }
+
+            const profiles = session.availableProfiles;
+            const activeIndex = session.activeProfileIndex || 0;
+
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" onclick="closeModal(event)">
+                <div class="modal-content" style="text-align:center; max-width: 400px;">
+                    <h2 style="margin-bottom:8px;">Cambia Profilo</h2>
+                    <p style="color:var(--text-secondary); margin-bottom:24px; font-size:14px;">Seleziona il profilo che vuoi visualizzare.</p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                        ${profiles.map((profile, index) => `
+                            <div onclick="${index === activeIndex ? 'return;' : `switchProfile(${index})`}" 
+                                 style="background: ${index === activeIndex ? 'rgba(10, 132, 255, 0.2)' : 'rgba(255,255,255,0.05)'}; border: 2px solid ${index === activeIndex ? 'var(--blue)' : 'rgba(255,255,255,0.1)'}; border-radius: 16px; padding: 16px; cursor: ${index === activeIndex ? 'default' : 'pointer'}; transition: all 0.2s; display: flex; align-items: center; gap: 12px;"
+                                 ${index !== activeIndex ? `onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'"` : ''}>
+                                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, var(--blue), var(--purple)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; flex-shrink: 0;">
+                                    ${(profile.nome || 'U').charAt(0).toUpperCase()}
+                                </div>
+                                <div style="flex: 1; text-align: left;">
+                                    <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px;">
+                                        ${profile.nome || 'Sconosciuto'} ${profile.cognome || ''}
+                                        ${index === activeIndex ? '<span style="color: var(--blue); font-size: 12px; margin-left: 8px;">● Attivo</span>' : ''}
+                                    </div>
+                                    <div style="font-size: 13px; color: var(--text-secondary);">
+                                        ${profile.classe || 'N/A'} • ${profile.scuola || ''}
+                                    </div>
+                                </div>
+                                ${index !== activeIndex ? '<i class="ph-bold ph-caret-right" style="font-size: 20px; color: var(--text-secondary);"></i>' : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <button onclick="closeModal()" style="background:none; width:100%; padding: 10px; margin-top:5px; border:none; color:var(--text-secondary); cursor:pointer;">Chiudi</button>
+                </div>
+            </div>`;
         }
 
         function publishPost() {

@@ -40,6 +40,53 @@ def fix_date_timezone(date_str):
 
 # ============= LOGICA ESTRAZIONE DATI =============
 
+def get_available_students(argo_instance):
+    """Scarica la lista dei figli (Schede) associati all'account"""
+    try:
+        # Endpoint per ottenere le schede dei figli
+        url = "https://www.portaleargo.it/famiglia/api/rest/schede"
+        headers = argo_instance._ArgoFamiglia__headers
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            schede = response.json()
+            profiles = []
+            
+            # Handle both list and dict with 'data' key
+            if isinstance(schede, dict) and 'data' in schede:
+                schede = schede['data']
+            
+            if isinstance(schede, list):
+                for idx, s in enumerate(schede):
+                    profiles.append({
+                        "id": idx, 
+                        "prgAlunno": s.get('prgAlunno'),
+                        "prgScheda": s.get('prgScheda'),
+                        "nome": s.get('alunno', {}).get('desNome', 'Sconosciuto') if isinstance(s.get('alunno'), dict) else s.get('desNome', 'Sconosciuto'),
+                        "cognome": s.get('alunno', {}).get('desCognome', '') if isinstance(s.get('alunno'), dict) else s.get('desCognome', ''),
+                        "classe": s.get('desClasse', ''),
+                        "scuola": s.get('desScuola', ''),
+                        "codMin": s.get('codMin', '')
+                    })
+            debug_log(f"✅ Trovati {len(profiles)} profili", profiles)
+            return profiles
+    except Exception as e:
+        debug_log("❌ Errore recupero profili", str(e))
+    return []
+
+def switch_student_context(argo_instance, profile_data):
+    """Dice ad Argo quale figlio stiamo guardando"""
+    try:
+        if 'codMin' in profile_data and profile_data['codMin']:
+            argo_instance._ArgoFamiglia__headers['x-cod-min'] = profile_data['codMin']
+        if 'prgAlunno' in profile_data and profile_data['prgAlunno']:
+            argo_instance._ArgoFamiglia__headers['x-prg-alunno'] = str(profile_data['prgAlunno'])
+        if 'prgScheda' in profile_data and profile_data['prgScheda']:
+            argo_instance._ArgoFamiglia__headers['x-prg-scheda'] = str(profile_data['prgScheda'])
+        debug_log(f"✅ Cambio profilo su: {profile_data.get('nome', 'Unknown')}")
+    except Exception as e:
+        debug_log("❌ Errore cambio contesto", str(e))
+
 def estrai_voti_da_dashboard(dashboard_data):
     """Estrae i voti direttamente dalla dashboard"""
     grades = []
@@ -190,14 +237,46 @@ def login():
     school = data.get('schoolCode')
     user = data.get('username')
     pwd = data.get('password')
+    selected_profile_index = data.get('selectedProfileIndex')  # Optional: for profile selection
 
     if not all([school, user, pwd]):
         return jsonify({"success": False, "error": "Dati mancanti"}), 400
 
     try:
-        debug_log("🚀 LOGIN REQUEST", {"user": user})
+        debug_log("🚀 LOGIN REQUEST", {"user": user, "profileIndex": selected_profile_index})
         
         argo = argofamiglia.ArgoFamiglia(school, user, pwd)
+        
+        # Get available profiles/students for this account
+        profiles = get_available_students(argo)
+        
+        # CASE A: Multiple profiles and no selection made yet
+        if len(profiles) > 1 and selected_profile_index is None:
+            return jsonify({
+                "success": True,
+                "multiProfile": True,  # Signal to frontend
+                "profiles": profiles,
+                "sessionData": {
+                    "schoolCode": school,
+                    "username": user
+                }
+            }), 200
+        
+        # CASE B: No profiles found
+        if len(profiles) == 0:
+            return jsonify({
+                "success": False,
+                "error": "Nessun profilo associato a questo account"
+            }), 404
+        
+        # CASE C: Single profile or profile selected
+        target_profile = profiles[0]  # Default to first profile
+        if selected_profile_index is not None and 0 <= int(selected_profile_index) < len(profiles):
+            target_profile = profiles[int(selected_profile_index)]
+        
+        # Apply profile context
+        if target_profile:
+            switch_student_context(argo, target_profile)
         
         # 1. Dashboard & Voti
         try:
@@ -219,16 +298,23 @@ def login():
         
         return jsonify({
             "success": True,
+            "multiProfile": False,
             "session": {
                 "schoolCode": school,
                 "authToken": headers.get('x-auth-token', ''),
                 "accessToken": headers.get('Authorization', '').replace("Bearer ", ""),
-                "userName": user
+                "userName": user,
+                "activeProfile": target_profile
             },
-            "student": {"name": user, "school": school},
+            "student": {
+                "name": f"{target_profile.get('nome', '')} {target_profile.get('cognome', '')}".strip() or user,
+                "class": target_profile.get('classe', ''),
+                "school": school
+            },
             "tasks": tasks_data,
             "voti": grades_data,
-            "promemoria": announcements_data
+            "promemoria": announcements_data,
+            "profiles": profiles  # Include all profiles for profile switching
         }), 200
 
     except Exception as e:
@@ -243,6 +329,7 @@ def sync_data():
     school = data.get('schoolCode')
     stored_user = data.get('storedUser')
     stored_pass = data.get('storedPass')
+    active_profile = data.get('activeProfile')  # Profile to sync for
     
     try:
         if not all([school, stored_user, stored_pass]):
@@ -255,6 +342,10 @@ def sync_data():
         user, pwd = decode(stored_user), decode(stored_pass)
         
         argo = argofamiglia.ArgoFamiglia(school, user, pwd)
+        
+        # Apply profile context if provided
+        if active_profile:
+            switch_student_context(argo, active_profile)
         
         try: dashboard_data = argo.dashboard()
         except: dashboard_data = {}
@@ -278,9 +369,64 @@ def sync_data():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 401
 
+@app.route('/switch-profile', methods=['POST'])
+def switch_profile():
+    """Switch to a different profile without re-login"""
+    data = request.json
+    school = data.get('schoolCode')
+    stored_user = data.get('storedUser')
+    stored_pass = data.get('storedPass')
+    profile_index = data.get('profileIndex')
+    
+    try:
+        if not all([school, stored_user, stored_pass]) or profile_index is None:
+            return jsonify({"success": False, "error": "Dati mancanti"}), 400
+        
+        import base64, urllib.parse
+        def decode(s):
+            try: return urllib.parse.unquote(base64.b64decode(s).decode('utf-8'))
+            except: return s
+        user, pwd = decode(stored_user), decode(stored_pass)
+        
+        argo = argofamiglia.ArgoFamiglia(school, user, pwd)
+        
+        # Get all profiles
+        profiles = get_available_students(argo)
+        
+        if profile_index < 0 or profile_index >= len(profiles):
+            return jsonify({"success": False, "error": "Indice profilo non valido"}), 400
+        
+        target_profile = profiles[profile_index]
+        switch_student_context(argo, target_profile)
+        
+        # Get data for the new profile
+        try: dashboard_data = argo.dashboard()
+        except: dashboard_data = {}
+            
+        grades_data = estrai_voti_da_dashboard(dashboard_data)
+        if not grades_data: grades_data = fallback_api_voti(argo)
+            
+        announcements_data = extract_promemoria(dashboard_data)
+        tasks_data = extract_homework_robust(argo)
+        
+        return jsonify({
+            "success": True,
+            "student": {
+                "name": f"{target_profile.get('nome', '')} {target_profile.get('cognome', '')}".strip(),
+                "class": target_profile.get('classe', ''),
+                "school": school
+            },
+            "activeProfile": target_profile,
+            "tasks": tasks_data,
+            "voti": grades_data,
+            "promemoria": announcements_data
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 401
+
 @app.route('/health')
 def health():
-    return jsonify({"status": "ok", "version": "FINAL_FIX_TZ"}), 200
+    return jsonify({"status": "ok", "version": "MULTI_PROFILE_SUPPORT"}), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5002))
