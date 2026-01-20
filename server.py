@@ -194,30 +194,56 @@ def switch_profilo(argo_instance, profilo_index):
 
 # ============= ESTRAZIONE DATI (Uguale a prima) =============
 
-def extract_grades_multi_strategy(argo_instance):
-    """Estrae voti con strategia multipla"""
+# ============= STRATEGIE ESTRAZIONE VOTI =============
+
+def strategia_1_dashboard(argo_instance):
+    """
+    STRATEGIA 1: Usa il metodo dashboard() della libreria
+    """
     grades = []
-    
-    # Strategia 1: Dashboard
     try:
+        debug_log("STRATEGIA 1: Chiamata dashboard()")
         dashboard_data = argo_instance.dashboard()
+        
+        debug_log("Dashboard RAW Response", dashboard_data)
+        
+        if not dashboard_data:
+            debug_log("⚠️ Dashboard vuota")
+            return grades
+        
+        # Naviga nella struttura
         data_obj = dashboard_data.get('data', {})
         dati_list = data_obj.get('dati', [])
         
+        # Fallback: controlla se 'dati' è nella radice
         if not dati_list and 'dati' in dashboard_data:
             dati_list = dashboard_data.get('dati', [])
         
-        main_data = dati_list[0] if dati_list else {}
+        if not dati_list:
+            debug_log("⚠️ Nessun elemento in 'dati'", {
+                "dashboard_keys": list(dashboard_data.keys()),
+                "data_keys": list(data_obj.keys()) if isinstance(data_obj, dict) else "N/A"
+            })
+            return grades
         
+        main_data = dati_list[0] if dati_list else {}
+        debug_log("Chiavi trovate in dati[0]", list(main_data.keys()))
+        
+        # Cerca in TUTTE le chiavi possibili
         voti_keys = [
-            'votiGiornalieri', 'votiPeriodici', 'votiScrutinio',
-            'voti_giornalieri', 'voti', 'valutazioni'
+            'votiGiornalieri',
+            'votiPeriodici', 
+            'votiScrutinio',
+            'voti_giornalieri',
+            'voti',
+            'valutazioni',
+            'valutazioniGiornaliere'
         ]
         
         for key in voti_keys:
             voti_raw = main_data.get(key, [])
             if voti_raw:
-                debug_log(f"✅ Trovati {len(voti_raw)} voti in '{key}'")
+                debug_log(f"✅ Trovati {len(voti_raw)} voti in '{key}'", voti_raw[:2])
                 
                 for v in voti_raw:
                     valore = v.get('codVoto') or v.get('voto') or v.get('valore')
@@ -226,33 +252,109 @@ def extract_grades_multi_strategy(argo_instance):
                     grades.append({
                         "materia": materia,
                         "valore": valore,
-                        "data": v.get('datGiorno') or v.get('data'),
+                        "data": v.get('datGiorno') or v.get('data') or v.get('dataVoto'),
                         "tipo": v.get('desVoto') or v.get('tipo', 'N/D'),
                         "peso": v.get('numPeso', '100'),
+                        # Alias per frontend
                         "subject": materia,
                         "value": valore,
                         "date": v.get('datGiorno', ''),
                         "id": str(uuid.uuid4())[:12]
                     })
-                break
-    
+                break # Ferma se trovato in una chiave
+                    
     except Exception as e:
-        debug_log(f"⚠️ Errore estrazione voti: {e}")
+        debug_log(f"❌ Errore Strategia 1", str(e))
     
-    # Strategia 2: API diretta (opzionale)
-    if not grades:
-        try:
-            headers = argo_instance._ArgoFamiglia__headers
-            endpoints = ["/votiGiornalieri", "/voti", "/valutazioni/giornaliere"]
+    return grades
+
+
+def strategia_2_api_diretta(argo_instance):
+    """
+    STRATEGIA 2: Chiamata diretta agli endpoint REST di Argo
+    """
+    grades = []
+    try:
+        headers = argo_instance._ArgoFamiglia__headers
+        base_url = "https://www.portaleargo.it/famiglia/api/rest"
+        
+        # Lista di endpoint possibili per i voti
+        endpoints = [
+            "/votiGiornalieri",
+            "/voti",
+            "/valutazioni/giornaliere",
+            "/registro/voti",
+            "/votiPeriodici"
+        ]
+        
+        for endpoint in endpoints:
+            url = base_url + endpoint
+            debug_log(f"STRATEGIA 2: Tentativo GET {url}")
             
-            for endpoint in endpoints:
-                url = f"https://www.portaleargo.it/famiglia/api/rest{endpoint}"
+            try:
                 response = requests.get(url, headers=headers, timeout=10)
                 
                 if response.status_code == 200:
                     data = response.json()
+                    
+                    # Se è una lista diretta
                     if isinstance(data, list) and len(data) > 0:
+                        debug_log(f"✅ Trovati {len(data)} voti in {endpoint}")
                         for v in data:
+                            grades.append({
+                                "materia": v.get('desMateria') or v.get('materia', 'N/D'),
+                                "valore": v.get('codVoto') or v.get('voto') or v.get('valore'),
+                                "data": v.get('datGiorno') or v.get('data'),
+                                "tipo": v.get('desVoto') or v.get('tipo', 'N/D'),
+                                "peso": v.get('numPeso', '100'),
+                                "subject": v.get('desMateria', 'N/D'),
+                                "value": v.get('codVoto', ''),
+                                "date": v.get('datGiorno', ''),
+                                "id": str(uuid.uuid4())[:12]
+                            })
+                        return grades # Successo
+                        
+                    # Se è un dict con array annidato
+                    elif isinstance(data, dict):
+                        for key in ['voti', 'dati', 'data', 'valutazioni']:
+                            if key in data and isinstance(data[key], list):
+                                debug_log(f"✅ Trovati {len(data[key])} voti in {endpoint}.{key}")
+                                for v in data[key]:
+                                    grades.append({
+                                        "materia": v.get('desMateria') or v.get('materia', 'N/D'),
+                                        "valore": v.get('codVoto') or v.get('voto') or v.get('valore'),
+                                        "data": v.get('datGiorno') or v.get('data'),
+                                        "tipo": v.get('desVoto') or v.get('tipo', 'N/D'),
+                                        "peso": v.get('numPeso', '100'),
+                                        "subject": v.get('desMateria', 'N/D'),
+                                        "value": v.get('codVoto', ''),
+                                        "date": v.get('datGiorno', ''),
+                                        "id": str(uuid.uuid4())[:12]
+                                    })
+                                return grades
+            except Exception as e:
+                debug_log(f"⚠️ Errore endpoint {endpoint}: {e}")
+                
+    except Exception as e:
+        debug_log(f"❌ Errore Strategia 2", str(e))
+    
+    return grades
+
+
+def strategia_3_metodo_diretto(argo_instance):
+    """
+    STRATEGIA 3: Usa metodi specifici della libreria argofamiglia
+    """
+    grades = []
+    try:
+        metodi = ['voti', 'getVoti', 'votiGiornalieri', 'getVotiGiornalieri', 'valutazioni']
+        for metodo in metodi:
+            if hasattr(argo_instance, metodo):
+                try:
+                    result = getattr(argo_instance, metodo)()
+                    if result and isinstance(result, list):
+                        debug_log(f"✅ Strategia 3: Trovati {len(result)} voti via {metodo}")
+                        for v in result:
                             grades.append({
                                 "materia": v.get('desMateria', 'N/D'),
                                 "valore": v.get('codVoto', ''),
@@ -263,10 +365,28 @@ def extract_grades_multi_strategy(argo_instance):
                                 "date": v.get('datGiorno', ''),
                                 "id": str(uuid.uuid4())[:12]
                             })
-                        break
-        except Exception as e:
-            debug_log(f"⚠️ Errore API voti: {e}")
+                        return grades
+                except:
+                    continue
+    except Exception as e:
+        debug_log(f"❌ Errore Strategia 3", str(e))
+    return grades
+
+
+def extract_grades_multi_strategy(argo_instance):
+    """
+    MASTER FUNCTION: Prova tutte le strategie in sequenza
+    """
+    # Strategia 1
+    grades = strategia_1_dashboard(argo_instance)
+    if grades: return grades
     
+    # Strategia 2
+    grades = strategia_2_api_diretta(argo_instance)
+    if grades: return grades
+    
+    # Strategia 3
+    grades = strategia_3_metodo_diretto(argo_instance)
     return grades
 
 
