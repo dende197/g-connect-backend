@@ -415,6 +415,8 @@
                 localStorage.removeItem('argo_tasks');
                 localStorage.removeItem('argo_is_logged_in');
                 localStorage.removeItem('argo_user'); // ⭐ Per persistere user
+                localStorage.removeItem('argo_profiles');
+                localStorage.removeItem('argo_active_profile_id');
                 console.log("🗑️ Sessione cancellata");
             }
         };
@@ -423,6 +425,8 @@
         const state = {
             view: 'login',
             user: { name: 'Andrea', class: '5B' }, // ⭐ Verrà sovrascritto da localStorage
+            profiles: [],
+            activeProfileId: null,
             isLoggedIn: false,
             isOffline: false,
             didup: { connected: false },
