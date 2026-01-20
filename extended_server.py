@@ -5,7 +5,7 @@ import os
 
 # --- PUNTO CRUCIALE: Importiamo il tuo vecchio server ---
 # Questo carica tutte le funzioni che già funzionano senza toccare il file originale
-from server import app, extract_grades_multi_strategy, extract_homework_safe, extract_promemoria, debug_log
+from server import app, estrai_voti_da_dashboard, fallback_api_voti, extract_homework_robust, extract_promemoria, debug_log
 
 # --- NUOVE FUNZIONI AGGIUNTIVE ---
 
@@ -85,10 +85,14 @@ def login_v2():
             switch_student_context(argo, target_profile)
         
         # 4. Scarica i dati usando le funzioni del TUO vecchio file
-        grades = extract_grades_multi_strategy(argo)
-        tasks = extract_homework_safe(argo)
         try: dboard = argo.dashboard()
         except: dboard = {}
+        
+        grades = estrai_voti_da_dashboard(dboard)
+        if not grades:
+            grades = fallback_api_voti(argo)
+        
+        tasks = extract_homework_robust(argo)
         memo = extract_promemoria(dboard)
 
         return jsonify({
