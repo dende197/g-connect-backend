@@ -367,43 +367,48 @@ def login():
         return jsonify({"success": False, "error": "Dati mancanti"}), 400
 
     try:
-        debug_log("LOGIN", {
+        debug_log("LOGIN REQUEST", {
             "school": school_code,
             "username": username,
             "timestamp": datetime.now().isoformat()
         })
         
-        # 1. Autenticazione
-        argo = argofamiglia.ArgoFamiglia(school_code, username, password)
-        debug_log("✅ Autenticazione riuscita")
+        # --- SESSIONE 1: VOTI (Priorità ai voti) ---
+        debug_log("🔐 [1/3] Creazione Sessione per VOTI...")
+        argo_voti = argofamiglia.ArgoFamiglia(school_code, username, password)
         
-        # 2. Estrai token
-        headers = argo._ArgoFamiglia__headers
+        # Estrai token dalla sessione voti (useremo questi per la risposta)
+        headers = argo_voti._ArgoFamiglia__headers
         auth_token = headers.get('x-auth-token', '')
         access_token = headers.get('Authorization', '').replace("Bearer ", "")
         
-        debug_log("Token estratti", {
-            "auth_token": auth_token[:30] + "..." if auth_token else "N/A",
-            "access_token": access_token[:30] + "..." if access_token else "N/A"
-        })
+        debug_log("🎓 Recupero VOTI...")
+        grades_data = extract_grades_multi_strategy(argo_voti)
+        debug_log(f"✅ Voti recuperati: {len(grades_data)}")
 
-        # ✅ 3. Recupera COMPITI PRIMA (ordine corretto!)
-        debug_log("📚 INIZIO ESTRAZIONE COMPITI")
-        tasks_data = extract_homework_safe(argo)
-        debug_log(f"📚 COMPITI FINALI: {len(tasks_data)} elementi")
-        
-        # ✅ 4. POI recupera VOTI
-        debug_log("🎓 INIZIO ESTRAZIONE VOTI")
-        grades_data = extract_grades_multi_strategy(argo)
-        debug_log(f"🎓 VOTI FINALI: {len(grades_data)} elementi", grades_data[:3])
-        
-        # 5. Recupera promemoria
+        # --- SESSIONE 2: COMPITI (Nuova sessione pulita) ---
+        debug_log("🔐 [2/3] Creazione Sessione per COMPITI...")
         try:
-            dashboard_data = argo.dashboard()
-        except:
-            dashboard_data = {}
-        announcements_data = extract_promemoria(dashboard_data)
+            argo_compiti = argofamiglia.ArgoFamiglia(school_code, username, password)
+            debug_log("📚 Recupero COMPITI...")
+            tasks_data = extract_homework_safe(argo_compiti)
+            debug_log(f"✅ Compiti recuperati: {len(tasks_data)}")
+        except Exception as e_tasks:
+            debug_log("⚠️ Errore sessione compiti", str(e_tasks))
+            tasks_data = []
 
+        # --- SESSIONE 3: MEMO/DASHBOARD (Nuova sessione pulita) ---
+        debug_log("🔐 [3/3] Creazione Sessione per DASHBOARD...")
+        announcements_data = []
+        try:
+            argo_dash = argofamiglia.ArgoFamiglia(school_code, username, password)
+            debug_log("📌 Recupero DASHBOARD...")
+            dashboard_data = argo_dash.dashboard()
+            announcements_data = extract_promemoria(dashboard_data)
+            debug_log(f"✅ Promemoria recuperati: {len(announcements_data)}")
+        except Exception as e_dash:
+            debug_log("⚠️ Errore sessione dashboard", str(e_dash))
+            
         # Risposta finale
         response_data = {
             "success": True,
@@ -424,7 +429,8 @@ def login():
             "debug_info": {
                 "voti_count": len(grades_data),
                 "tasks_count": len(tasks_data),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "mode": "MULTI_SESSION_ISOLATED"
             }
         }
         
@@ -469,27 +475,39 @@ def sync_data():
         user = decode_cred(stored_user)
         pass_ = decode_cred(stored_pass)
         
-        # Re-login
-        argo = argofamiglia.ArgoFamiglia(school, user, pass_)
+        # --- SESSIONE 1: VOTI ---
+        debug_log("🔐 [1/3] Sync Sessione VOTI...")
+        argo_voti = argofamiglia.ArgoFamiglia(school, user, pass_)
+        grades_data = extract_grades_multi_strategy(argo_voti)
         
-        # ✅ Recupera COMPITI PRIMA, poi voti (ordine corretto)
-        tasks_data = extract_homework_safe(argo)
-        grades_data = extract_grades_multi_strategy(argo)
-        
+        # --- SESSIONE 2: COMPITI ---
+        debug_log("🔐 [2/3] Sync Sessione COMPITI...")
+        tasks_data = []
         try:
-            dashboard_data = argo.dashboard()
+            argo_tasks = argofamiglia.ArgoFamiglia(school, user, pass_)
+            tasks_data = extract_homework_safe(argo_tasks)
+        except Exception as e:
+            debug_log("⚠️ Errore Sync Compiti", str(e))
+            
+        # --- SESSIONE 3: DASHBOARD ---
+        debug_log("🔐 [3/3] Sync Sessione DASHBOARD...")
+        announcements_data = []
+        try:
+            argo_dash = argofamiglia.ArgoFamiglia(school, user, pass_)
+            dashboard_data = argo_dash.dashboard()
+            announcements_data = extract_promemoria(dashboard_data)
         except:
-            dashboard_data = {}
-        announcements_data = extract_promemoria(dashboard_data)
+             pass
         
-        # Nuovi token
-        headers = argo._ArgoFamiglia__headers
+        # Nuovi token (dalla sessione voti o l'ultima valida)
+        headers = argo_voti._ArgoFamiglia__headers
         new_auth_token = headers.get('x-auth-token', '')
         new_access_token = headers.get('Authorization', '').replace("Bearer ", "")
         
         debug_log(f"✅ SYNC OK", {
             "voti": len(grades_data),
-            "tasks": len(tasks_data)
+            "tasks": len(tasks_data),
+            "mode": "MULTI_SESSION_ISOLATED"
         })
         
         return jsonify({
