@@ -1535,7 +1535,13 @@
 
                 <!-- WEEKLY PLAN SECTION (REORDERED) -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 12px;">
-                    <h3 style="margin:0; text-align: left; color: white;">Agenda della settimana</h3>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <h3 style="margin:0; text-align: left; color: white;">Agenda della settimana</h3>
+                        <button onclick="showTasksBySubjectModal()" style="background: var(--blue); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                            <i class="ph-bold ph-circles-four"></i>
+                            Per Materia
+                        </button>
+                    </div>
                     <button onclick="showPlanWeekModal()" style="background: rgba(255,255,255,0.1); border: none; width: 28px; height: 28px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
                         <i class="ph-bold ph-plus" style="font-size: 14px;"></i>
                     </button>
@@ -1562,65 +1568,6 @@
                         return `<div style="text-align: center; opacity: 0.5; font-size: 13px; padding: 10px;">Nessun compito pianificato.</div>`;
                     }
                 })()}
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <h3 style="margin: 0;">Tutte le Scadenze</h3>
-                    <button onclick="showTasksBySubjectModal()" style="background: var(--blue); color: white; border: none; padding: 8px 14px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                        <i class="ph-bold ph-circles-four"></i>
-                        Vedi per Materia
-                    </button>
-                </div>
-                <div id="tasks-list">
-                    ${state.tasks.map(t => {
-                    const dueDate = t.dateObj && !isNaN(t.dateObj.getTime()) ? t.dateObj : null;
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const daysUntil = dueDate ? Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
-                    let dateLabel = '';
-                    let dateColor = 'var(--text-secondary)';
-
-                    if (dueDate) {
-                        if (daysUntil === 0) {
-                            dateLabel = 'OGGI';
-                            dateColor = 'var(--red)';
-                        } else if (daysUntil === 1) {
-                            dateLabel = 'DOMANI';
-                            dateColor = 'var(--orange)';
-                        } else if (daysUntil < 0) {
-                            dateLabel = 'SCADUTO';
-                            dateColor = 'var(--red)';
-                        } else {
-                            dateLabel = dueDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-                            dateColor = daysUntil <= 3 ? 'var(--orange)' : 'var(--blue)';
-                        }
-                    } else {
-                        dateLabel = t.display_date || 'Data non disponibile';
-                    }
-
-                    const subjectColor = getSubjectColor(t.subject);
-
-                    return `
-                        <div class="glass-list-item" style="display:flex; align-items:center; gap:15px; border-left: 4px solid ${t.done ? 'var(--green)' : subjectColor}; padding: 16px;">
-                            <div style="width: 44px; height: 44px; border-radius: 12px; background: ${t.done ? 'rgba(48, 209, 88, 0.15)' : subjectColor + '15'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid ${t.done ? 'rgba(48, 209, 88, 0.3)' : subjectColor + '30'}">
-                                ${t.done ? '<i class="ph-fill ph-check" style="color: var(--green); font-size: 22px;"></i>' : `<i class="ph ph-calendar" style="color: ${subjectColor}; font-size: 20px;"></i>`}
-                            </div>
-                            <div style="flex:1; min-width: 0;">
-                                <div style="font-size:11px; color:${subjectColor}; font-weight:800; margin-bottom: 4px; letter-spacing: 0.5px; text-transform: uppercase;">${t.subject}</div>
-                                <div style="color: white; margin-top: 4px; font-size: 16px; font-weight: 600; ${t.done ? 'opacity: 0.5; text-decoration: line-through;' : ''}">${t.text}</div>
-                                <div style="font-size: 12px; color: ${dateColor}; font-weight: 700; margin-top: 6px; display: flex; align-items: center; gap: 6px;">
-                                    <i class="ph ph-clock" style="font-size: 14px;"></i>
-                                    ${dateLabel}
-                                    ${daysUntil !== null && daysUntil >= 0 ? `<span style="opacity: 0.7; font-weight: 500;">(${daysUntil === 0 ? 'oggi' : daysUntil === 1 ? 'domani' : `tra ${daysUntil} gg`})</span>` : ''}
-                                </div>
-                            </div>
-                            <button onclick="toggleTask('${t.id}')" style="background: none; border: none; color: ${t.done ? 'var(--green)' : 'rgba(255,255,255,0.2)'}; font-size: 24px; cursor: pointer; padding: 8px;">
-                                <i class="${t.done ? 'ph-fill ph-check-circle' : 'ph ph-circle'}"></i>
-                            </button>
-                        </div>
-                    `;
-                }).join('')}
-                    ${state.tasks.length === 0 ? '<div style="text-align:center; padding: 40px; opacity: 0.5;"><i class="ph ph-check-circle" style="font-size: 48px; color: var(--green); margin-bottom: 12px; display: block;"></i>Finito tutto! 🎉<br><span style="font-size: 12px; color: var(--text-secondary);">Non hai compiti in scadenza</span></div>' : ''}
                 </div>
             </div>`;
         }
