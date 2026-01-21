@@ -586,7 +586,9 @@
             promemoria: [],
             reminders: [],
             syncing: false,
-            selectedDay: new Date().getDate()
+            selectedDay: new Date().getDate(),
+            stressLevels: JSON.parse(localStorage.getItem('argo_stress_levels') || '{}'),
+            plannedTasks: JSON.parse(localStorage.getItem('argo_planned_tasks') || '{}')
         };
 
         const app = document.getElementById('app');
@@ -894,7 +896,6 @@
 
         function saveTasks() {
             try {
-                // ⭐ Salva solo i dati serializzabili (non dateObj che è un oggetto Date)
                 const tasksToSave = state.tasks.map(t => ({
                     id: t.id,
                     text: t.text,
@@ -905,7 +906,9 @@
                     done: t.done
                 }));
                 localStorage.setItem('argo_tasks', JSON.stringify(tasksToSave));
-                console.log("💾 Compiti salvati con stato done");
+                localStorage.setItem('argo_planned_tasks', JSON.stringify(state.plannedTasks));
+                localStorage.setItem('argo_stress_levels', JSON.stringify(state.stressLevels));
+                console.log("💾 Dati persistiti correttamente");
             } catch (e) {
                 console.error("❌ Errore salvataggio tasks:", e);
                 alert("Errore salvataggio locale - controlla se il browser blocca storage o se sei in incognito.");
@@ -1088,7 +1091,7 @@
                 <h2 style="margin-bottom: 16px; text-align: left;">Panoramica</h2>
                 <div style="display: flex; gap: 12px; margin-bottom: 24px;">
                     
-                    <!-- GRADE AVERAGE WIDGET (REFINED LOGIC) -->
+                    <!-- GRADE AVERAGE WIDGET -->
                     <div class="card glass-panel" onclick="showVotiView()" style="flex: 1; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0; cursor:pointer;">
                         <div style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
                             ${(() => {
@@ -1098,7 +1101,7 @@
 
                     let color = 'var(--red)';
                     if (m >= 6.00) color = 'var(--green)';
-                    else if (m >= 5.50) color = '#F5D90A'; // Yellow
+                    else if (m >= 5.50) color = '#F5D90A';
 
                     return `
                                     <svg width="64" height="64" viewBox="0 0 70 70">
@@ -1112,57 +1115,64 @@
                         <span style="font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 700; text-transform: uppercase;">Media</span>
                     </div>
 
-                    <!-- STRESS WIDGET (NEW) -->
-                    <div class="card glass-panel" style="flex: 1; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0;">
+                    <!-- STRESS WIDGET -->
+                    <div class="card glass-panel" onclick="showStressModal()" style="flex: 1; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0; cursor:pointer;">
                         <div style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
-                             <div style="width: 44px; height: 44px; background: rgba(255, 69, 58, 0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #ff453a;">
-                                <i class="ph-fill ph-activity" style="font-size: 22px;"></i>
-                            </div>
+                             ${(() => {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const level = state.stressLevels[todayStr] || 0;
+                    const colors = ['rgba(255,255,255,0.1)', '#4ade80', '#fbbf24', '#f87171', '#ef4444', '#7f1d1d'];
+                    const color = colors[level] || colors[0];
+                    return `
+                                     <div style="width: 44px; height: 44px; background: ${color}20; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: ${color}; border: 1px solid ${color}40;">
+                                        <i class="ph-fill ph-activity" style="font-size: 22px;"></i>
+                                    </div>
+                                    ${level > 0 ? `<div style="position: absolute; bottom: 0; right: 0; background: ${color}; color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 8px;">${level}</div>` : ''}
+                                 `;
+                })()}
                         </div>
                         <span style="font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 700; text-transform: uppercase;">Stress</span>
                     </div>
-
-                    <!-- COMPLETED TASKS WIDGET -->
-                    <div class="card glass-panel" style="flex: 1; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0;">
-                        <div style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
-                             <div style="width: 44px; height: 44px; background: rgba(48, 209, 88, 0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--green);">
-                                <i class="ph-fill ph-check-square" style="font-size: 22px;"></i>
-                            </div>
-                            ${totalToday > 0 ? `<div style="position: absolute; bottom: 0; right: 0; background: var(--green); color: black; font-size: 10px; font-weight: 800; padding: 2px 5px; border-radius: 8px;">${completedToday}/${totalToday}</div>` : ''}
-                        </div>
-                        <span style="font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 700; text-transform: uppercase;">Compiti</span>
-                    </div>
                 </div>
 
-                <!-- TO DO LIST -->
+                <!-- MINI PLANNER (INDISPENSABILI OGGI) -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <h2 style="margin:0; text-align: left;">Indispensabili Oggi</h2>
+                    <h2 style="margin:0; text-align: left;">Organizza Oggi</h2>
                     <button onclick="showOrganizeStudyModal()" style="background: rgba(255,255,255,0.1); border: none; width: 32px; height: 32px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
                         <i class="ph-bold ph-plus"></i>
                     </button>
                 </div>
                 <div class="card glass-panel" onclick="navigate('planner')" style="padding: 20px; cursor: pointer; background: rgba(255,255,255,0.15);">
-                     ${todayTasks.length > 0 ? `
-                        <div style="display: flex; flex-direction: column; gap: 12px;">
-                            ${todayTasks.slice(0, 3).map(t => `
-                                <div style="display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                                    <div style="width: 20px; height: 20px; border: 2px solid ${t.done ? 'var(--green)' : 'var(--orange)'}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
-                                        ${t.done ? '<i class="ph-bold ph-check" style="font-size: 12px; color: black;"></i>' : ''}
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <span style="font-size: 15px; font-weight: 500; color: white; opacity: ${t.done ? 0.5 : 1}; text-decoration: ${t.done ? 'line-through' : 'none'}">${t.text}</span>
-                                        <div style="font-size: 11px; color: var(--blue); font-weight: 700;">${t.subject}</div>
-                                    </div>
+                     ${(() => {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const plannedIds = state.plannedTasks[todayStr] || [];
+                    const plannedTasks = state.tasks.filter(t => plannedIds.includes(t.id));
+
+                    if (plannedTasks.length > 0) {
+                        return `
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    ${plannedTasks.map(t => `
+                                        <div style="display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                            <div onclick="event.stopPropagation(); toggleTask('${t.id}')" style="width: 20px; height: 20px; border: 2px solid ${t.done ? 'var(--green)' : 'var(--orange)'}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                                                ${t.done ? '<i class="ph-bold ph-check" style="font-size: 12px; color: black;"></i>' : ''}
+                                            </div>
+                                            <div style="flex: 1;">
+                                                <span style="font-size: 15px; font-weight: 500; color: white; opacity: ${t.done ? 0.5 : 1}; text-decoration: ${t.done ? 'line-through' : 'none'}">${t.text}</span>
+                                                <div style="font-size: 11px; color: var(--blue); font-weight: 700;">${t.subject}</div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
                                 </div>
-                            `).join('')}
-                            ${todayTasks.length > 3 ? `<div style="font-size: 12px; color: var(--blue); text-align: center;">+ altri ${todayTasks.length - 3} compiti</div>` : ''}
-                        </div>
-                     ` : `
-                        <div style="text-align: center; padding: 10px; opacity: 0.6;">
-                            <i class="ph ph-smiley" style="font-size: 32px; margin-bottom: 8px;"></i>
-                            <div>Nessun compito per oggi!</div>
-                        </div>
-                     `}
+                             `;
+                    } else {
+                        return `
+                                <div style="text-align: center; padding: 10px; opacity: 0.6;">
+                                    <i class="ph ph-calendar-plus" style="font-size: 32px; margin-bottom: 8px;"></i>
+                                    <div>Tocca + per pianificare la giornata</div>
+                                </div>
+                             `;
+                    }
+                })()}
                 </div>
             </div>
             `;
@@ -1374,20 +1384,31 @@
                     const existingCalendar = calendarEl._fullCalendar;
                     if (existingCalendar) existingCalendar.destroy();
 
-                    // ⭐ Ottimizzazione: Nascondi settimane antecedenti
+                    // ⭐ Ottimizzazione: Mostra solo questa settimana e la prossima
                     const today = new Date();
+
+                    // Inizio: Lunedì di questa settimana
                     const day = today.getDay();
-                    const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Monday start
-                    const startOfWeek = new Date(today.setDate(diff));
+                    const diffToMonday = today.getDate() - (day === 0 ? 6 : day - 1);
+                    const startOfWeek = new Date(new Date(today).setDate(diffToMonday));
                     startOfWeek.setHours(0, 0, 0, 0);
+
+                    // Fine: Domenica della prossima settimana
+                    const endOfNextWeek = new Date(startOfWeek);
+                    endOfNextWeek.setDate(startOfWeek.getDate() + 13); // +14 days - 1
+                    endOfNextWeek.setHours(23, 59, 59, 999);
 
                     const calendar = new FullCalendar.Calendar(calendarEl, {
                         initialView: 'dayGridMonth',
                         locale: 'it',
                         themeSystem: 'standard',
+                        firstDay: 1, // Lunedì
                         height: 'auto',
-                        validRange: { start: startOfWeek }, // ⭐ Nasconde il passato
-                        headerToolbar: { left: 'title', center: '', right: 'prev,next' },
+                        validRange: {
+                            start: startOfWeek.toISOString().split('T')[0],
+                            end: new Date(endOfNextWeek.getTime() + 86400000).toISOString().split('T')[0] // exclusive end
+                        },
+                        headerToolbar: { left: 'title', center: '', right: '' }, // No navigation needed
                         events: state.tasks
                             .filter(t => t.due_date && t.hasValidDate)
                             .map(t => ({
@@ -1463,47 +1484,75 @@
                         ${state.syncing ? 'Sincronizzazione...' : 'Sincronizza'}
                     </button>
                 </div>
-                ${state.lastSync ? `<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; display: flex; align-items: center; gap: 6px;">
-                    <i class="ph ph-check-circle" style="color: var(--green);"></i>
-                    Ultima sincronizzazione: ${state.lastSync}
-                </div>` : ''}
+
+                <!-- WEEKLY PLAN SECTION -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h3 style="margin:0; text-align: left; color: white;">Pianificato per la settimana</h3>
+                    <button onclick="showPlanWeekModal()" style="background: rgba(255,255,255,0.1); border: none; width: 28px; height: 28px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                        <i class="ph-bold ph-plus" style="font-size: 14px;"></i>
+                    </button>
+                </div>
+                <div class="card glass-panel" style="padding: 16px; background: rgba(255,255,255,0.05); margin-bottom: 24px;">
+                    ${(() => {
+                    const plannedThisWeek = state.tasks.filter(t => {
+                        // Check if it's planned for ANY day in state.plannedTasks
+                        return Object.values(state.plannedTasks).some(ids => ids.includes(t.id));
+                    });
+
+                    if (plannedThisWeek.length > 0) {
+                        return plannedThisWeek.map(t => `
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                    <div onclick="toggleTask('${t.id}')" style="width: 18px; height: 18px; border: 2px solid ${t.done ? 'var(--green)' : 'var(--blue)'}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 5px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                        ${t.done ? '<i class="ph-bold ph-check" style="font-size: 10px; color: black;"></i>' : ''}
+                                    </div>
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="font-size: 14px; color: white; ${t.done ? 'text-decoration: line-through; opacity: 0.5;' : ''}">${t.text}</div>
+                                        <div style="font-size: 10px; color: var(--blue); font-weight: 700;">${t.subject}</div>
+                                    </div>
+                                </div>
+                            `).join('');
+                    } else {
+                        return `<div style="text-align: center; opacity: 0.5; font-size: 13px;">Nessun compito pianificato per questa settimana.</div>`;
+                    }
+                })()}
+                </div>
                 
-                <!-- PLANNING TOOLKIT (REMOVED FOR CLEANLINESS) -->
-                
-                <h3 style="text-align: center;">IL TUO CALENDARIO</h3>
-                <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border-radius: 28px; padding: 15px; margin-bottom: 20px; border: 1px solid rgba(255, 255, 255, 0.2);">
-                    <div id="calendar"></div>
+                <h3 style="text-align: center; margin-bottom: 12px;">CALENDARIO COMPATTATO</h3>
+                <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border-radius: 28px; padding: 15px; margin-bottom: 24px; border: 1px solid rgba(255, 255, 255, 0.2);">
+                    <div id="calendar" style="min-height: 180px;"></div>
                 </div>
 
-                <h3>Scadenze</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h3 style="margin: 0;">Tutte le Scadenze</h3>
+                </div>
                 <div id="tasks-list">
                     ${state.tasks.map(t => {
-                const dueDate = t.dateObj && !isNaN(t.dateObj.getTime()) ? t.dateObj : null;
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const daysUntil = dueDate ? Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
-                let dateLabel = '';
-                let dateColor = 'var(--text-secondary)';
+                    const dueDate = t.dateObj && !isNaN(t.dateObj.getTime()) ? t.dateObj : null;
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const daysUntil = dueDate ? Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
+                    let dateLabel = '';
+                    let dateColor = 'var(--text-secondary)';
 
-                if (dueDate) {
-                    if (daysUntil === 0) {
-                        dateLabel = 'OGGI';
-                        dateColor = 'var(--red)';
-                    } else if (daysUntil === 1) {
-                        dateLabel = 'DOMANI';
-                        dateColor = 'var(--orange)';
-                    } else if (daysUntil < 0) {
-                        dateLabel = 'SCADUTO';
-                        dateColor = 'var(--red)';
+                    if (dueDate) {
+                        if (daysUntil === 0) {
+                            dateLabel = 'OGGI';
+                            dateColor = 'var(--red)';
+                        } else if (daysUntil === 1) {
+                            dateLabel = 'DOMANI';
+                            dateColor = 'var(--orange)';
+                        } else if (daysUntil < 0) {
+                            dateLabel = 'SCADUTO';
+                            dateColor = 'var(--red)';
+                        } else {
+                            dateLabel = dueDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+                            dateColor = daysUntil <= 3 ? 'var(--orange)' : 'var(--blue)';
+                        }
                     } else {
-                        dateLabel = dueDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-                        dateColor = daysUntil <= 3 ? 'var(--orange)' : 'var(--blue)';
+                        dateLabel = t.display_date || 'Data non disponibile';
                     }
-                } else {
-                    dateLabel = t.display_date || 'Data non disponibile';
-                }
 
-                return `
+                    return `
                         <div class="glass-list-item" style="display:flex; align-items:center; gap:15px; border-left: 3px solid ${t.done ? 'var(--green)' : dateColor};">
                             <div style="width: 44px; height: 44px; border-radius: 12px; background: ${t.done ? 'rgba(48, 209, 88, 0.15)' : 'rgba(10, 132, 255, 0.15)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid ${t.done ? 'rgba(48, 209, 88, 0.3)' : 'rgba(10, 132, 255, 0.3)'};">
                                 ${t.done ? '<i class="ph-fill ph-check" style="color: var(--green); font-size: 22px;"></i>' : '<i class="ph ph-calendar" style="color: var(--blue); font-size: 20px;"></i>'}
@@ -1522,10 +1571,68 @@
                             </button>
                         </div>
                     `;
-            }).join('')}
+                }).join('')}
                     ${state.tasks.length === 0 ? '<div style="text-align:center; padding: 40px; opacity: 0.5;"><i class="ph ph-check-circle" style="font-size: 48px; color: var(--green); margin-bottom: 12px; display: block;"></i>Finito tutto! 🎉<br><span style="font-size: 12px; color: var(--text-secondary);">Non hai compiti in scadenza</span></div>' : ''}
                 </div>
             </div>`;
+        }
+
+        function showPlanWeekModal() {
+            modalContainer.innerHTML = `
+                <div class="modal-overlay" onclick="closeModal(event)">
+                    <div class="modal-content glass-panel" style="max-width: 450px; padding: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2 style="margin:0;">Pianifica Settimana</h2>
+                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
+                        </div>
+                        <p style="font-size: 14px; opacity: 0.7; margin-bottom: 20px;">Assegna i compiti ai giorni della settimana per organizzare il tuo studio.</p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 20px; max-height: 500px; overflow-y: auto;">
+                            ${state.tasks.filter(t => !t.done).map(t => {
+                return `
+                                    <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1);">
+                                        <div style="font-weight: 700; color: white; margin-bottom: 4px;">${t.text}</div>
+                                        <div style="font-size: 11px; color: var(--blue); margin-bottom: 12px;">${t.subject}</div>
+                                        
+                                        <div style="display: flex; justify-content: space-between; gap: 4px;">
+                                            ${['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((dayLabel, i) => {
+                    const dayIndex = (i + 1) % 7; // Monday is 1, Sunday is 0
+                    // Calculate the date for this day of the current week
+                    const today = new Date();
+                    const d = today.getDay();
+                    const diff = today.getDate() - (d === 0 ? 6 : d - 1) + i;
+                    const date = new Date(new Date(today).setDate(diff));
+                    const dateStr = date.toISOString().split('T')[0];
+                    const isPlanned = state.plannedTasks[dateStr] && state.plannedTasks[dateStr].includes(t.id);
+
+                    return `
+                                                    <div onclick="togglePlanDay('${t.id}', '${dateStr}')" style="flex:1; height: 32px; border-radius: 8px; background: ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; cursor: pointer; color: ${isPlanned ? 'white' : 'rgba(255,255,255,0.5)'};">
+                                                        ${dayLabel}
+                                                    </div>
+                                                `;
+                }).join('')}
+                                        </div>
+                                    </div>
+                                `;
+            }).join('')}
+                        </div>
+                        <button onclick="closeModal()" class="btn-primary" style="margin-top: 20px;">Fatto</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function togglePlanDay(taskId, dateStr) {
+            if (!state.plannedTasks[dateStr]) state.plannedTasks[dateStr] = [];
+            const index = state.plannedTasks[dateStr].indexOf(taskId);
+            if (index > -1) {
+                state.plannedTasks[dateStr].splice(index, 1);
+            } else {
+                state.plannedTasks[dateStr].push(taskId);
+            }
+            saveTasks();
+            render();
+            showPlanWeekModal(); // Refresh modal
         }
 
         function selectDay(day) {
@@ -2279,41 +2386,107 @@
             }).join('');
         }
 
+        function showStressModal() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const currentLevel = state.stressLevels[todayStr] || 0;
+
+            modalContainer.innerHTML = `
+                <div class="modal-overlay" onclick="closeModal(event)">
+                    <div class="modal-content glass-panel" style="max-width: 400px; padding: 24px; text-align: center;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2 style="margin:0;">Stress Giornaliero</h2>
+                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
+                        </div>
+                        <p style="opacity: 0.7; margin-bottom: 24px;">Come ti senti oggi? Registrare il tuo livello di stress ci aiuta a ottimizzare il tuo planner.</p>
+                        
+                        <div style="display: flex; justify-content: space-between; gap: 10px; margin-bottom: 30px;">
+                            ${[1, 2, 3, 4, 5].map(lv => {
+                const colors = ['', '#4ade80', '#fbbf24', '#f87171', '#ef4444', '#7f1d1d'];
+                const color = colors[lv];
+                const isActive = currentLevel === lv;
+                return `
+                                    <div onclick="setStressLevel(${lv})" style="flex: 1; aspect-ratio: 1; border-radius: 12px; background: ${isActive ? color : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isActive ? color : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; transform: ${isActive ? 'scale(1.1)' : 'scale(1)'};">
+                                        <span style="font-size: 20px; font-weight: 800; color: ${isActive ? 'white' : 'rgba(255,255,255,0.3)'};">${lv}</span>
+                                    </div>
+                                `;
+            }).join('')}
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px; opacity: 0.5;">
+                            <div style="text-align: left;"><i class="ph ph-leaf"></i> Rilassato</div>
+                            <div style="text-align: right;">Esaurito <i class="ph ph-fire"></i></div>
+                        </div>
+
+                        <button onclick="closeModal()" class="btn-primary" style="margin-top: 24px;">Conferma</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function setStressLevel(lv) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            state.stressLevels[todayStr] = lv;
+            saveTasks();
+            render();
+            showStressModal(); // Refresh modal
+        }
+
         function showOrganizeStudyModal() {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayTasks = state.tasks.filter(t => {
-                if (!t.dateObj) return false;
-                const d = new Date(t.dateObj);
-                d.setHours(0, 0, 0, 0);
-                return d.getTime() === today.getTime();
-            });
+            const todayStr = new Date().toISOString().split('T')[0];
+            const plannedIds = state.plannedTasks[todayStr] || [];
+
+            // Show ALL pending tasks (not just today's)
+            const allPendingTasks = state.tasks.filter(t => !t.done);
 
             modalContainer.innerHTML = `
                 <div class="modal-overlay" onclick="closeModal(event)">
                     <div class="modal-content glass-panel" style="max-width: 400px; padding: 24px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2 style="margin:0;">Organizza Studio</h2>
+                            <h2 style="margin:0;">Cosa fai oggi?</h2>
                             <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
                         </div>
-                        <p style="font-size: 14px; opacity: 0.7; margin-bottom: 20px;">Seleziona i compiti che vuoi completare oggi per organizzare la tua sessione.</p>
+                        <p style="font-size: 14px; opacity: 0.7; margin-bottom: 20px;">Scegli dalla tua lista quali compiti vuoi affrontare oggi.</p>
                         
-                        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; max-height: 300px; overflow-y: auto;">
-                            ${todayTasks.length > 0 ? todayTasks.map(t => `
-                                <div class="glass-list-item" style="margin-bottom: 0; display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="this.querySelector('input').click()">
-                                    <input type="checkbox" style="width: 20px; height: 20px; accent-color: var(--green);" ${t.done ? 'checked' : ''} onclick="event.stopPropagation(); toggleTask('${t.id}')">
-                                    <div style="flex: 1;">
-                                        <div style="font-weight: 600;">${t.text}</div>
-                                        <div style="font-size: 11px; color: var(--blue); font-weight: 700;">${t.subject}</div>
+                        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; max-height: 400px; overflow-y: auto;">
+                            ${allPendingTasks.length > 0 ? allPendingTasks.map(t => {
+                const isPlanned = plannedIds.includes(t.id);
+                return `
+                                    <div class="glass-list-item" style="margin-bottom: 0; display: flex; align-items: center; gap: 12px; cursor: pointer; border-left: 3px solid ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.1)'};" onclick="togglePlanTask('${t.id}')">
+                                        <div style="width: 24px; height: 24px; border-radius: 6px; background: ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                            ${isPlanned ? '<i class="ph-bold ph-check" style="font-size: 14px; color: black;"></i>' : ''}
+                                        </div>
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; font-size: 15px;">${t.text}</div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                <div style="font-size: 11px; color: var(--blue); font-weight: 700;">${t.subject}</div>
+                                                <div style="font-size: 10px; opacity: 0.5;">Scade: ${t.display_date}</div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            `).join('') : '<div style="text-align: center; opacity: 0.5;">Nessun compito previsto per oggi.</div>'}
+                                `;
+            }).join('') : '<div style="text-align: center; opacity: 0.5; padding: 20px;">Non ci sono compiti in sospeso. Ottimo lavoro!</div>'}
                         </div>
 
-                        <button onclick="closeModal()" class="btn-primary">Pronto!</button>
+                        <button onclick="closeModal()" class="btn-primary">Aggiorna Agenda</button>
                     </div>
                 </div>
             `;
+        }
+
+        function togglePlanTask(id) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (!state.plannedTasks[todayStr]) state.plannedTasks[todayStr] = [];
+
+            const index = state.plannedTasks[todayStr].indexOf(id);
+            if (index > -1) {
+                state.plannedTasks[todayStr].splice(index, 1);
+            } else {
+                state.plannedTasks[todayStr].push(id);
+            }
+
+            saveTasks();
+            render();
+            showOrganizeStudyModal(); // Refresh modal
         }
 
         function startStudySession() {
