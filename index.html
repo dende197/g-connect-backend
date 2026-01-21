@@ -9,28 +9,44 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link
-        href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 
     <style>
         :root {
-            --bg-color: #000000;
-            --surface-color: #1C1C1E;
-            --surface-highlight: #2C2C2E;
-            --blue: #0A84FF;
-            --purple: #BF5AF2;
-            --indigo: #5E5CE6;
-            --pink: #FF375F;
-            --red: #FF453A;
-            --orange: #FF9F0A;
-            --yellow: #FFD60A;
-            --green: #30D158;
-            --text-primary: #FFFFFF;
-            --text-secondary: #8E8E93;
-            --radius-L: 24px;
-            --radius-M: 16px;
+            /* 🌌 COSMIC PALETTE */
+            --bg-deep: #020617;
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+
+            /* 💎 GLASS SURFACES */
+            --glass-base: rgba(30, 41, 59, 0.4);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-highlight: rgba(255, 255, 255, 0.15);
+            --glass-detail: rgba(255, 255, 255, 0.03);
+
+            /* 🌈 ACCENTS */
+            --primary: #3b82f6;
+            /* Blue */
+            --primary-glow: rgba(59, 130, 246, 0.5);
+            --secondary: #8b5cf6;
+            /* Violet */
+            --accent-grad: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+
+            /* 🎨 TEXT */
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+
+            /* 📐 SHAPES */
+            --radius-xl: 32px;
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+
+            /* 🔄 TRANSITIONS */
+            --ease-elastic: cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
 
         * {
@@ -40,9 +56,15 @@
         }
 
         body {
-            font-family: 'SF Pro Display', 'Inter', -apple-system, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
+            font-family: 'Outfit', -apple-system, sans-serif;
+            background: var(--bg-deep);
+            /* Fallback */
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 40%),
+                var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-main);
             margin: 0;
             overflow: hidden;
             width: 100vw;
@@ -53,7 +75,8 @@
             height: 100%;
             overflow-y: scroll;
             -webkit-overflow-scrolling: touch;
-            padding-bottom: 120px;
+            padding-bottom: 140px;
+            /* Spazio per nav */
             scroll-behavior: smooth;
         }
 
@@ -66,234 +89,270 @@
             scrollbar-width: none;
         }
 
-        /* FullCalendar Customization */
-        .fc {
-            --fc-button-bg-color: transparent;
-            --fc-button-border-color: rgba(255, 255, 255, 0.1);
-            --fc-button-active-bg-color: var(--blue);
-            --fc-border-color: rgba(255, 255, 255, 0.05);
-            --fc-page-bg-color: transparent;
-            --fc-today-bg-color: rgba(10, 132, 255, 0.1);
-        }
-
-        .fc .fc-toolbar-title {
-            font-size: 1.2rem;
-            font-weight: 700;
-        }
-
-        .fc .fc-button-primary:not(:disabled):active,
-        .fc .fc-button-primary:not(:disabled).fc-button-active {
-            background-color: var(--blue);
-        }
-
-        .fc-theme-standard td,
-        .fc-theme-standard th {
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .fc-daygrid-day-number {
-            font-size: 14px;
-            font-weight: 500;
-            padding: 10px !important;
-        }
-
-        .fc-event {
-            border-radius: 4px;
-            padding: 2px 4px;
-            border: none;
-            font-size: 10px;
-            cursor: pointer;
-        }
-
-        .view {
-            padding: 24px;
-            animation: fadeIn 0.3s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
-
-        @keyframes spin {
-            from {
-                transform: rotate(0deg);
-            }
-
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
+        /* ✨ TYPOGRAPHY */
         h1 {
-            font-size: 32px;
+            font-size: 36px;
             font-weight: 700;
+            letter-spacing: -0.02em;
             margin: 0;
-            letter-spacing: 0.3px;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         h2 {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 600;
+            letter-spacing: -0.01em;
             margin: 0;
+            color: var(--text-main);
         }
 
         h3 {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
-            margin: 0;
-            color: var(--text-secondary);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            margin-bottom: 12px;
         }
 
+        p {
+            line-height: 1.6;
+            color: var(--text-muted);
+        }
+
+        /* 💎 CARDS (GLASSMORPHISM) */
         .card {
-            background: rgba(28, 28, 30, 0.6);
+            background: var(--glass-base);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: var(--radius-L);
-            padding: 20px;
-            margin-bottom: 16px;
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid var(--glass-highlight);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        /* Navigation */
+        .card:active {
+            transform: scale(0.98);
+        }
+
+        /* 🚀 BUTTONS */
+        .btn-primary {
+            background: var(--accent-grad);
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            font-size: 16px;
+            width: 100%;
+            cursor: pointer;
+            box-shadow: 0 10px 20px -5px var(--primary-glow);
+            transition: all 0.3s var(--ease-elastic);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.95);
+            box-shadow: 0 5px 10px -5px var(--primary-glow);
+        }
+
+        .btn-icon-only {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--glass-highlight);
+            color: var(--text-main);
+            border: 1px solid var(--glass-border);
+            transition: all 0.2s;
+        }
+
+        /* 📱 NAVIGATION (Floating Island) */
         #bottom-nav {
             position: fixed;
-            bottom: 30px;
+            bottom: 32px;
             left: 50%;
             transform: translateX(-50%);
             width: auto;
-            padding: 0 30px;
-            height: 72px;
-            background: rgba(25, 25, 25, 0.9);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            border-radius: 40px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 320px;
+            padding: 12px 32px;
+            height: 80px;
+
+            background: rgba(15, 23, 42, 0.85);
+            /* Darker for contrast */
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+
+            border: 1px solid var(--glass-border);
+            border-radius: 100px;
+            /* Pill shape */
+
             display: flex;
-            gap: 32px;
+            gap: 24px;
             align-items: center;
-            justify-content: center;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-            z-index: 999;
+            justify-content: space-between;
+
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
         }
 
         .nav-item {
             background: none;
             border: none;
-            padding: 0;
-            color: rgba(255, 255, 255, 0.4);
+            padding: 10px;
+            color: var(--text-dim);
             display: flex;
             flex-direction: column;
             align-items: center;
-            transition: all 0.2s;
-            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
         }
 
         .nav-item i {
-            font-size: 28px;
+            font-size: 26px;
+            transition: color 0.3s, transform 0.3s;
         }
 
         .nav-item.active {
             color: white;
-            transform: translateY(-2px);
         }
 
         .nav-item.active i {
-            text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+            color: #a78bfa;
+            /* Light violet */
+            transform: translateY(-4px);
+            filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.6));
         }
 
-        /* Chat */
-        .message-bubble {
-            padding: 12px 16px;
-            border-radius: 20px;
-            margin-bottom: 8px;
-            max-width: 80%;
-            line-height: 1.4;
-            word-wrap: break-word;
+        /* Dot indicator for active nav */
+        .nav-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            width: 4px;
+            height: 4px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px white;
         }
 
-        .msg-me {
-            background: var(--blue);
+        /* 💬 CHAT & INPUTS */
+        input,
+        textarea {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.6);
             color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 4px;
+            border: 1px solid var(--glass-border);
+            padding: 16px;
+            font-size: 16px;
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            transition: border-color 0.2s;
         }
 
-        .msg-other {
-            background: var(--surface-highlight);
-            color: white;
-            align-self: flex-start;
-            border-bottom-left-radius: 4px;
+        input:focus,
+        textarea:focus {
+            border-color: var(--primary);
+            background: rgba(15, 23, 42, 0.8);
         }
 
-        /* Modals and Inputs */
+        /* 🗂️ MODALS */
         .modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(2, 6, 23, 0.9);
+            /* Deep dark overlay */
+            backdrop-filter: blur(10px);
             z-index: 2000;
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
-            backdrop-filter: blur(5px);
-            animation: fadeIn 0.2s;
+            /* Bottom sheet logic */
         }
 
         .modal-content {
-            background: var(--surface-color);
-            border-radius: 24px 24px 0 0;
-            padding: 24px;
-            max-height: 90vh;
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 1) 100%);
+            border-top: 1px solid var(--glass-highlight);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            padding: 32px 24px;
+            max-height: 85vh;
             overflow-y: auto;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 -10px 60px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        input,
-        textarea {
-            width: 100%;
-            background: var(--surface-highlight);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 12px 14px;
-            font-size: 16px;
-            border-radius: 12px;
-            font-family: inherit;
-            resize: none;
-            margin-bottom: 10px;
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+
+            to {
+                transform: translateY(0);
+            }
         }
 
-        .search-container {
-            position: sticky;
-            top: -1px;
-            z-index: 10;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            padding: 10px 0;
-            margin: 0 -24px 20px -24px;
-            padding: 10px 24px;
+        /* ✨ UTILS */
+        .text-gradient {
+            background: var(--accent-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
-        .btn-primary {
-            background: var(--blue);
-            color: white;
-            width: 100%;
+        .badge {
+            padding: 6px 12px;
+            border-radius: 100px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .badge-primary {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--primary);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .badge-success {
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        /* Fullcalendar Override to match theme */
+        .fc {
+            color: var(--text-muted);
+        }
+
+        .fc-toolbar-title {
+            color: var(--text-main) !important;
+        }
+
+        .fc-daygrid-day-number {
+            color: var(--text-muted) !important;
+        }
+
+        .fc-col-header-cell-cushion {
+            color: var(--text-dim) !important;
+        }
+
+        .fc .fc-button-primary {
+            background: var(--glass-highlight);
             border: none;
-            padding: 16px;
-            border-radius: 14px;
-            font-weight: 600;
-            font-size: 16px;
-            cursor: pointer;
+        }
+
+        .fc .fc-button-active {
+            background: var(--primary) !important;
+            color: white !important;
         }
 
         .offline-badge {
