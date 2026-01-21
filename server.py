@@ -564,31 +564,37 @@ def login():
             fallback_mode = True
         
         # 2. Gestione Profili Multipli (Solo se tentativo A ok)
+        # MODIFICA COMPATIBILITÀ: Non blocchiamo più se non c'è selezione.
+        # Se front-end è vecchio, non sa gestire MULTIPLE_PROFILES.
+        # Quindi: default a 0, ma mandiamo lista profili per frontend aggiornati.
+        
+        profiles_payload = []
         if not fallback_mode and profiles:
-            if len(profiles) > 1 and selected_profile_index is None:
-                # Ritorna lista profili al frontend per scelta utente
-                simplified_profiles = []
+            if len(profiles) > 1:
+                # Prepariamo lista per dopo
                 for idx, p in enumerate(profiles):
-                    simplified_profiles.append({
+                    profiles_payload.append({
                         "index": idx,
                         "name": f"{p.get('alunno', {}).get('desNome', '')} {p.get('alunno', {}).get('desCognome', '')}",
                         "school": p.get('desScuola', 'Scuola'),
                         "class": p.get('desClasse', '')
                     })
-                
-                debug_log("⚠️ Rilevati profili multipli", simplified_profiles)
-                return jsonify({
-                    "success": False,
-                    "status": "MULTIPLE_PROFILES",
-                    "profiles": simplified_profiles
-                }), 200
+                debug_log(f"⚠️ Rilevati {len(profiles)} profili. Auto-select index 0 per compatibilità.")
 
-            # Selezione Profilo (default 0)
-            target_index = int(selected_profile_index) if selected_profile_index is not None else 0
-            if target_index < len(profiles):
-                target_profile = profiles[target_index]
-                auth_token = target_profile['token']
-                debug_log(f"✅ Profilo selezionato: Indice {target_index}", target_profile.get('alunno', {}))
+        # 3. Selezione Profilo (default 0 se unico o non specificato)
+        target_index = int(selected_profile_index) if selected_profile_index is not None else 0
+        
+        # Security check su indice
+        if not profiles:
+            target_profile = None # Fallback mode gestirà
+        elif target_index < len(profiles):
+            target_profile = profiles[target_index]
+            auth_token = target_profile['token']
+            debug_log(f"✅ Profilo selezionato: Indice {target_index}", target_profile.get('alunno', {}))
+        else:
+             target_index = 0
+             target_profile = profiles[0]
+             auth_token = target_profile['token']
         
         # 3. Setup Sessione Operativa
         # Se siamo in fallack o se advanced ha fallito qualcosa, usiamo Standard Login
@@ -636,8 +642,8 @@ def login():
         student_class = "DidUP"
         
         # Se avevamo profili dal advanced login, usiamo quelli per info più precise
-        if not fallback_mode and profiles and 'target_index' in locals() and target_index < len(profiles):
-             p = profiles[target_index]
+        if not fallback_mode and profiles and 'target_index' in locals() and target_profile:
+             p = target_profile
              student_name = f"{p.get('alunno', {}).get('desNome', '')} {p.get('alunno', {}).get('desCognome', '')}".strip() or username
              student_class = p.get('desClasse', 'DidUP')
 
@@ -649,7 +655,7 @@ def login():
                 "authToken": auth_token,
                 "accessToken": access_token,
                 "userName": username,
-                "profileIndex": selected_profile_index if selected_profile_index is not None else 0
+                "profileIndex": target_index
             },
             "student": {
                 "name": student_name,
@@ -666,6 +672,12 @@ def login():
                 "mode": "FALLBACK_HYBRID" if fallback_mode else "MULTI_PROFILE_FAST"
             }
         }
+        
+        # Se c'erano più profili, li aggiungiamo e settiamo status, MA con success=True
+        # Così il vecchio frontend entra (col profilo 0), il nuovo frontend vede status e apre modale
+        if profiles_payload:
+            response_data["status"] = "MULTIPLE_PROFILES"
+            response_data["profiles"] = profiles_payload
         
         debug_log("RISPOSTA FINALE", response_data)
         return jsonify(response_data), 200
