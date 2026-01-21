@@ -126,8 +126,8 @@
 
         /* 💎 CARDS (LIQUID GLASS STANDARD) */
         .card {
-            background: rgba(15, 23, 42, 0.6);
-            /* Slightly more opaque for readability */
+            background: rgba(40, 48, 70, 0.4);
+            /* Lighter, more milky */
             backdrop-filter: blur(24px) saturate(140%);
             -webkit-backdrop-filter: blur(24px) saturate(140%);
             border: 1px solid var(--glass-border);
@@ -141,10 +141,10 @@
             overflow: hidden;
         }
 
-        /* 💎 PREMIUM SATIN GLASS (For Grades, Tasks, Polls) */
+        /* 💎 PREMIUM SATIN GLASS (For Grades, Tasks, Polls) - LIGHTER */
         .glass-panel {
-            background: rgba(30, 40, 60, 0.75);
-            /* Deep Blue-Grey Satin */
+            background: rgba(50, 60, 90, 0.45);
+            /* Distinctive lighter blue-grey */
             backdrop-filter: blur(40px) saturate(180%);
             -webkit-backdrop-filter: blur(40px) saturate(180%);
             border: 1px solid rgba(255, 255, 255, 0.15);
@@ -152,13 +152,13 @@
             box-shadow:
                 0 20px 50px -12px rgba(0, 0, 0, 0.7),
                 inset 0 0 40px rgba(255, 255, 255, 0.05);
-            /* Inner Glow */
             border-radius: var(--radius-xl);
         }
 
         .glass-list-item {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.07);
+            /* Lighter list items */
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: var(--radius-md);
             padding: 16px;
             margin-bottom: 12px;
@@ -1022,16 +1022,16 @@
                         </div>
                         <div style="display: flex; gap: 16px; overflow-x: auto; padding-bottom: 10px; margin: 0 -24px; padding-left: 24px;">
                             ${state.news.map(n => `
-                                <div onclick="window.open('${n.url}', '_blank')" style="min-width: 260px; height: 150px; background: linear-gradient(135deg, #1c1c1e 0%, #111 100%); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; cursor:pointer;">
-                                    <i class="ph-fill ph-file-pdf" style="position: absolute; right: -10px; bottom: -10px; font-size: 80px; color: rgba(255,255,255,0.03); transform: rotate(-15deg);"></i>
+                                <div onclick="window.open('${n.url}', '_blank')" style="min-width: 260px; height: 150px; background: linear-gradient(135deg, rgba(60, 70, 90, 0.45) 0%, rgba(40, 50, 70, 0.45) 100%); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; cursor:pointer;">
+                                    <i class="ph-fill ph-file-pdf" style="position: absolute; right: -10px; bottom: -10px; font-size: 80px; color: rgba(255,255,255,0.05); transform: rotate(-15deg);"></i>
                                     <div>
                                         <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
                                             <i class="ph-fill ph-file-pdf" style="color: var(--red); font-size: 16px;"></i>
                                             <span style="color: var(--text-secondary); font-size: 11px; font-weight: 700; text-transform: uppercase;">CIRCOLARE</span>
                                         </div>
-                                        <h3 style="margin: 0; font-size: 17px; line-height: 1.3; font-weight: 600;">${n.title}</h3>
+                                        <h3 style="margin: 0; font-size: 17px; line-height: 1.3; font-weight: 600; color: white;">${n.title}</h3>
                                     </div>
-                                    <span style="font-size: 12px; color: var(--blue);">Apri documento <i class="ph-bold ph-arrow-up-right" style="font-size:10px;"></i></span>
+                                    <span style="font-size: 12px; color: var(--blue); font-weight: 600;">Apri documento <i class="ph-bold ph-arrow-up-right" style="font-size:10px;"></i></span>
                                 </div>
                             `).join('')}
                         </div>
@@ -1391,7 +1391,7 @@
                     Ultima sincronizzazione: ${state.lastSync}
                 </div>` : ''}
                 
-                <div style="background: #1C1C1E; border-radius: 20px; padding: 15px; margin-bottom: 20px; border: 1px solid #2C2C2E;">
+                <div style="background: rgba(40, 48, 70, 0.4); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 20px; padding: 15px; margin-bottom: 20px; border: 1px solid var(--glass-border);">
                     <div id="calendar"></div>
                 </div>
 
