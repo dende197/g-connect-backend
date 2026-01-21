@@ -121,34 +121,31 @@
             margin-bottom: 14px;
         }
 
-        /* 💎 CARDS (WHITE SATIN GLASS - BRIGHTER V3) */
+        /* 💎 CARDS (CLEAN WHITE SATIN - NO GLOW) */
         .card {
             background: rgba(255, 255, 255, 0.22);
-            /* Increased brightness */
+            /* Homogeneous flat background */
             backdrop-filter: blur(30px) saturate(120%);
             -webkit-backdrop-filter: blur(30px) saturate(120%);
             border: 1px solid rgba(255, 255, 255, 0.25);
-            border-top: 1px solid rgba(255, 255, 255, 0.35);
             border-radius: var(--radius-lg);
             padding: 24px;
             margin-bottom: 24px;
-            box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.5);
-            transition: transform 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth);
+            box-shadow: none;
+            /* REMOVED SHADOWS as requested */
             position: relative;
             overflow: hidden;
         }
 
-        /* 💎 PREMIUM SATIN GLASS - PURE WHITE SATIN */
+        /* 💎 PREMIUM SATIN PANEL */
         .glass-panel {
             background: rgba(255, 255, 255, 0.25);
-            /* Ultra bright for active panels */
+            /* Flat homogeneous */
             backdrop-filter: blur(50px) saturate(100%);
             -webkit-backdrop-filter: blur(50px) saturate(100%);
             border: 1px solid rgba(255, 255, 255, 0.3);
-            border-top: 1px solid rgba(255, 255, 255, 0.5);
-            box-shadow:
-                0 20px 50px -12px rgba(0, 0, 0, 0.6),
-                inset 0 0 40px rgba(255, 255, 255, 0.1);
+            box-shadow: none;
+            /* REMOVED GLOWS */
             border-radius: var(--radius-xl);
         }
 
@@ -238,6 +235,25 @@
 
         .btn-icon-only:active {
             background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* 🔍 SEARCH FILTERS */
+        .search-filter-pill {
+            padding: 6px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .search-filter-pill.active {
+            background: var(--blue);
+            border-color: var(--blue);
+            color: white;
         }
 
         /* 📱 NAVIGATION (Floating Island) */
@@ -556,14 +572,8 @@
             didup: { connected: false },
             feed: { search: '', classFilter: 'Tutte' },
             tasks: [], // ⭐ Inizializza vuoto, carica da localStorage
-            posts: [
-                { id: 1, author: 'Marco Rossi', class: '4A', text: 'Ragazzi chi ha gli appunti di filosofia?', likes: 4, liked: false, comments: [], image: null, anon: false },
-                { id: 2, author: 'Rappresentanti', class: 'Istituto', text: '⚠️ Assemlea di Istituto confermata per Venerdì in Aula Magna. ', likes: 89, liked: true, comments: [], image: null, anon: false }
-            ],
-            marketItems: [
-                { id: 1, title: 'Matematica Blu Vol.3', price: '15€', image: 'https://m.media-amazon.com/images/I/71s+3sDQPIL._AC_UF1000,1000_QL80_. jpg', seller: 'Luca E.' },
-                { id: 2, title: 'Divina Commedia', price: '10€', image: null, seller: 'Sofia B.' }
-            ],
+            posts: [], // Loaded from API
+            marketItems: [], // Loaded from API
             messages: { 'Alessandro Russo': [{ text: 'Ciao Andrea! ', me: false }] },
             news: [
                 { id: 128, title: 'Circolare n.  128 - Assemblea d\'Istituto 7 Febbraio', date: 'OGGI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' },
@@ -651,6 +661,10 @@
 
                 state.isLoggedIn = true;
                 state.didup.connected = true;
+
+                // ⭐ Fetch Feed & Market on startup
+                await Promise.all([fetchFeed(), fetchMarket()]);
+
                 state.view = 'home';
                 render();
 
@@ -673,16 +687,67 @@
             }
         }
 
+        // ⭐ PERSISTENCE HELPERS (New API)
+        async function fetchFeed() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/posts`);
+                const data = await res.json();
+                if (data.success) {
+                    state.posts = data.data;
+                    console.log("📝 Feed caricato:", state.posts.length);
+                }
+            } catch (e) { console.error("Errore fetch feed:", e); }
+        }
+
+        async function fetchMarket() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/market`);
+                const data = await res.json();
+                if (data.success) {
+                    state.marketItems = data.data;
+                    console.log("🛒 Market caricato:", state.marketItems.length);
+                }
+            } catch (e) { console.error("Errore fetch market:", e); }
+        }
+
+        async function submitPost(postData) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/posts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(postData)
+                });
+                const data = await res.json();
+                if (data.success) state.posts = data.data;
+            } catch (e) { console.error("Errore submit post:", e); }
+        }
+
+        async function submitItem(itemData) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/market`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(itemData)
+                });
+                const data = await res.json();
+                if (data.success) state.marketItems = data.data;
+            } catch (e) { console.error("Errore submit item:", e); }
+        }
+
         async function performSync(sessionData) {
             if (state.syncing) return;
             state.syncing = true;
             render();
+
+            // ⭐ Fetch Global Data (Feed & Market)
+            await Promise.all([fetchFeed(), fetchMarket()]);
 
             // ⭐ Usa la sessione passata o carica quella salvata (come nel codice vecchio)
             if (!sessionData) sessionData = sessionManager.load();
             if (!sessionData) {
                 console.warn("⚠️ Nessuna sessione disponibile per sync");
                 state.syncing = false;
+                render();
                 return;
             }
 
@@ -711,22 +776,8 @@
                     error: data.error
                 });
 
-                // ⭐ DEBUG: Mostra dettagli completi in console
-                if (data.tasks && data.tasks.length > 0) console.log("📋 Tasks ricevuti:", data.tasks);
-
-                // ⭐ DEBUG CRITICO per voti
-                console.log("🎓 DEBUG VOTI - data.voti:", data.voti);
-                console.log("🎓 DEBUG VOTI - tipo:", typeof data.voti, "è array?", Array.isArray(data.voti));
-                if (data.voti) {
-                    console.log("🎓 DEBUG VOTI - lunghezza:", data.voti.length);
-                    console.log("🎓 DEBUG VOTI - primo elemento:", data.voti[0]);
-                }
-
-                if (data.promemoria && data.promemoria.length > 0) console.log("📋 Promemoria ricevuti:", data.promemoria);
-                if (data.announcements && data.announcements.length > 0) console.log("📋 Announcements ricevuti:", data.announcements);
-
                 if (data.success && data.tasks) {
-                    // ⭐ Gestione compiti (come nel codice vecchio)
+                    // ⭐ Gestione compiti
                     if (data.tasks.length === 0 && state.tasks.length > 0) {
                         console.warn("⚠️ Il server ha mandato 0 compiti. Mantengo quelli locali per sicurezza.");
                         state.isOffline = false;
@@ -741,10 +792,6 @@
                     if (data.voti !== undefined) {
                         state.voti = Array.isArray(data.voti) ? data.voti : [];
                         localStorage.setItem('argo_voti', JSON.stringify(state.voti));
-                        console.log("💾 Voti salvati:", state.voti.length);
-                        if (state.voti.length === 0) {
-                            console.warn("⚠️ Array voti vuoto - il backend potrebbe non recuperare i voti da DidUP");
-                        }
                     }
 
                     // ⭐ CRITICO: Aggiorna promemoria e salva SEMPRE
@@ -752,20 +799,11 @@
                     if (promemoriaData !== undefined) {
                         state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
                         localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
-                        console.log("💾 Promemoria salvati:", state.promemoria.length);
-                        if (state.promemoria.length === 0) {
-                            console.warn("⚠️ Array promemoria vuoto - il backend potrebbe non recuperare i promemoria da DidUP");
-                        }
                     }
 
                     state.lastSync = new Date().toLocaleTimeString();
                     state.isOffline = false;
                     state.didup.connected = true;
-                    console.log("✅ Sync completato:", {
-                        tasks: state.tasks.length,
-                        voti: state.voti.length,
-                        promemoria: state.promemoria.length
-                    });
                     updateOfflineBadge();
                     render();
                 } else {
@@ -774,7 +812,6 @@
             } catch (e) {
                 console.error("⚠️ Errore Sync:", e);
                 if (e.message.includes("Sessione non valida")) {
-                    // ⭐ Prova silent login se abbiamo le credenziali (come nel codice vecchio)
                     if (sessionData && sessionData.storedUser && sessionData.storedPass) {
                         await performSilentLogin(sessionData.schoolCode, sessionData.storedUser, sessionData.storedPass);
                     } else {
@@ -810,20 +847,12 @@
                     body: JSON.stringify({ schoolCode: school, username: user, password: pass })
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const data = await response.json();
 
                 if (data.success) {
                     console.log("✅ Silent Login riuscito!");
-                    console.log("📥 Dati ricevuti:", {
-                        tasks: data.tasks?.length || 0,
-                        voti: data.voti?.length || 0,
-                        promemoria: data.promemoria?.length || 0
-                    });
-
                     const newSession = {
                         ...data.session,
                         storedUser: encodedUser,
@@ -832,22 +861,15 @@
                     };
                     sessionManager.save(newSession);
 
-                    // ⭐ Carica TUTTI i dati
                     if (data.tasks) updateTasks(data.tasks, true);
-
-                    // ⭐ CRITICO: Carica voti
                     if (data.voti !== undefined) {
                         state.voti = Array.isArray(data.voti) ? data.voti : [];
                         localStorage.setItem('argo_voti', JSON.stringify(state.voti));
-                        console.log("✅ Voti caricati nel silent login:", state.voti.length);
                     }
-
-                    // ⭐ CRITICO: Carica promemoria
                     const promemoriaData = data.promemoria || data.announcements;
                     if (promemoriaData !== undefined) {
                         state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
                         localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
-                        console.log("✅ Promemoria caricati nel silent login:", state.promemoria.length);
                     }
 
                     if (data.student) {
@@ -1017,7 +1039,10 @@
                         <h1 style="color: white; text-align: left;">Dashboard</h1>
                     </div>
                     <div style="display: flex; gap: 12px;">
-                        <button onclick="openArgoLogin()" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; color: white; fount-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <div onclick="showSearchModal()" style="width: 44px; height: 44px; background: rgba(255,255,255,0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor:pointer;" title="Cerca">
+                            <i class="ph-bold ph-magnifying-glass" style="font-size: 20px;"></i>
+                        </div>
+                        <button onclick="openArgoLogin()" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; color: white; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                             <i class="ph-fill ph-user-switch"></i> Cambia Profilo
                         </button>
                     </div>
@@ -1061,47 +1086,62 @@
 
                 <!-- WIDGETS SECTION -->
                 <h2 style="margin-bottom: 16px; text-align: left;">Panoramica</h2>
-                <div style="display: flex; gap: 16px; margin-bottom: 30px;">
+                <div style="display: flex; gap: 12px; margin-bottom: 24px;">
                     
-                    <!-- GRADE AVERAGE WIDGET (UPDATED COLORS) -->
-                    <div class="card glass-panel" onclick="showVotiView()" style="flex: 1; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0; cursor:pointer;">
-                        <div style="position: relative; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
+                    <!-- GRADE AVERAGE WIDGET (REFINED LOGIC) -->
+                    <div class="card glass-panel" onclick="showVotiView()" style="flex: 1; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0; cursor:pointer;">
+                        <div style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
                             ${(() => {
                     const media = calcolaMedia(state.voti);
-                    const percent = media ? (parseFloat(media) / 10 * 188) : 0;
-                    const m = parseFloat(media);
+                    const m = media ? parseFloat(media) : 0;
+                    const percent = (m / 10) * 188;
+
                     let color = 'var(--red)';
-                    if (m >= 6.0) color = 'var(--green)';
-                    else if (m >= 5.5) color = '#F5D90A'; // Yellow range fix
-                    // else red (< 5.5)
+                    if (m >= 6.00) color = 'var(--green)';
+                    else if (m >= 5.50) color = '#F5D90A'; // Yellow
 
                     return `
-                                    <svg width="70" height="70" viewBox="0 0 70 70">
-                                        <circle cx="35" cy="35" r="30" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="5" />
-                                        <circle cx="35" cy="35" r="30" fill="none" stroke="${color}" stroke-width="5" stroke-dasharray="188" stroke-dashoffset="${188 - percent}" transform="rotate(-90 35 35)" stroke-linecap="round" />
+                                    <svg width="64" height="64" viewBox="0 0 70 70">
+                                        <circle cx="35" cy="35" r="30" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6" />
+                                        <circle cx="35" cy="35" r="30" fill="none" stroke="${color}" stroke-width="6" stroke-dasharray="188" stroke-dashoffset="${188 - percent}" transform="rotate(-90 35 35)" stroke-linecap="round" />
                                     </svg>
-                                    <span style="position: absolute; font-size: 18px; font-weight: 700; color: white;">${media || '--'}</span>
+                                    <span style="position: absolute; font-size: 16px; font-weight: 700; color: white;">${media ? m.toFixed(2) : '--'}</span>
                                 `;
                 })()}
                         </div>
-                        <span style="font-size: 13px; color: rgba(255,255,255,0.7); font-weight: 600;">Media Voti</span>
+                        <span style="font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 700; text-transform: uppercase;">Media</span>
                     </div>
 
-                    <!-- COMPLETED TASKS WIDGET (NEW) -->
-                    <div class="card glass-panel" style="flex: 1; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0;">
-                        <div style="position: relative; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
-                             <div style="width: 50px; height: 50px; background: rgba(48, 209, 88, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--green);">
-                                <i class="ph-fill ph-check-square" style="font-size: 24px;"></i>
+                    <!-- STRESS WIDGET (NEW) -->
+                    <div class="card glass-panel" style="flex: 1; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0;">
+                        <div style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
+                             <div style="width: 44px; height: 44px; background: rgba(255, 69, 58, 0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #ff453a;">
+                                <i class="ph-fill ph-activity" style="font-size: 22px;"></i>
                             </div>
-                            ${totalToday > 0 ? `<div style="position: absolute; bottom: 0; right: 0; background: var(--green); color: black; font-size: 12px; font-weight: 700; padding: 2px 6px; border-radius: 10px;">${completedToday}/${totalToday}</div>` : ''}
                         </div>
-                        <span style="font-size: 13px; color: rgba(255,255,255,0.7); font-weight: 600;">Compiti Oggi</span>
+                        <span style="font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 700; text-transform: uppercase;">Stress</span>
+                    </div>
+
+                    <!-- COMPLETED TASKS WIDGET -->
+                    <div class="card glass-panel" style="flex: 1; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0;">
+                        <div style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
+                             <div style="width: 44px; height: 44px; background: rgba(48, 209, 88, 0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--green);">
+                                <i class="ph-fill ph-check-square" style="font-size: 22px;"></i>
+                            </div>
+                            ${totalToday > 0 ? `<div style="position: absolute; bottom: 0; right: 0; background: var(--green); color: black; font-size: 10px; font-weight: 800; padding: 2px 5px; border-radius: 8px;">${completedToday}/${totalToday}</div>` : ''}
+                        </div>
+                        <span style="font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 700; text-transform: uppercase;">Compiti</span>
                     </div>
                 </div>
 
-                <!-- TO DO LIST (MOVED FROM TOP) -->
-                <h2 style="margin-bottom: 16px; text-align: left;">Indispensabili Oggi</h2>
-                <div class="card glass-panel" onclick="navigate('planner')" style="padding: 20px; cursor: pointer;">
+                <!-- TO DO LIST -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h2 style="margin:0; text-align: left;">Indispensabili Oggi</h2>
+                    <button onclick="showOrganizeStudyModal()" style="background: rgba(255,255,255,0.1); border: none; width: 32px; height: 32px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                        <i class="ph-bold ph-plus"></i>
+                    </button>
+                </div>
+                <div class="card glass-panel" onclick="navigate('planner')" style="padding: 20px; cursor: pointer; background: rgba(255,255,255,0.15);">
                      ${todayTasks.length > 0 ? `
                         <div style="display: flex; flex-direction: column; gap: 12px;">
                             ${todayTasks.slice(0, 3).map(t => `
@@ -1331,17 +1371,22 @@
             setTimeout(() => {
                 const calendarEl = document.getElementById('calendar');
                 if (calendarEl) {
-                    // Rimuovi il calendario esistente se presente
                     const existingCalendar = calendarEl._fullCalendar;
-                    if (existingCalendar) {
-                        existingCalendar.destroy();
-                    }
+                    if (existingCalendar) existingCalendar.destroy();
+
+                    // ⭐ Ottimizzazione: Nascondi settimane antecedenti
+                    const today = new Date();
+                    const day = today.getDay();
+                    const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Monday start
+                    const startOfWeek = new Date(today.setDate(diff));
+                    startOfWeek.setHours(0, 0, 0, 0);
 
                     const calendar = new FullCalendar.Calendar(calendarEl, {
                         initialView: 'dayGridMonth',
                         locale: 'it',
                         themeSystem: 'standard',
                         height: 'auto',
+                        validRange: { start: startOfWeek }, // ⭐ Nasconde il passato
                         headerToolbar: { left: 'title', center: '', right: 'prev,next' },
                         events: state.tasks
                             .filter(t => t.due_date && t.hasValidDate)
@@ -1359,21 +1404,21 @@
                             const event = info.event;
                             modalContainer.innerHTML = `
                                 <div class="modal-overlay" onclick="closeModal(event)">
-                                    <div class="modal-content">
+                                    <div class="modal-content glass-panel">
                                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                                             <h2 style="margin: 0;">Dettaglio Compito</h2>
-                                            <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; font-size: 16px; cursor: pointer;">Chiudi</button>
+                                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
                                         </div>
                                         <div style="margin-bottom: 12px;">
-                                            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Materia</div>
+                                            <div style="font-size: 11px; color: var(--blue); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Materia</div>
                                             <div style="font-size: 18px; font-weight: 600; color: white;">${event.extendedProps.subject}</div>
                                         </div>
                                         <div style="margin-bottom: 12px;">
-                                            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Descrizione</div>
+                                            <div style="font-size: 11px; color: var(--blue); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Descrizione</div>
                                             <div style="font-size: 16px; color: white; line-height: 1.5;">${event.extendedProps.fullText}</div>
                                         </div>
                                         <div>
-                                            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Scadenza</div>
+                                            <div style="font-size: 11px; color: var(--blue); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Scadenza</div>
                                             <div style="font-size: 16px; color: white; display: flex; align-items: center; gap: 6px;">
                                                 <i class="ph ph-calendar"></i>
                                                 ${new Date(event.start).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -1407,7 +1452,12 @@
             return `
             <div class="view" style="padding: 20px; padding-bottom: 100px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                    <h1 style="margin: 0;">Planner</h1>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <h1 style="margin: 0;">Planner</h1>
+                        <button onclick="addManualReminder()" style="background: rgba(255,255,255,0.1); border: none; width: 28px; height: 28px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                            <i class="ph-bold ph-plus" style="font-size: 14px;"></i>
+                        </button>
+                    </div>
                     <button onclick="performSync()" style="background: var(--blue); color: white; border: none; padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
                         <i class="ph ph-arrow-clockwise" style="font-size: 16px; ${state.syncing ? 'animation: spin 1s linear infinite;' : ''}"></i>
                         ${state.syncing ? 'Sincronizzazione...' : 'Sincronizza'}
@@ -2027,41 +2077,43 @@
             }
         }
 
-        function publishPost() {
+        async function publishPost() {
             const text = document.getElementById('new-post-text').value;
             const isAnon = document.getElementById('post-anon-toggle').checked;
             const imgPreview = document.querySelector('#image-preview img');
 
             if (text) {
-                state.posts.unshift({
+                const newPost = {
                     id: Date.now(),
-                    author: isAnon ? "Studente" : state.user.name,
-                    class: isAnon ? "5B" : state.user.class,
+                    author: isAnon ? "Studente" : (state.user.name || "Utente"),
+                    class: isAnon ? "5B" : (state.user.class || "5B"),
                     text: text,
                     likes: 0,
                     liked: false,
                     anon: isAnon,
                     image: imgPreview ? imgPreview.src : null,
                     comments: []
-                });
+                };
+                await submitPost(newPost);
                 closeModal();
                 render();
             }
         }
 
-        function publishItem() {
+        async function publishItem() {
             const title = document.getElementById('item-title').value;
             const price = document.getElementById('item-price').value;
             const imgPreview = document.querySelector('#image-preview img');
 
             if (title && price) {
-                state.marketItems.unshift({
+                const newItem = {
                     id: Date.now(),
                     title: title,
                     price: price,
                     image: imgPreview ? imgPreview.src : null,
-                    seller: state.user.name
-                });
+                    seller: state.user.name || "Utente"
+                };
+                await submitItem(newItem);
                 closeModal();
                 render();
             }
@@ -2138,6 +2190,132 @@
             state.feed.classFilter = c;
             render();
         }
+        function showSearchModal() {
+            modalContainer.innerHTML = `
+                <div class="modal-overlay" onclick="closeModal(event)">
+                    <div class="modal-content glass-panel" style="max-width: 400px; padding: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2 style="margin:0;">Cerca</h2>
+                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
+                        </div>
+                        
+                        <div style="display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none;">
+                            <div onclick="setSearchFilter('tutti')" id="filter-tutti" class="search-filter-pill active">Tutti</div>
+                            <div onclick="setSearchFilter('alunni')" id="filter-alunni" class="search-filter-pill">Alunni</div>
+                            <div onclick="setSearchFilter('professori')" id="filter-professori" class="search-filter-pill">Professori</div>
+                            <div onclick="setSearchFilter('materie')" id="filter-materie" class="search-filter-pill">Materie</div>
+                        </div>
+
+                        <div class="search-bar" style="margin-bottom: 20px; background: rgba(255,255,255,0.1);">
+                            <i class="ph-bold ph-magnifying-glass"></i>
+                            <input type="text" id="global-search-input" placeholder="Cerca..." oninput="performGlobalSearch(this.value)" style="background: transparent; border: none; color: white; width: 100%; padding: 8px;">
+                        </div>
+
+                        <div id="search-results" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
+                            <div style="text-align: center; opacity: 0.5; padding: 20px;">Inizia a scrivere per cercare...</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            state.activeSearchFilter = 'tutti';
+        }
+
+        function setSearchFilter(f) {
+            state.activeSearchFilter = f;
+            document.querySelectorAll('.search-filter-pill').forEach(p => p.classList.remove('active'));
+            document.getElementById(`filter-${f}`).classList.add('active');
+            performGlobalSearch(document.getElementById('global-search-input').value);
+        }
+
+        function performGlobalSearch(q) {
+            const resultsEl = document.getElementById('search-results');
+            if (!q || q.length < 2) {
+                resultsEl.innerHTML = '<div style="text-align: center; opacity: 0.5; padding: 20px;">Inizia a scrivere per cercare...</div>';
+                return;
+            }
+
+            let results = [];
+            const query = q.toLowerCase();
+
+            if (state.activeSearchFilter === 'tutti' || state.activeSearchFilter === 'alunni' || state.activeSearchFilter === 'professori') {
+                const dirResults = DIRECTORY.filter(person => {
+                    if (state.activeSearchFilter === 'alunni' && person.class === 'Docente') return false;
+                    if (state.activeSearchFilter === 'professori' && person.class !== 'Docente') return false;
+                    return person.name.toLowerCase().includes(query);
+                });
+                results = results.concat(dirResults.map(p => ({ type: 'person', ...p })));
+            }
+
+            if (state.activeSearchFilter === 'tutti' || state.activeSearchFilter === 'materie') {
+                const taskResults = state.tasks.filter(t => t.subject.toLowerCase().includes(query) || t.text.toLowerCase().includes(query));
+                results = results.concat(taskResults.map(t => ({ type: 'task', ...t })));
+            }
+
+            if (results.length === 0) {
+                resultsEl.innerHTML = '<div style="text-align: center; opacity: 0.5; padding: 20px;">Nessun risultato trovato</div>';
+                return;
+            }
+
+            resultsEl.innerHTML = results.map(r => {
+                if (r.type === 'person') {
+                    return `
+                        <div class="glass-list-item" style="margin-bottom: 0; display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 36px; height: 36px; background: var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">${r.name[0]}</div>
+                            <div>
+                                <div style="font-weight: 600;">${r.name}</div>
+                                <div style="font-size: 11px; color: var(--text-muted);">${r.class}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="glass-list-item" style="margin-bottom: 0;">
+                            <div style="font-size: 11px; color: var(--blue); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">${r.subject}</div>
+                            <div style="font-weight: 500;">${r.text}</div>
+                            <div style="font-size: 10px; color: var(--orange); margin-top: 4px;">Scadenza: ${r.due_date}</div>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        function showOrganizeStudyModal() {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayTasks = state.tasks.filter(t => {
+                if (!t.dateObj) return false;
+                const d = new Date(t.dateObj);
+                d.setHours(0, 0, 0, 0);
+                return d.getTime() === today.getTime();
+            });
+
+            modalContainer.innerHTML = `
+                <div class="modal-overlay" onclick="closeModal(event)">
+                    <div class="modal-content glass-panel" style="max-width: 400px; padding: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2 style="margin:0;">Organizza Studio</h2>
+                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
+                        </div>
+                        <p style="font-size: 14px; opacity: 0.7; margin-bottom: 20px;">Seleziona i compiti che vuoi completare oggi per organizzare la tua sessione.</p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; max-height: 300px; overflow-y: auto;">
+                            ${todayTasks.length > 0 ? todayTasks.map(t => `
+                                <div class="glass-list-item" style="margin-bottom: 0; display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="this.querySelector('input').click()">
+                                    <input type="checkbox" style="width: 20px; height: 20px; accent-color: var(--green);" ${t.done ? 'checked' : ''} onclick="event.stopPropagation(); toggleTask('${t.id}')">
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600;">${t.text}</div>
+                                        <div style="font-size: 11px; color: var(--blue); font-weight: 700;">${t.subject}</div>
+                                    </div>
+                                </div>
+                            `).join('') : '<div style="text-align: center; opacity: 0.5;">Nessun compito previsto per oggi.</div>'}
+                        </div>
+
+                        <button onclick="closeModal()" class="btn-primary">Pronto!</button>
+                    </div>
+                </div>
+            `;
+        }
+
         function startStudySession() {
             const duration = prompt("Quanti minuti vuoi studiare?", "25");
             if (duration && !isNaN(duration)) {

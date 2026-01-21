@@ -65,6 +65,27 @@ def debug_log(message, data=None):
             else:
                 print(str(data)[:2000])
         print(f"{'='*60}\n")
+# ============= PERSISTENCE CONFIG =============
+POSTS_FILE = "posts.json"
+MARKET_FILE = "market.json"
+
+def load_json_file(filename, default=[]):
+    """Carica dati da file JSON locale"""
+    try:
+        if os.path.exists(filename):
+            with open(filename, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        debug_log(f"⚠️ Errore caricamento {filename}", str(e))
+    return default
+
+def save_json_file(filename, data):
+    """Salva dati su file JSON locale"""
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        debug_log(f"⚠️ Errore salvataggio {filename}", str(e))
 
 # ============= ADVANCED ARGO CLASS (MULTI-PROFILE) =============
 
@@ -563,6 +584,51 @@ def create_session(school, user, password, access_token, auth_token):
 def health():
     return jsonify({"status": "ok", "debug": DEBUG_MODE}), 200
 
+# ============= PERSISTENCE ENDPOINTS =============
+
+@app.route('/api/posts', methods=['GET', 'POST'])
+def handle_posts():
+    if request.method == 'GET':
+        posts = load_json_file(POSTS_FILE, [])
+        return jsonify({"success": True, "data": posts}), 200
+    
+    if request.method == 'POST':
+        new_post = request.json
+        if not new_post:
+            return jsonify({"success": False, "error": "No data"}), 400
+            
+        posts = load_json_file(POSTS_FILE, [])
+        # Add timestamp/ID if missing
+        if 'id' not in new_post:
+            new_post['id'] = int(datetime.now().timestamp() * 1000)
+        
+        # Prepend to keep latest first
+        posts.insert(0, new_post)
+        
+        # Limit to last 100 posts to avoid file bloat
+        posts = posts[:100]
+        
+        save_json_file(POSTS_FILE, posts)
+        return jsonify({"success": True, "data": posts}), 200
+
+@app.route('/api/market', methods=['GET', 'POST'])
+def handle_market():
+    if request.method == 'GET':
+        items = load_json_file(MARKET_FILE, [])
+        return jsonify({"success": True, "data": items}), 200
+        
+    if request.method == 'POST':
+        new_item = request.json
+        if not new_item:
+            return jsonify({"success": False, "error": "No data"}), 400
+            
+        items = load_json_file(MARKET_FILE, [])
+        if 'id' not in new_item:
+            new_item['id'] = int(datetime.now().timestamp() * 1000)
+            
+        items.insert(0, new_item)
+        save_json_file(MARKET_FILE, items)
+        return jsonify({"success": True, "data": items}), 200
 
 @app.route('/login', methods=['POST'])
 def login():
