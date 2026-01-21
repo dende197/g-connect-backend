@@ -195,6 +195,29 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
             debug_log("Errore Raw Login", str(e))
             raise e
 
+    def get_full_dashboard(self):
+        """
+        Richiede la dashboard completa partendo dall'inizio dell'anno scolastico.
+        """
+        try:
+            # Data inizio anno scolastico (es. 1 Settembre 2024)
+            # Modificare l'anno dinamicamente se necessario
+            start_date = "2024-09-01 00:00:00"
+            
+            payload = {
+                "dataultimoaggiornamento": start_date,
+                "opzioni": json.dumps(argofamiglia.CONSTANTS.DASHBOARD_OPTIONS)
+            }
+            
+            debug_log("📅 Richiesta Full Dashboard dal:", start_date)
+            res = requests.post(argofamiglia.CONSTANTS.ENDPOINT + "dashboard/dashboard", 
+                              headers=self._ArgoFamiglia__headers,
+                              json=payload)
+            return res.json()
+        except Exception as e:
+            debug_log("⚠️ Errore Full Dashboard", str(e))
+            return {}
+
 # ============= STRATEGIE ESTRAZIONE VOTI =============
 
 def strategia_1_dashboard(argo_instance):
@@ -441,9 +464,25 @@ def extract_homework_safe(argo_instance):
     """Recupera compiti con gestione errori"""
     tasks_data = []
     try:
-        debug_log("📚 Chiamata getCompitiByDate()")
-        raw_homework = argo_instance.getCompitiByDate()
-        debug_log("Compiti RAW", raw_homework)
+        debug_log("📚 Extraction Compiti via FULL DASHBOARD")
+        # Usa la nostra chiamata custom che parte da inizio anno
+        dashboard_data = argo_instance.get_full_dashboard()
+        
+        # Parsing manuale simile a getCompitiByDate ma su dati custom
+        raw_homework = {}
+        if 'data' in dashboard_data and 'dati' in dashboard_data['data']:
+            dati = dashboard_data['data']['dati']
+            if dati and len(dati) > 0:
+                registro = dati[0].get('registro', [])
+                for element in registro:
+                     for compito in element.get("compiti", []):
+                        data_consegna = compito.get("dataConsegna")
+                        if data_consegna not in raw_homework:
+                            raw_homework[data_consegna] = {"compiti": [], "materie": []}
+                        raw_homework[data_consegna]["compiti"].append(compito.get("compito"))
+                        raw_homework[data_consegna]["materie"].append(element.get("materia"))
+
+        debug_log(f"Compiti Estratti (Giorni): {len(raw_homework)}")
         
         if isinstance(raw_homework, dict):
             for date_str, details in raw_homework.items():
@@ -642,7 +681,8 @@ def login():
         announcements_data = []
         try:
             argo_dash = create_session(school_code, username, password, access_token, auth_token)
-            dashboard_data = argo_dash.dashboard()
+            # Usa la FULL dashboard anche qui per sicurezza
+            dashboard_data = argo_dash.get_full_dashboard()
             announcements_data = extract_promemoria(dashboard_data)
         except Exception as e_dash:
             debug_log("⚠️ Errore sessione dashboard", str(e_dash))
