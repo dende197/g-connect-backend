@@ -124,14 +124,14 @@
             color: var(--text-muted);
         }
 
-        /* 💎 CARDS (LIQUID GLASS STANDARD) */
+        /* 💎 CARDS (WHITE SATIN GLASS) */
         .card {
-            background: rgba(40, 48, 70, 0.4);
-            /* Lighter, more milky */
-            backdrop-filter: blur(24px) saturate(140%);
-            -webkit-backdrop-filter: blur(24px) saturate(140%);
-            border: 1px solid var(--glass-border);
-            border-top: 1px solid var(--glass-highlight);
+            background: rgba(255, 255, 255, 0.12);
+            /* White satin */
+            backdrop-filter: blur(30px) saturate(120%);
+            -webkit-backdrop-filter: blur(30px) saturate(120%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: var(--radius-lg);
             padding: 24px;
             margin-bottom: 24px;
@@ -141,24 +141,24 @@
             overflow: hidden;
         }
 
-        /* 💎 PREMIUM SATIN GLASS (For Grades, Tasks, Polls) - LIGHTER */
+        /* 💎 PREMIUM SATIN GLASS (For Grades, Tasks, Polls) - PURE WHITE SATIN */
         .glass-panel {
-            background: rgba(50, 60, 90, 0.45);
-            /* Distinctive lighter blue-grey */
-            backdrop-filter: blur(40px) saturate(180%);
-            -webkit-backdrop-filter: blur(40px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-top: 1px solid rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.15);
+            /* Slightly stronger white */
+            backdrop-filter: blur(50px) saturate(100%);
+            -webkit-backdrop-filter: blur(50px) saturate(100%);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-top: 1px solid rgba(255, 255, 255, 0.4);
             box-shadow:
-                0 20px 50px -12px rgba(0, 0, 0, 0.7),
+                0 20px 50px -12px rgba(0, 0, 0, 0.6),
                 inset 0 0 40px rgba(255, 255, 255, 0.05);
             border-radius: var(--radius-xl);
         }
 
         .glass-list-item {
-            background: rgba(255, 255, 255, 0.07);
-            /* Lighter list items */
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.1);
+            /* White tint */
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: var(--radius-md);
             padding: 16px;
             margin-bottom: 12px;
@@ -1043,22 +1043,23 @@
                         
                         <!-- GRADE AVERAGE WIDGET -->
                         <!-- GRADE AVERAGE WIDGET (PREMIUM GLASS) -->
-                        <div class="card glass-panel" onclick="showVotiView()" style="flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0; cursor:pointer;">
-                            <div style="position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+                        <!-- GRADE AVERAGE WIDGET (PREMIUM GLASS) -->
+                        <div class="card glass-panel" onclick="showVotiView()" style="flex: 1; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0; cursor:pointer;">
+                            <div style="position: relative; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
                                 ${(() => {
                     const media = calcolaMedia(state.voti);
-                    const percent = media ? (parseFloat(media) / 10 * 213) : 0;
+                    const percent = media ? (parseFloat(media) / 10 * 188) : 0; // Adjusted for smaller radius (r=30 -> 2*pi*30 ~ 188)
                     const color = parseFloat(media) >= 6 ? 'var(--green)' : 'var(--red)';
                     return `
-                                        <svg width="80" height="80" viewBox="0 0 80 80">
-                                            <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="6" />
-                                            <circle cx="40" cy="40" r="34" fill="none" stroke="${color}" stroke-width="6" stroke-dasharray="213" stroke-dashoffset="${213 - percent}" transform="rotate(-90 40 40)" stroke-linecap="round" />
+                                        <svg width="70" height="70" viewBox="0 0 70 70">
+                                            <circle cx="35" cy="35" r="30" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="5" />
+                                            <circle cx="35" cy="35" r="30" fill="none" stroke="${color}" stroke-width="5" stroke-dasharray="188" stroke-dashoffset="${188 - percent}" transform="rotate(-90 35 35)" stroke-linecap="round" />
                                         </svg>
-                                        <span style="position: absolute; font-size: 20px; font-weight: 700; color: white;">${media || '--'}</span>
+                                        <span style="position: absolute; font-size: 18px; font-weight: 700; color: white;">${media || '--'}</span>
                                     `;
                 })()}
                             </div>
-                            <span style="font-size: 14px; color: var(--text-secondary); font-weight: 600;">Media Voti</span>
+                            <span style="font-size: 13px; color: var(--text-secondary); font-weight: 600;">Media Voti</span>
                         </div>
 
                         <!-- TASKS WIDGET (PREMIUM GLASS) -->
