@@ -1396,17 +1396,29 @@
                     <div id="calendar"></div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
-                    <div class="card" onclick="showVotiView()" style="margin-bottom:0; background: rgba(48, 209, 88, 0.1); border: 1px solid #30D158; cursor:pointer;">
-                        <i class="ph-fill ph-graduation-cap" style="color:#30D158; font-size: 24px;"></i>
-                        <div style="font-size: 20px; font-weight: 800; margin-top: 5px; color: white;">${state.voti.length}</div>
-                        <div style="font-size: 12px; opacity: 0.7; color: var(--text-secondary);">Voti Registrati</div>
-                    </div>
-                    <div class="card" onclick="showBachecaModal()" style="margin-bottom:0; background: rgba(255, 159, 10, 0.1); border: 1px solid #FF9F0A; cursor:pointer;">
-                        <i class="ph-fill ph-megaphone" style="color:#FF9F0A; font-size: 24px;"></i>
-                        <div style="font-size: 20px; font-weight: 800; margin-top: 5px; color: white;">${state.promemoria.length}</div>
-                        <div style="font-size: 12px; opacity: 0.7; color: var(--text-secondary);">Avvisi Bacheca</div>
-                    </div>
+                <!-- PLANNING TOOLKIT -->
+                <h3 style="margin-bottom: 12px;">Gestione Studio</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 30px;">
+                    <button onclick="startStudySession()" style="background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
+                        <div style="width: 40px; height: 40px; background: rgba(37, 99, 235, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #60a5fa;">
+                            <i class="ph-fill ph-play" style="font-size: 20px;"></i>
+                        </div>
+                        <span style="font-size: 13px; font-weight: 600; color: white;">Avvia</span>
+                    </button>
+
+                    <button onclick="addManualReminder()" style="background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
+                        <div style="width: 40px; height: 40px; background: rgba(48, 209, 88, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #4ade80;">
+                            <i class="ph-fill ph-plus" style="font-size: 20px;"></i>
+                        </div>
+                        <span style="font-size: 13px; font-weight: 600; color: white;">Aggiungi</span>
+                    </button>
+
+                    <button onclick="alert('Prenditi 15 minuti di pausa! ☕')" style="background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
+                        <div style="width: 40px; height: 40px; background: rgba(255, 159, 10, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fb923c;">
+                            <i class="ph-fill ph-coffee" style="font-size: 20px;"></i>
+                        </div>
+                        <span style="font-size: 13px; font-weight: 600; color: white;">Pausa</span>
+                    </button>
                 </div>
 
                 <h3>Scadenze</h3>
@@ -2121,6 +2133,17 @@
         function setFeedClass(c) {
             state.feed.classFilter = c;
             render();
+        }
+        function startStudySession() {
+            const duration = prompt("Quanti minuti vuoi studiare?", "25");
+            if (duration && !isNaN(duration)) {
+                // For now simple alert, can be expanded to a real visible timer later
+                alert(`⏱️ Sessione di studio avviata per ${duration} minuti!\n\nConcentrati e metti via il telefono.`);
+
+                setTimeout(() => {
+                    alert("⏰ DING! Sessione finita. Prenditi una pausa!");
+                }, duration * 60 * 1000);
+            }
         }
 
         // ⭐ Funzione di test per verificare la connessione backend
