@@ -1644,9 +1644,25 @@
         // ⭐ SELEZIONE PROFILO (Multi-Figlio)
         function showProfileSelectionModal(profiles) {
             console.log("👥 Mostro modale selezione profili:", profiles);
+
+            // Definisce selectProfile globalmente per sicurezza
+            window.selectProfile = function (index, event) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                const btn = event ? event.currentTarget : null;
+                if (btn) {
+                    btn.style.opacity = '0.5';
+                    btn.innerHTML = '<i class="ph-bold ph-spinner ph-spin" style="margin:auto;"></i> Connessione...';
+                }
+                console.log("👉 Profilo selezionato:", index);
+                performArgoSync(index);
+            };
+
             modalContainer.innerHTML = `
-            <div class="modal-overlay" style="animation: fadeIn 0.3s ease-out;">
-                <div class="modal-content" style="max-width: 400px; padding: 0; background: var(--surface-color); border: 1px solid rgba(255,255,255,0.1);">
+            <div class="modal-overlay" style="z-index: 9999; animation: fadeIn 0.3s ease-out;">
+                <div class="modal-content" style="max-width: 400px; padding: 0; background: var(--surface-color); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
                     <div style="padding: 24px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05);">
                         <div style="width: 64px; height: 64px; background: rgba(10, 132, 255, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
                             <i class="ph-fill ph-users" style="font-size: 32px; color: var(--blue);"></i>
@@ -1657,30 +1673,21 @@
                     
                     <div style="padding: 24px; display: flex; flex-direction: column; gap: 12px; max-height: 50vh; overflow-y: auto;">
                         ${profiles.map(p => `
-                        <button onclick="selectProfile(${p.index})" style="background: var(--surface-highlight); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 16px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s; width: 100%; text-align: left;">
-                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--blue), var(--indigo)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: white;">
+                        <button onclick="window.selectProfile(${p.index}, event)" 
+                                style="background: var(--surface-highlight); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 16px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s; width: 100%; text-align: left; -webkit-tap-highlight-color: transparent;">
+                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--blue), var(--indigo)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: white; flex-shrink: 0;">
                                 ${p.name.charAt(0)}
                             </div>
-                            <div>
+                            <div style="flex-grow: 1;">
                                 <div style="font-weight: 600; font-size: 16px; color: white; margin-bottom: 4px;">${p.name}</div>
                                 <div style="font-size: 12px; color: var(--text-secondary);">${p.school} • ${p.class}</div>
                             </div>
-                            <i class="ph-bold ph-caret-right" style="margin-left: auto; color: var(--text-secondary);"></i>
+                            <i class="ph-bold ph-caret-right" style="color: var(--text-secondary);"></i>
                         </button>
                         `).join('')}
                     </div>
-                    
-                    <div style="padding: 16px 24px 24px; border-top: 1px solid rgba(255,255,255,0.05);">
-                        <button onclick="closeModal()" style="width: 100%; padding: 14px; background: rgba(255,255,255,0.05); border-radius: 14px; border: none; color: var(--text-secondary); font-weight: 600; cursor: pointer;">Annulla</button>
-                    </div>
                 </div>
             </div>`;
-        }
-
-        function selectProfile(index) {
-            console.log("👉 Profilo selezionato:", index);
-            // Salva preferenza e procedi con il sync
-            performArgoSync(index);
         }
 
         async function performArgoSync(profileIndex = null) {
