@@ -685,7 +685,8 @@ def login():
         
         # Se c'erano più profili, li aggiungiamo e settiamo status, MA con success=True
         # Così il vecchio frontend entra (col profilo 0), il nuovo frontend vede status e apre modale
-        if profiles_payload:
+        # FIX: Aggiungiamo status SOLO se client NON ha già scelto (profileIndex is None).
+        if profiles_payload and selected_profile_index is None:
             response_data["status"] = "MULTIPLE_PROFILES"
             response_data["profiles"] = profiles_payload
         
