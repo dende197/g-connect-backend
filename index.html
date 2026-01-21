@@ -1641,6 +1641,9 @@
             }
         }
 
+        // ⭐ Credenziali Temporanee (per sopravvivere alla modale se il DOM cambia)
+        let tempCreds = { school: '', user: '', pass: '' };
+
         // ⭐ Funzione Globale di Selezione
         // ⭐ Funzione Globale di Selezione
         window.selectProfileGlobal = function (index, btnElement) {
@@ -1703,17 +1706,32 @@
 
         async function performArgoSync(profileIndex = null) {
             const btn = document.getElementById('login-btn');
-            const school = document.getElementById('argo-school').value;
-            const user = document.getElementById('argo-user').value;
-            const pass = document.getElementById('argo-pass').value;
+
+            // Tentativo lettura DOM
+            const inputSchool = document.getElementById('argo-school');
+            const inputUser = document.getElementById('argo-user');
+            const inputPass = document.getElementById('argo-pass');
+
+            let school = inputSchool ? inputSchool.value : tempCreds.school;
+            let user = inputUser ? inputUser.value : tempCreds.user;
+            let pass = inputPass ? inputPass.value : tempCreds.pass;
+
+            // Aggiorna cache se abbiamo letto dal DOM
+            if (inputSchool && inputUser && inputPass) {
+                tempCreds = { school, user, pass };
+            }
 
             if (!school || !user || !pass) {
-                alert("Inserisci tutti i dati!");
+                alert("Dati mancanti! Reinserisci le credenziali.");
+                // Se mancano e non sono nel DOM, forse dobbiamo ricaricare la login view?
+                if (!inputSchool) render();
                 return;
             }
 
-            btn.innerText = "Connessione... ";
-            btn.disabled = true;
+            if (btn) {
+                btn.innerText = "Connessione... ";
+                btn.disabled = true;
+            }
 
             try {
                 // Prepara payload
@@ -1864,8 +1882,10 @@
                     b.style.opacity = '1';
                 });
             } finally {
-                btn.innerText = "Accedi";
-                btn.disabled = false;
+                if (btn) {
+                    btn.innerText = "Accedi";
+                    btn.disabled = false;
+                }
             }
         }
 
