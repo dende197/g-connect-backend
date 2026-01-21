@@ -573,9 +573,19 @@ def login():
             if len(profiles) > 1:
                 # Prepariamo lista per dopo
                 for idx, p in enumerate(profiles):
+                    alunno = p.get('alunno', {})
+                    nome = alunno.get('desNome', '').strip()
+                    cognome = alunno.get('desCognome', '').strip()
+                    
+                    # Fallback robusto per il nome
+                    if not nome and not cognome:
+                         nome_completo = f"Studente {idx + 1}"
+                    else:
+                         nome_completo = f"{nome} {cognome}".strip()
+
                     profiles_payload.append({
                         "index": idx,
-                        "name": f"{p.get('alunno', {}).get('desNome', '')} {p.get('alunno', {}).get('desCognome', '')}",
+                        "name": nome_completo,
                         "school": p.get('desScuola', 'Scuola'),
                         "class": p.get('desClasse', '')
                     })

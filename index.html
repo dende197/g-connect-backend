@@ -1641,24 +1641,20 @@
             }
         }
 
+        // ⭐ Funzione Globale di Selezione
+        window.selectProfileGlobal = function (index, btnElement) {
+            console.log("✅ CLICK BUTTON PROFILO:", index);
+            if (btnElement) {
+                btnElement.style.opacity = '0.5';
+                btnElement.innerHTML = '<div style="display:flex;align-items:center;gap:10px;"><i class="ph-bold ph-spinner ph-spin"></i> Attendi...</div>';
+                btnElement.onclick = null; // Prevent double click
+            }
+            performArgoSync(index);
+        }
+
         // ⭐ SELEZIONE PROFILO (Multi-Figlio)
         function showProfileSelectionModal(profiles) {
             console.log("👥 Mostro modale selezione profili:", profiles);
-
-            // Definisce selectProfile globalmente per sicurezza
-            window.selectProfile = function (index, event) {
-                if (event) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }
-                const btn = event ? event.currentTarget : null;
-                if (btn) {
-                    btn.style.opacity = '0.5';
-                    btn.innerHTML = '<i class="ph-bold ph-spinner ph-spin" style="margin:auto;"></i> Connessione...';
-                }
-                console.log("👉 Profilo selezionato:", index);
-                performArgoSync(index);
-            };
 
             modalContainer.innerHTML = `
             <div class="modal-overlay" style="z-index: 9999; animation: fadeIn 0.3s ease-out;">
@@ -1672,19 +1668,22 @@
                     </div>
                     
                     <div style="padding: 24px; display: flex; flex-direction: column; gap: 12px; max-height: 50vh; overflow-y: auto;">
-                        ${profiles.map(p => `
-                        <button onclick="window.selectProfile(${p.index}, event)" 
+                        ${profiles.map(p => {
+                // Fallback per nome vuoto
+                const displayName = (p.name && p.name.trim().length > 0 && p.name !== " ") ? p.name : `Studente ${p.index + 1}`;
+                return `
+                        <button onclick="window.selectProfileGlobal(${p.index}, this)" 
                                 style="background: var(--surface-highlight); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 16px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s; width: 100%; text-align: left; -webkit-tap-highlight-color: transparent;">
                             <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--blue), var(--indigo)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: white; flex-shrink: 0;">
-                                ${p.name.charAt(0)}
+                                ${displayName.charAt(0)}
                             </div>
                             <div style="flex-grow: 1;">
-                                <div style="font-weight: 600; font-size: 16px; color: white; margin-bottom: 4px;">${p.name}</div>
+                                <div style="font-weight: 600; font-size: 16px; color: white; margin-bottom: 4px;">${displayName}</div>
                                 <div style="font-size: 12px; color: var(--text-secondary);">${p.school} • ${p.class}</div>
                             </div>
                             <i class="ph-bold ph-caret-right" style="color: var(--text-secondary);"></i>
                         </button>
-                        `).join('')}
+                        `}).join('')}
                     </div>
                 </div>
             </div>`;
