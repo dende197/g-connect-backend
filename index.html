@@ -1399,7 +1399,13 @@
                     endOfNextWeek.setHours(23, 59, 59, 999);
 
                     const calendar = new FullCalendar.Calendar(calendarEl, {
-                        initialView: 'dayGridMonth',
+                        initialView: 'dayGridTwoWeeks',
+                        views: {
+                            dayGridTwoWeeks: {
+                                type: 'dayGrid',
+                                duration: { weeks: 2 }
+                            }
+                        },
                         locale: 'it',
                         themeSystem: 'standard',
                         firstDay: 1, // Lunedì
