@@ -124,6 +124,7 @@
             from {
                 transform: rotate(0deg);
             }
+
             to {
                 transform: rotate(360deg);
             }
@@ -460,7 +461,7 @@
 
             if (isLoggedIn && savedSession) {
                 console.log("✅ Sessione valida trovata!");
-                
+
                 // ⭐ Carica tasks con done persistito e ricostruisci dateObj
                 const cachedTasks = localStorage.getItem('argo_tasks');
                 if (cachedTasks) {
@@ -480,7 +481,7 @@
                         state.tasks = [];
                     }
                 }
-                
+
                 // ⭐ Carica user da localStorage
                 const cachedUser = localStorage.getItem('argo_user');
                 if (cachedUser) {
@@ -494,7 +495,7 @@
                     state.user = savedSession.student;
                     localStorage.setItem('argo_user', JSON.stringify(state.user));
                 }
-                
+
                 // ⭐ Carica voti e promemoria da localStorage
                 const cachedVoti = localStorage.getItem('argo_voti');
                 if (cachedVoti) {
@@ -506,7 +507,7 @@
                         state.voti = [];
                     }
                 }
-                
+
                 const cachedProm = localStorage.getItem('argo_promemoria');
                 if (cachedProm) {
                     try {
@@ -517,7 +518,7 @@
                         state.promemoria = [];
                     }
                 }
-                
+
                 state.isLoggedIn = true;
                 state.didup.connected = true;
                 state.view = 'home';
@@ -546,7 +547,7 @@
             if (state.syncing) return;
             state.syncing = true;
             render();
-            
+
             // ⭐ Usa la sessione passata o carica quella salvata (come nel codice vecchio)
             if (!sessionData) sessionData = sessionManager.load();
             if (!sessionData) {
@@ -557,10 +558,10 @@
 
             try {
                 console.log("📤 Invio richiesta sync con sessione salvata");
-                
+
                 const response = await fetch(`${API_BASE_URL}/sync`, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
@@ -579,10 +580,10 @@
                     promemoriaCount: data.promemoria?.length || data.announcements?.length || 0,
                     error: data.error
                 });
-                
+
                 // ⭐ DEBUG: Mostra dettagli completi in console
                 if (data.tasks && data.tasks.length > 0) console.log("📋 Tasks ricevuti:", data.tasks);
-                
+
                 // ⭐ DEBUG CRITICO per voti
                 console.log("🎓 DEBUG VOTI - data.voti:", data.voti);
                 console.log("🎓 DEBUG VOTI - tipo:", typeof data.voti, "è array?", Array.isArray(data.voti));
@@ -590,7 +591,7 @@
                     console.log("🎓 DEBUG VOTI - lunghezza:", data.voti.length);
                     console.log("🎓 DEBUG VOTI - primo elemento:", data.voti[0]);
                 }
-                
+
                 if (data.promemoria && data.promemoria.length > 0) console.log("📋 Promemoria ricevuti:", data.promemoria);
                 if (data.announcements && data.announcements.length > 0) console.log("📋 Announcements ricevuti:", data.announcements);
 
@@ -605,7 +606,7 @@
                         return;
                     }
                     updateTasks(data.tasks, true);
-                    
+
                     // ⭐ CRITICO: Aggiorna voti e salva SEMPRE
                     if (data.voti !== undefined) {
                         state.voti = Array.isArray(data.voti) ? data.voti : [];
@@ -615,7 +616,7 @@
                             console.warn("⚠️ Array voti vuoto - il backend potrebbe non recuperare i voti da DidUP");
                         }
                     }
-                    
+
                     // ⭐ CRITICO: Aggiorna promemoria e salva SEMPRE
                     const promemoriaData = data.promemoria || data.announcements;
                     if (promemoriaData !== undefined) {
@@ -626,7 +627,7 @@
                             console.warn("⚠️ Array promemoria vuoto - il backend potrebbe non recuperare i promemoria da DidUP");
                         }
                     }
-                    
+
                     state.lastSync = new Date().toLocaleTimeString();
                     state.isOffline = false;
                     state.didup.connected = true;
@@ -672,7 +673,7 @@
 
                 const response = await fetch(`${API_BASE_URL}/login`, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
@@ -703,14 +704,14 @@
 
                     // ⭐ Carica TUTTI i dati
                     if (data.tasks) updateTasks(data.tasks, true);
-                    
+
                     // ⭐ CRITICO: Carica voti
                     if (data.voti !== undefined) {
                         state.voti = Array.isArray(data.voti) ? data.voti : [];
                         localStorage.setItem('argo_voti', JSON.stringify(state.voti));
                         console.log("✅ Voti caricati nel silent login:", state.voti.length);
                     }
-                    
+
                     // ⭐ CRITICO: Carica promemoria
                     const promemoriaData = data.promemoria || data.announcements;
                     if (promemoriaData !== undefined) {
@@ -718,7 +719,7 @@
                         localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
                         console.log("✅ Promemoria caricati nel silent login:", state.promemoria.length);
                     }
-                    
+
                     if (data.student) {
                         state.user = data.student;
                         localStorage.setItem('argo_user', JSON.stringify(state.user));
@@ -776,8 +777,8 @@
                 let isoDate = dateObj.toISOString().split('T')[0];
 
                 // ⭐ Cerca match per preservare done
-                const match = localTasks.find(l => 
-                    (l.id === t.id) || 
+                const match = localTasks.find(l =>
+                    (l.id === t.id) ||
                     (l.text === (t.text || t.desCompito) && l.subject === (t.subject || t.materia))
                 );
 
@@ -828,17 +829,17 @@
 
         function logout() {
             if (confirm('Sei sicuro di voler disconnettere? Dovrai effettuare nuovamente il login.')) {
-            sessionManager.clear();
-            state.isLoggedIn = false;
+                sessionManager.clear();
+                state.isLoggedIn = false;
                 state.didup.connected = false;
-            state.user = { name: 'Andrea', class: '5B' };
-            state.tasks = [];
+                state.user = { name: 'Andrea', class: '5B' };
+                state.tasks = [];
                 state.voti = [];
                 state.promemoria = [];
                 state.isOffline = false;
                 state.lastSync = null;
-            state.view = 'login';
-            render();
+                state.view = 'login';
+                render();
                 console.log('✅ Logout completato');
             }
         }
@@ -847,7 +848,7 @@
             // Se c'è una sessione salvata ma l'utente vuole rifare login, mostra il form
             const savedSession = sessionManager.load();
             const hasSession = savedSession && sessionManager.isLoggedIn();
-            
+
             return `
             <div class="view" style="height: 100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding: 24px;">
                 <h1 style="margin-bottom:40px;">📚 G-Connect</h1>
@@ -1190,7 +1191,7 @@
                     if (existingCalendar) {
                         existingCalendar.destroy();
                     }
-                    
+
                     const calendar = new FullCalendar.Calendar(calendarEl, {
                         initialView: 'dayGridMonth',
                         locale: 'it',
@@ -1209,7 +1210,7 @@
                                     subject: t.subject
                                 }
                             })),
-                        eventClick: function(info) {
+                        eventClick: function (info) {
                             const event = info.event;
                             modalContainer.innerHTML = `
                                 <div class="modal-overlay" onclick="closeModal(event)">
@@ -1244,7 +1245,7 @@
                                 const clickedDate = new Date(info.dateStr);
                                 return taskDate.toDateString() === clickedDate.toDateString();
                             });
-                            
+
                             if (tasksForDay.length > 0) {
                                 const tasksList = tasksForDay.map(t => `• ${t.subject}: ${t.text}`).join('\\n');
                                 alert(`Compiti per ${info.dateStr}:\\n\\n${tasksList}`);
@@ -1292,32 +1293,32 @@
                 <h3>Scadenze</h3>
                 <div id="tasks-list">
                     ${state.tasks.map(t => {
-                        const dueDate = t.dateObj && !isNaN(t.dateObj.getTime()) ? t.dateObj : null;
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const daysUntil = dueDate ? Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
-                        let dateLabel = '';
-                        let dateColor = 'var(--text-secondary)';
-                        
-                        if (dueDate) {
-                            if (daysUntil === 0) {
-                                dateLabel = 'OGGI';
-                                dateColor = 'var(--red)';
-                            } else if (daysUntil === 1) {
-                                dateLabel = 'DOMANI';
-                                dateColor = 'var(--orange)';
-                            } else if (daysUntil < 0) {
-                                dateLabel = 'SCADUTO';
-                                dateColor = 'var(--red)';
-                            } else {
-                                dateLabel = dueDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-                                dateColor = daysUntil <= 3 ? 'var(--orange)' : 'var(--blue)';
-                            }
-                        } else {
-                            dateLabel = t.display_date || 'Data non disponibile';
-                        }
-                        
-                        return `
+                const dueDate = t.dateObj && !isNaN(t.dateObj.getTime()) ? t.dateObj : null;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const daysUntil = dueDate ? Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24)) : null;
+                let dateLabel = '';
+                let dateColor = 'var(--text-secondary)';
+
+                if (dueDate) {
+                    if (daysUntil === 0) {
+                        dateLabel = 'OGGI';
+                        dateColor = 'var(--red)';
+                    } else if (daysUntil === 1) {
+                        dateLabel = 'DOMANI';
+                        dateColor = 'var(--orange)';
+                    } else if (daysUntil < 0) {
+                        dateLabel = 'SCADUTO';
+                        dateColor = 'var(--red)';
+                    } else {
+                        dateLabel = dueDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+                        dateColor = daysUntil <= 3 ? 'var(--orange)' : 'var(--blue)';
+                    }
+                } else {
+                    dateLabel = t.display_date || 'Data non disponibile';
+                }
+
+                return `
                         <div class="card" style="display:flex; align-items:center; gap:15px; background: rgba(255,255,255,0.03); border-left: 3px solid ${t.done ? 'var(--green)' : dateColor};">
                             <div style="width: 40px; height: 40px; border-radius: 10px; background: ${t.done ? 'rgba(48, 209, 88, 0.2)' : 'rgba(10, 132, 255, 0.2)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                                 ${t.done ? '<i class="ph-fill ph-check" style="color: var(--green); font-size: 20px;"></i>' : '<i class="ph ph-calendar" style="color: var(--blue); font-size: 18px;"></i>'}
@@ -1336,7 +1337,7 @@
                             </button>
                         </div>
                     `;
-                    }).join('')}
+            }).join('')}
                     ${state.tasks.length === 0 ? '<div style="text-align:center; padding: 40px; opacity: 0.5;"><i class="ph ph-check-circle" style="font-size: 48px; color: var(--green); margin-bottom: 12px; display: block;"></i>Finito tutto! 🎉<br><span style="font-size: 12px; color: var(--text-secondary);">Non hai compiti in scadenza</span></div>' : ''}
                 </div>
             </div>`;
@@ -1367,13 +1368,13 @@
             console.log("🎓 renderVoti chiamato - state.voti:", state.voti);
             console.log("🎓 renderVoti chiamato - state.grades:", state.grades);
             console.log("🎓 renderVoti chiamato - localStorage argo_voti:", localStorage.getItem('argo_voti'));
-            
+
             // ⭐ Prova prima voti, poi grades
-            const votiData = (state.voti && state.voti.length > 0) ? state.voti : 
-                            ((state.grades && state.grades.length > 0) ? state.grades : []);
-            
+            const votiData = (state.voti && state.voti.length > 0) ? state.voti :
+                ((state.grades && state.grades.length > 0) ? state.grades : []);
+
             console.log("🎓 votiData finale:", votiData);
-            
+
             if (votiData.length === 0) {
                 return `
                     <div style="text-align:center; padding: 40px; color: var(--text-secondary);">
@@ -1435,9 +1436,9 @@
 
         function showBachecaModal() {
             // ⭐ Prova prima promemoria, poi announcements
-            const dataBacheca = state.promemoria && state.promemoria.length > 0 ? state.promemoria : 
-                               (state.announcements && state.announcements.length > 0 ? state.announcements : []);
-            
+            const dataBacheca = state.promemoria && state.promemoria.length > 0 ? state.promemoria :
+                (state.announcements && state.announcements.length > 0 ? state.announcements : []);
+
             console.log("📢 Rendering bacheca - state.promemoria:", state.promemoria?.length || 0, "state.announcements:", state.announcements?.length || 0);
 
             modalContainer.innerHTML = `
@@ -1463,7 +1464,7 @@
                         const oggetto = item.oggetto || item.titolo || item.title || 'Avviso';
                         const testo = item.testo || item.text || item.descrizione || item.description || '';
                         const url = item.url || item.allegato || null;
-                        
+
                         return `
                                 <div class="card" style="margin-bottom:0; padding:16px; border-left: 4px solid var(--orange); background: rgba(255, 159, 10, 0.05);">
                                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -1640,7 +1641,49 @@
             }
         }
 
-        async function performArgoSync() {
+        // ⭐ SELEZIONE PROFILO (Multi-Figlio)
+        function showProfileSelectionModal(profiles) {
+            console.log("👥 Mostro modale selezione profili:", profiles);
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" style="animation: fadeIn 0.3s ease-out;">
+                <div class="modal-content" style="max-width: 400px; padding: 0; background: var(--surface-color); border: 1px solid rgba(255,255,255,0.1);">
+                    <div style="padding: 24px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <div style="width: 64px; height: 64px; background: rgba(10, 132, 255, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                            <i class="ph-fill ph-users" style="font-size: 32px; color: var(--blue);"></i>
+                        </div>
+                        <h2 style="font-size: 20px; margin-bottom: 8px;">Seleziona Profilo</h2>
+                        <p style="font-size: 14px; color: var(--text-secondary); margin: 0;">Scegli quale studente visualizzare</p>
+                    </div>
+                    
+                    <div style="padding: 24px; display: flex; flex-direction: column; gap: 12px; max-height: 50vh; overflow-y: auto;">
+                        ${profiles.map(p => `
+                        <button onclick="selectProfile(${p.index})" style="background: var(--surface-highlight); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 16px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s; width: 100%; text-align: left;">
+                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--blue), var(--indigo)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: white;">
+                                ${p.name.charAt(0)}
+                            </div>
+                            <div>
+                                <div style="font-weight: 600; font-size: 16px; color: white; margin-bottom: 4px;">${p.name}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${p.school} • ${p.class}</div>
+                            </div>
+                            <i class="ph-bold ph-caret-right" style="margin-left: auto; color: var(--text-secondary);"></i>
+                        </button>
+                        `).join('')}
+                    </div>
+                    
+                    <div style="padding: 16px 24px 24px; border-top: 1px solid rgba(255,255,255,0.05);">
+                        <button onclick="closeModal()" style="width: 100%; padding: 14px; background: rgba(255,255,255,0.05); border-radius: 14px; border: none; color: var(--text-secondary); font-weight: 600; cursor: pointer;">Annulla</button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function selectProfile(index) {
+            console.log("👉 Profilo selezionato:", index);
+            // Salva preferenza e procedi con il sync
+            performArgoSync(index);
+        }
+
+        async function performArgoSync(profileIndex = null) {
             const btn = document.getElementById('login-btn');
             const school = document.getElementById('argo-school').value;
             const user = document.getElementById('argo-user').value;
@@ -1655,13 +1698,41 @@
             btn.disabled = true;
 
             try {
+                // Prepara payload
+                const payload = {
+                    schoolCode: school,
+                    username: user,
+                    password: pass
+                };
+
+                // Se abbiamo un indice profilo (o era salvato in sessione), mandiamolo
+                if (profileIndex !== null) {
+                    payload.profileIndex = profileIndex;
+                } else {
+                    // Controlla se c'è un profilo salvato in sessione precedente
+                    const savedSession = sessionManager.load();
+                    if (savedSession && savedSession.profileIndex !== undefined) {
+                        payload.profileIndex = savedSession.profileIndex;
+                    }
+                }
+
                 const response = await fetch(`${API_BASE_URL}/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ schoolCode: school, username: user, password: pass })
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
+
+                // ⭐ GESTIONE MULTI-PROFILO
+                if (response.ok && data.status === 'MULTIPLE_PROFILES') {
+                    console.log("👥 Backend richiede selezione profilo");
+                    showProfileSelectionModal(data.profiles);
+                    // Reset pulsante login
+                    btn.innerText = "Accedi";
+                    btn.disabled = false;
+                    return; // Stop qui, l'utente sceglierà
+                }
 
                 if (!response.ok) {
                     throw new Error(data.error || "Errore Server");
@@ -1675,7 +1746,7 @@
                         promemoria: data.promemoria?.length || data.announcements?.length || 0,
                         student: data.student
                     });
-                    
+
                     // ⭐ CRITICO: Salva sessione con credenziali codificate (come nel codice vecchio che funzionava)
                     if (data.session) {
                         data.session.storedUser = btoa(unescape(encodeURIComponent(user)));
@@ -1692,26 +1763,26 @@
                         });
                         console.log("💾 Sessione minima creata con credenziali");
                     }
-                    
+
                     // ⭐ Salva user
                     if (data.student) {
                         state.user = data.student;
                         localStorage.setItem('argo_user', JSON.stringify(state.user));
                         console.log("💾 User salvato:", state.user.name);
                     }
-                    
+
                     // ⭐ Carica compiti con updateTasks per preservare date
                     if (data.tasks && data.tasks.length > 0) {
                         updateTasks(data.tasks, false);
                         console.log("✅ Compiti caricati:", state.tasks.length);
                     }
-                    
+
                     // ⭐ CRITICO: Carica voti e salva SEMPRE
                     console.log("🎓 LOGIN - Controllo voti in data:", data);
                     console.log("🎓 LOGIN - data.voti:", data.voti);
                     console.log("🎓 LOGIN - typeof data.voti:", typeof data.voti);
                     console.log("🎓 LOGIN - Array.isArray(data.voti):", Array.isArray(data.voti));
-                    
+
                     if (data.voti !== undefined) {
                         state.voti = Array.isArray(data.voti) ? data.voti : [];
                         localStorage.setItem('argo_voti', JSON.stringify(state.voti));
@@ -1727,7 +1798,7 @@
                         console.error("❌ Chiavi disponibili in data:", Object.keys(data));
                         console.error("❌ Risposta completa:", data);
                     }
-                    
+
                     // ⭐ CRITICO: Carica promemoria e salva SEMPRE
                     const promemoriaData = data.promemoria || data.announcements;
                     if (promemoriaData !== undefined) {
@@ -1845,7 +1916,7 @@
                 t.done = !t.done;
                 saveTasks();
                 if (state.reminders.find(x => x.id === id)) {
-                localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
+                    localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
                 }
                 render();
             }
@@ -1881,28 +1952,28 @@
                 statusEl.innerHTML = '<span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span> Test in corso...';
                 statusEl.style.color = "var(--orange)";
             }
-            
+
             try {
                 console.log("🔍 Test connessione backend...");
-                
+
                 // Test 1: Health check
                 const healthRes = await fetch(`${API_BASE_URL}/health`, {
                     method: 'GET',
                     headers: { 'Accept': 'application/json' }
                 });
                 console.log("✅ Health check:", healthRes.status, healthRes.ok);
-                
+
                 // Test 2: Verifica formato risposta (se disponibile)
                 if (healthRes.ok) {
                     const healthData = await healthRes.json().catch(() => ({}));
                     console.log("📋 Health response:", healthData);
                 }
-                
+
                 if (statusEl) {
                     statusEl.innerHTML = '<span style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></span> Backend raggiungibile';
                     statusEl.style.color = "var(--green)";
                 }
-                
+
                 alert("✅ Backend raggiungibile! Controlla la console per i dettagli.");
             } catch (e) {
                 console.error("❌ Test fallito:", e);

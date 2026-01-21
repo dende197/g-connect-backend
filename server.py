@@ -33,8 +33,29 @@ CORS(app, origins=[
 # ============= CONFIGURAZIONE DEBUG =============
 DEBUG_MODE = True  # Imposta False in produzione
 
+import logging
+
+# Configure logging to file
+logging.basicConfig(
+    filename='server.log',
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filemode='w'  # Overwrite each time server restarts
+)
+
 def debug_log(message, data=None):
-    """Helper per logging strutturato"""
+    """Helper per logging strutturato su file e console"""
+    log_msg = f"{message}"
+    if data:
+        if isinstance(data, (dict, list)):
+            log_msg += f"\n{json.dumps(data, indent=2, ensure_ascii=False, default=str)[:2000]}"
+        else:
+            log_msg += f"\n{str(data)[:2000]}"
+    
+    # Write to file
+    logging.info(log_msg)
+    
+    # Print to console (existing behavior)
     if DEBUG_MODE:
         print(f"\n{'='*60}")
         print(f"🔍 {message}")
