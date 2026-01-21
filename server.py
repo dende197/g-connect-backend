@@ -524,59 +524,75 @@ def login():
         })
         
         # 1. Login Avanzato (Ottieni Access Token + Lista Profili)
-        # Se abbiamo già i token (da una chiamata precedente non andata a buon fine o altro) potremmo riusarli,
-        # ma per sicurezza rifacciamo il login master.
+        # Tentativo A: Flow Manuale (Supporta Multi-Profilo)
         
-        login_result = AdvancedArgo.raw_login(school_code, username, password)
-        access_token = login_result['access_token']
-        profiles = login_result['profiles']
+        access_token = None
+        auth_token = None
+        profiles = []
+        fallback_mode = False
         
-        if not profiles:
-             return jsonify({"success": False, "error": "Nessun profilo trovato"}), 401
-
-        # 2. Gestione Profili Multipli
-        if len(profiles) > 1 and selected_profile_index is None:
-            # Ritorna lista profili al frontend per scelta utente
-            simplified_profiles = []
-            for idx, p in enumerate(profiles):
-                simplified_profiles.append({
-                    "index": idx,
-                    "name": f"{p.get('alunno', {}).get('desNome', '')} {p.get('alunno', {}).get('desCognome', '')}",
-                    "school": p.get('desScuola', 'Scuola'),
-                    "class": p.get('desClasse', '')
-                })
+        try:
+            debug_log("🔐 Tentativo A: AdvancedArgo.raw_login (Multi-Profilo)")
+            login_result = AdvancedArgo.raw_login(school_code, username, password)
+            access_token = login_result['access_token']
+            profiles = login_result['profiles']
+            debug_log(f"✅ Advanced Login OK. Profili trovati: {len(profiles)}")
             
-            debug_log("⚠️ Rilevati profili multipli", simplified_profiles)
-            return jsonify({
-                "success": False,
-                "status": "MULTIPLE_PROFILES",
-                "profiles": simplified_profiles
-            }), 200
-
-        # 3. Selezione Profilo (default 0 se unico o non specificato)
-        target_index = int(selected_profile_index) if selected_profile_index is not None else 0
-        if target_index >= len(profiles):
-             return jsonify({"success": False, "error": "Indice profilo non valido"}), 400
-             
-        target_profile = profiles[target_index]
-        auth_token = target_profile['token']
+        except Exception as e_advanced:
+            debug_log(f"⚠️ Advanced Login Fallito: {str(e_advanced)}. Attivo FALLBACK.")
+            fallback_mode = True
         
-        debug_log(f"✅ Profilo selezionato: Indice {target_index}", target_profile.get('alunno', {}))
+        # 2. Gestione Profili Multipli (Solo se tentativo A ok)
+        if not fallback_mode and profiles:
+            if len(profiles) > 1 and selected_profile_index is None:
+                # Ritorna lista profili al frontend per scelta utente
+                simplified_profiles = []
+                for idx, p in enumerate(profiles):
+                    simplified_profiles.append({
+                        "index": idx,
+                        "name": f"{p.get('alunno', {}).get('desNome', '')} {p.get('alunno', {}).get('desCognome', '')}",
+                        "school": p.get('desScuola', 'Scuola'),
+                        "class": p.get('desClasse', '')
+                    })
+                
+                debug_log("⚠️ Rilevati profili multipli", simplified_profiles)
+                return jsonify({
+                    "success": False,
+                    "status": "MULTIPLE_PROFILES",
+                    "profiles": simplified_profiles
+                }), 200
+
+            # Selezione Profilo (default 0)
+            target_index = int(selected_profile_index) if selected_profile_index is not None else 0
+            if target_index < len(profiles):
+                target_profile = profiles[target_index]
+                auth_token = target_profile['token']
+                debug_log(f"✅ Profilo selezionato: Indice {target_index}", target_profile.get('alunno', {}))
+        
+        # 3. Setup Sessione Operativa
+        # Se siamo in fallack o se advanced ha fallito qualcosa, usiamo Standard Login
+        
+        if fallback_mode or not access_token or not auth_token:
+            debug_log("🔐 Attivazione Fallback: Standard ArgoFamiglia Login")
+            # Login Standard (fa rete)
+            temp_argo = argofamiglia.ArgoFamiglia(school_code, username, password)
+            # Estrai token dalla sessione standard
+            headers = temp_argo._ArgoFamiglia__headers
+            auth_token = headers.get('x-auth-token', '')
+            access_token = headers.get('Authorization', '').replace("Bearer ", "")
+            debug_log("✅ Fallback Login OK")
 
         # 4. Strategia Sessioni Isolate (Voti -> Compiti -> Dashboard)
-        # Ora passiamo direttamente i token, SENZA rifare login di rete! --> EFFICIENZA MASSIMA
         
         # --- SESSIONE 1: VOTI ---
-        debug_log("🔐 [1/3] Sessione VOTI (Fast Init)...")
-        # Usiamo AdvancedArgo iniettando i token
+        debug_log("🔐 [1/3] Sessione VOTI...")
         argo_voti = create_session(school_code, username, password, access_token, auth_token)
         grades_data = extract_grades_multi_strategy(argo_voti)
         debug_log(f"✅ Voti recuperati: {len(grades_data)}")
 
         # --- SESSIONE 2: COMPITI ---
-        debug_log("🔐 [2/3] Sessione COMPITI (Fast Init)...")
+        debug_log("🔐 [2/3] Sessione COMPITI...")
         try:
-            # Creiamo NUOVA istanza ma usiamo STESSI token validi
             argo_tasks = create_session(school_code, username, password, access_token, auth_token)
             tasks_data = extract_homework_safe(argo_tasks)
             debug_log(f"✅ Compiti recuperati: {len(tasks_data)}")
@@ -585,7 +601,7 @@ def login():
             tasks_data = []
 
         # --- SESSIONE 3: DASHBOARD ---
-        debug_log("🔐 [3/3] Sessione DASHBOARD (Fast Init)...")
+        debug_log("🔐 [3/3] Sessione DASHBOARD...")
         announcements_data = []
         try:
             argo_dash = create_session(school_code, username, password, access_token, auth_token)
@@ -594,9 +610,15 @@ def login():
         except Exception as e_dash:
             debug_log("⚠️ Errore sessione dashboard", str(e_dash))
             
-        # Dati studente
-        student_info = target_profile.get('alunno', {})
-        student_name = f"{student_info.get('desNome', '')} {student_info.get('desCognome', '')}".strip() or username
+        # Dati studente (Best effort)
+        student_name = username
+        student_class = "DidUP"
+        
+        # Se avevamo profili dal advanced login, usiamo quelli per info più precise
+        if not fallback_mode and profiles and 'target_index' in locals() and target_index < len(profiles):
+             p = profiles[target_index]
+             student_name = f"{p.get('alunno', {}).get('desNome', '')} {p.get('alunno', {}).get('desCognome', '')}".strip() or username
+             student_class = p.get('desClasse', 'DidUP')
 
         # Risposta finale
         response_data = {
@@ -606,11 +628,11 @@ def login():
                 "authToken": auth_token,
                 "accessToken": access_token,
                 "userName": username,
-                "profileIndex": target_index # Salviamo l'indice per il sync futuro
+                "profileIndex": selected_profile_index if selected_profile_index is not None else 0
             },
             "student": {
                 "name": student_name,
-                "class": target_profile.get('desClasse', 'DidUP'),
+                "class": student_class,
                 "school": school_code
             },
             "tasks": tasks_data,
@@ -620,7 +642,7 @@ def login():
                 "voti_count": len(grades_data),
                 "tasks_count": len(tasks_data),
                 "timestamp": datetime.now().isoformat(),
-                "mode": "MULTI_PROFILE_FAST"
+                "mode": "FALLBACK_HYBRID" if fallback_mode else "MULTI_PROFILE_FAST"
             }
         }
         
@@ -630,7 +652,7 @@ def login():
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        debug_log(f"❌ LOGIN FAILED", error_trace)
+        debug_log(f"❌ LOGIN FAILED (Fatal)", error_trace)
         return jsonify({
             "success": False,
             "error": str(e),
@@ -667,21 +689,30 @@ def sync_data():
         user = decode_cred(stored_user)
         pass_ = decode_cred(stored_pass)
         
-        # Per il SYNC, rifacciamo il login completo per refreshare tutto
-        # Questo è importante perché token scadono. 
-        # Usiamo raw_login per efficienza e per selezionare il profilo corretto.
+        # --- LOGIN / REFRESH ---
+        access_token = None
+        auth_token = None
+        fallback_mode = False
         
-        login_result = AdvancedArgo.raw_login(school, user, pass_)
-        access_token = login_result['access_token']
-        profiles = login_result['profiles']
-        
-        # Selezioniamo il profilo richiesto (o 0)
-        target_idx = int(profile_index)
-        if target_idx >= len(profiles):
-            target_idx = 0 # Fallback
+        try:
+             # Tentativo A: Advanced Login
+            login_result = AdvancedArgo.raw_login(school, user, pass_)
+            access_token = login_result['access_token']
+            profiles = login_result['profiles']
             
-        target_profile = profiles[target_idx]
-        auth_token = target_profile['token']
+            target_idx = int(profile_index)
+            if target_idx >= len(profiles): target_idx = 0
+            auth_token = profiles[target_idx]['token']
+            
+        except Exception:
+            # Tentativo B: Fallback Standard
+            fallback_mode = True
+            debug_log("⚠️ Sync Advanced Fail -> Fallback Standard")
+            temp_argo = argofamiglia.ArgoFamiglia(school, user, pass_)
+            headers = temp_argo._ArgoFamiglia__headers
+            auth_token = headers.get('x-auth-token', '')
+            access_token = headers.get('Authorization', '').replace("Bearer ", "")
+
         
         # --- SESSIONI ISOLATE (Ma veloci con token iniettati) ---
         
@@ -717,16 +748,6 @@ def sync_data():
                 "accessToken": access_token
             }
         }), 200
-        
-    except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
-        debug_log(f"❌ SYNC FAILED", error_trace)
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": error_trace if DEBUG_MODE else None
-        }), 401
         
     except Exception as e:
         import traceback
