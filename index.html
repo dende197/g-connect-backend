@@ -60,15 +60,15 @@
 
         body {
             font-family: 'Outfit', -apple-system, sans-serif;
-            background: var(--bg-deep);
-            background-image:
-                radial-gradient(circle at 5% 5%, rgba(37, 99, 235, 0.2) 0%, transparent 45%),
-                radial-gradient(circle at 95% 95%, rgba(30, 64, 175, 0.2) 0%, transparent 45%),
-                var(--bg-gradient);
+            background: black;
+            /* SAFETY BASE */
+            background: linear-gradient(to bottom, #000000 0%, #0a1128 100%);
+            /* ORDER THEME */
             background-attachment: fixed;
             color: var(--text-main);
             margin: 0;
             overflow: hidden;
+            /* Main window overflow hidden */
             width: 100vw;
             height: 100dvh;
         }
@@ -76,29 +76,31 @@
         #app {
             height: 100%;
             overflow-y: scroll;
+            overflow-x: hidden;
+            /* CRITICAL MOBILE FIX */
             -webkit-overflow-scrolling: touch;
             padding-bottom: 140px;
             scroll-behavior: smooth;
+            width: 100%;
+            /* Ensure fits viewport */
+            max-width: 100vw;
         }
 
-        #app::-webkit-scrollbar {
-            display: none;
+        /* ✨ TYPOGRAPHY - ENTERED */
+        h1,
+        h2,
+        h3 {
+            text-align: center;
+            /* ORDER */
         }
 
-        #app {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-
-        /* ✨ TYPOGRAPHY */
         h1 {
             font-size: 32px;
             font-weight: 700;
             letter-spacing: -0.02em;
             margin: 0;
-            background: linear-gradient(to right, #fff, #bfdbfe);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: white;
+            /* Clean white */
             text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
         }
 
@@ -119,15 +121,10 @@
             margin-bottom: 14px;
         }
 
-        p {
-            line-height: 1.6;
-            color: var(--text-muted);
-        }
-
-        /* 💎 CARDS (WHITE SATIN GLASS) */
+        /* 💎 CARDS (WHITE SATIN GLASS - BRIGHTER) */
         .card {
-            background: rgba(255, 255, 255, 0.12);
-            /* White satin */
+            background: rgba(255, 255, 255, 0.15);
+            /* Significantly brighter white/grey */
             backdrop-filter: blur(30px) saturate(120%);
             -webkit-backdrop-filter: blur(30px) saturate(120%);
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -141,10 +138,10 @@
             overflow: hidden;
         }
 
-        /* 💎 PREMIUM SATIN GLASS (For Grades, Tasks, Polls) - PURE WHITE SATIN */
+        /* 💎 PREMIUM SATIN GLASS - PURE WHITE SATIN */
         .glass-panel {
-            background: rgba(255, 255, 255, 0.15);
-            /* Slightly stronger white */
+            background: rgba(255, 255, 255, 0.18);
+            /* Even brighter for active panels */
             backdrop-filter: blur(50px) saturate(100%);
             -webkit-backdrop-filter: blur(50px) saturate(100%);
             border: 1px solid rgba(255, 255, 255, 0.25);
@@ -155,33 +152,9 @@
             border-radius: var(--radius-xl);
         }
 
-        .glass-list-item {
-            background: rgba(255, 255, 255, 0.1);
-            /* White tint */
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: var(--radius-md);
-            padding: 16px;
-            margin-bottom: 12px;
-            transition: all 0.2s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .glass-list-item:active {
-            background: rgba(255, 255, 255, 0.08);
-            transform: scale(0.99);
-        }
-
-        /* Subtle glow effect on cards */
+        /* REMOVED GLARE EFFECTS ("Bagliori superflui") */
         .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-            opacity: 0.5;
+            display: none;
         }
 
         .card:active {
@@ -1048,8 +1021,12 @@
                             <div style="position: relative; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
                                 ${(() => {
                     const media = calcolaMedia(state.voti);
-                    const percent = media ? (parseFloat(media) / 10 * 188) : 0; // Adjusted for smaller radius (r=30 -> 2*pi*30 ~ 188)
-                    const color = parseFloat(media) >= 6 ? 'var(--green)' : 'var(--red)';
+                    const percent = media ? (parseFloat(media) / 10 * 188) : 0;
+                    const m = parseFloat(media);
+                    let color = 'var(--red)';
+                    if (m >= 8) color = 'var(--green)';
+                    else if (m >= 6) color = '#F5D90A'; // Yellow
+
                     return `
                                         <svg width="70" height="70" viewBox="0 0 70 70">
                                             <circle cx="35" cy="35" r="30" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="5" />
@@ -1392,33 +1369,11 @@
                     Ultima sincronizzazione: ${state.lastSync}
                 </div>` : ''}
                 
-                <div style="background: rgba(40, 48, 70, 0.4); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 20px; padding: 15px; margin-bottom: 20px; border: 1px solid var(--glass-border);">
+                <!-- PLANNING TOOLKIT (REMOVED FOR CLEANLINESS) -->
+                
+                <h3 style="text-align: center;">IL TUO CALENDARIO</h3>
+                <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border-radius: 28px; padding: 15px; margin-bottom: 20px; border: 1px solid rgba(255, 255, 255, 0.2);">
                     <div id="calendar"></div>
-                </div>
-
-                <!-- PLANNING TOOLKIT -->
-                <h3 style="margin-bottom: 12px;">Gestione Studio</h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 30px;">
-                    <button onclick="startStudySession()" style="background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
-                        <div style="width: 40px; height: 40px; background: rgba(37, 99, 235, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #60a5fa;">
-                            <i class="ph-fill ph-play" style="font-size: 20px;"></i>
-                        </div>
-                        <span style="font-size: 13px; font-weight: 600; color: white;">Avvia</span>
-                    </button>
-
-                    <button onclick="addManualReminder()" style="background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
-                        <div style="width: 40px; height: 40px; background: rgba(48, 209, 88, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #4ade80;">
-                            <i class="ph-fill ph-plus" style="font-size: 20px;"></i>
-                        </div>
-                        <span style="font-size: 13px; font-weight: 600; color: white;">Aggiungi</span>
-                    </button>
-
-                    <button onclick="alert('Prenditi 15 minuti di pausa! ☕')" style="background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
-                        <div style="width: 40px; height: 40px; background: rgba(255, 159, 10, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fb923c;">
-                            <i class="ph-fill ph-coffee" style="font-size: 20px;"></i>
-                        </div>
-                        <span style="font-size: 13px; font-weight: 600; color: white;">Pausa</span>
-                    </button>
                 </div>
 
                 <h3>Scadenze</h3>
