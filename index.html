@@ -1033,6 +1033,27 @@
             </div>`;
         }
 
+        function getSubjectColor(subject) {
+            if (!subject) return 'var(--blue)';
+            const s = subject.toLowerCase();
+            if (s.includes('ita')) return '#FF3B30'; // Red
+            if (s.includes('mat')) return '#007AFF'; // Blue
+            if (s.includes('ing')) return '#5856D6'; // Indigo
+            if (s.includes('storia') || s.includes('geo')) return '#FF9500'; // Orange
+            if (s.includes('scienza') || s.includes('biol')) return '#34C759'; // Green
+            if (s.includes('fisica')) return '#AF52DE'; // Purple
+            if (s.includes('arte')) return '#FF2D55'; // Pink
+            if (s.includes('ed')) return '#5AC8FA'; // Light Blue
+            if (s.includes('rel')) return '#FFCC00'; // Yellow
+
+            // Fallback: Hash-based color
+            let hash = 0;
+            for (let i = 0; i < subject.length; i++) {
+                hash = subject.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return `hsl(${Math.abs(hash) % 360}, 70%, 60%)`;
+        }
+
         function renderHome() {
             // Count completed tasks for today
             const today = new Date();
@@ -1178,9 +1199,11 @@
                              `;
                     } else {
                         return `
-                                <div style="text-align: center; padding: 10px; opacity: 0.6;">
-                                    <i class="ph ph-calendar-plus" style="font-size: 32px; margin-bottom: 8px;"></i>
-                                    <div>Tocca + per pianificare la giornata</div>
+                                <div onclick="event.stopPropagation(); showOrganizeStudyModal()" style="text-align: center; padding: 30px 10px; opacity: 0.8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;">
+                                    <div style="width: 56px; height: 56px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px dashed rgba(255,255,255,0.3);">
+                                        <i class="ph-bold ph-plus" style="font-size: 24px; color: white;"></i>
+                                    </div>
+                                    <div style="font-weight: 500; font-size: 14px;">Tocca per pianificare la giornata</div>
                                 </div>
                              `;
                     }
@@ -1505,9 +1528,14 @@
                     </button>
                 </div>
 
-                <!-- WEEKLY PLAN SECTION -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <h3 style="margin:0; text-align: left; color: white;">Pianificato per la settimana</h3>
+                <h3 style="text-align: center; margin-bottom: 8px; font-size: 11px;">IL TUO CALENDARIO</h3>
+                <div style="background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 20px; padding: 10px; border: 1px solid rgba(255, 255, 255, 0.15);">
+                    <div id="calendar" style="font-size: 0.75em;"></div>
+                </div>
+
+                <!-- WEEKLY PLAN SECTION (REORDERED) -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 12px;">
+                    <h3 style="margin:0; text-align: left; color: white;">Agenda della settimana</h3>
                     <button onclick="showPlanWeekModal()" style="background: rgba(255,255,255,0.1); border: none; width: 28px; height: 28px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
                         <i class="ph-bold ph-plus" style="font-size: 14px;"></i>
                     </button>
@@ -1515,35 +1543,33 @@
                 <div class="card glass-panel" style="padding: 16px; background: rgba(255,255,255,0.05); margin-bottom: 24px;">
                     ${(() => {
                     const plannedThisWeek = state.tasks.filter(t => {
-                        // Check if it's planned for ANY day in state.plannedTasks
                         return Object.values(state.plannedTasks).some(ids => ids.includes(t.id));
                     });
 
                     if (plannedThisWeek.length > 0) {
                         return plannedThisWeek.map(t => `
-                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                                    <div onclick="toggleTask('${t.id}')" style="width: 18px; height: 18px; border: 2px solid ${t.done ? 'var(--green)' : 'var(--blue)'}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 5px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                        ${t.done ? '<i class="ph-bold ph-check" style="font-size: 10px; color: black;"></i>' : ''}
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                    <div onclick="toggleTask('${t.id}')" style="width: 20px; height: 20px; border: 2px solid ${t.done ? 'var(--green)' : getSubjectColor(t.subject)}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                        ${t.done ? '<i class="ph-bold ph-check" style="font-size: 12px; color: black;"></i>' : ''}
                                     </div>
                                     <div style="flex: 1; min-width: 0;">
-                                        <div style="font-size: 14px; color: white; ${t.done ? 'text-decoration: line-through; opacity: 0.5;' : ''}">${t.text}</div>
-                                        <div style="font-size: 10px; color: var(--blue); font-weight: 700;">${t.subject}</div>
+                                        <div style="font-size: 14px; color: white; font-weight: 500; ${t.done ? 'text-decoration: line-through; opacity: 0.5;' : ''}">${t.text}</div>
+                                        <div style="font-size: 10px; color: ${getSubjectColor(t.subject)}; font-weight: 700; text-transform: uppercase;">${t.subject}</div>
                                     </div>
                                 </div>
                             `).join('');
                     } else {
-                        return `<div style="text-align: center; opacity: 0.5; font-size: 13px;">Nessun compito pianificato per questa settimana.</div>`;
+                        return `<div style="text-align: center; opacity: 0.5; font-size: 13px; padding: 10px;">Nessun compito pianificato.</div>`;
                     }
                 })()}
-                </div>
-                
-                <h3 style="text-align: center; margin-bottom: 8px; font-size: 11px;">IL TUO CALENDARIO</h3>
-                <div style="background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 20px; padding: 10px; margin-bottom: 20px; border: 1px solid rgba(255, 255, 255, 0.15);">
-                    <div id="calendar" style="font-size: 0.75em;"></div>
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <h3 style="margin: 0;">Tutte le Scadenze</h3>
+                    <button onclick="showTasksBySubjectModal()" style="background: var(--blue); color: white; border: none; padding: 8px 14px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <i class="ph-bold ph-circles-four"></i>
+                        Vedi per Materia
+                    </button>
                 </div>
                 <div id="tasks-list">
                     ${state.tasks.map(t => {
@@ -1572,21 +1598,23 @@
                         dateLabel = t.display_date || 'Data non disponibile';
                     }
 
+                    const subjectColor = getSubjectColor(t.subject);
+
                     return `
-                        <div class="glass-list-item" style="display:flex; align-items:center; gap:15px; border-left: 3px solid ${t.done ? 'var(--green)' : dateColor};">
-                            <div style="width: 44px; height: 44px; border-radius: 12px; background: ${t.done ? 'rgba(48, 209, 88, 0.15)' : 'rgba(10, 132, 255, 0.15)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid ${t.done ? 'rgba(48, 209, 88, 0.3)' : 'rgba(10, 132, 255, 0.3)'};">
-                                ${t.done ? '<i class="ph-fill ph-check" style="color: var(--green); font-size: 22px;"></i>' : '<i class="ph ph-calendar" style="color: var(--blue); font-size: 20px;"></i>'}
+                        <div class="glass-list-item" style="display:flex; align-items:center; gap:15px; border-left: 4px solid ${t.done ? 'var(--green)' : subjectColor}; padding: 16px;">
+                            <div style="width: 44px; height: 44px; border-radius: 12px; background: ${t.done ? 'rgba(48, 209, 88, 0.15)' : subjectColor + '15'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid ${t.done ? 'rgba(48, 209, 88, 0.3)' : subjectColor + '30'}">
+                                ${t.done ? '<i class="ph-fill ph-check" style="color: var(--green); font-size: 22px;"></i>' : `<i class="ph ph-calendar" style="color: ${subjectColor}; font-size: 20px;"></i>`}
                             </div>
                             <div style="flex:1; min-width: 0;">
-                                <div style="font-size:11px; color:var(--blue); font-weight:700; margin-bottom: 4px; letter-spacing: 0.5px;">${t.subject.toUpperCase()}</div>
+                                <div style="font-size:11px; color:${subjectColor}; font-weight:800; margin-bottom: 4px; letter-spacing: 0.5px; text-transform: uppercase;">${t.subject}</div>
                                 <div style="color: white; margin-top: 4px; font-size: 16px; font-weight: 600; ${t.done ? 'opacity: 0.5; text-decoration: line-through;' : ''}">${t.text}</div>
-                                <div style="font-size: 12px; color: ${dateColor}; font-weight: 600; margin-top: 6px; display: flex; align-items: center; gap: 6px;">
+                                <div style="font-size: 12px; color: ${dateColor}; font-weight: 700; margin-top: 6px; display: flex; align-items: center; gap: 6px;">
                                     <i class="ph ph-clock" style="font-size: 14px;"></i>
                                     ${dateLabel}
-                                    ${daysUntil !== null && daysUntil >= 0 ? `<span style="opacity: 0.7;">(${daysUntil === 0 ? 'oggi' : daysUntil === 1 ? 'domani' : `tra ${daysUntil} giorni`})</span>` : ''}
-                        </div>
+                                    ${daysUntil !== null && daysUntil >= 0 ? `<span style="opacity: 0.7; font-weight: 500;">(${daysUntil === 0 ? 'oggi' : daysUntil === 1 ? 'domani' : `tra ${daysUntil} gg`})</span>` : ''}
+                                </div>
                             </div>
-                            <button onclick="toggleTask('${t.id}')" style="background: none; border: none; color: ${t.done ? 'var(--green)' : 'var(--text-secondary)'}; font-size: 24px; cursor: pointer; padding: 8px;">
+                            <button onclick="toggleTask('${t.id}')" style="background: none; border: none; color: ${t.done ? 'var(--green)' : 'rgba(255,255,255,0.2)'}; font-size: 24px; cursor: pointer; padding: 8px;">
                                 <i class="${t.done ? 'ph-fill ph-check-circle' : 'ph ph-circle'}"></i>
                             </button>
                         </div>
@@ -2460,34 +2488,85 @@
 
             modalContainer.innerHTML = `
                 <div class="modal-overlay" onclick="closeModal(event)">
-                    <div class="modal-content glass-panel" style="max-width: 400px; padding: 24px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2 style="margin:0;">Cosa fai oggi?</h2>
-                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
+                    <div class="modal-content glass-panel" style="max-width: 450px; padding: 30px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                            <h2 style="margin:0; font-size: 24px;">Cosa fai oggi?</h2>
+                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 28px; opacity: 0.6;"></i>
                         </div>
-                        <p style="font-size: 14px; opacity: 0.7; margin-bottom: 20px;">Scegli dalla tua lista quali compiti vuoi affrontare oggi.</p>
+                        <p style="font-size: 15px; opacity: 0.8; margin-bottom: 24px; line-height: 1.5;">Seleziona dalla lista i compiti che vuoi affrontare oggi. Verranno aggiunti alla tua agenda giornaliera.</p>
                         
-                        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; max-height: 400px; overflow-y: auto;">
+                        <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 30px; max-height: 450px; overflow-y: auto; padding-right: 8px;">
                             ${allPendingTasks.length > 0 ? allPendingTasks.map(t => {
                 const isPlanned = plannedIds.includes(t.id);
+                const subjectColor = getSubjectColor(t.subject);
                 return `
-                                    <div class="glass-list-item" style="margin-bottom: 0; display: flex; align-items: center; gap: 12px; cursor: pointer; border-left: 3px solid ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.1)'};" onclick="togglePlanTask('${t.id}')">
-                                        <div style="width: 24px; height: 24px; border-radius: 6px; background: ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                            ${isPlanned ? '<i class="ph-bold ph-check" style="font-size: 14px; color: black;"></i>' : ''}
+                                    <div class="glass-list-item" style="margin-bottom: 0; padding: 18px; display: flex; align-items: center; gap: 16px; cursor: pointer; border-left: 4px solid ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.05)'}; background: ${isPlanned ? 'rgba(48, 209, 88, 0.08)' : 'rgba(255,255,255,0.03)'};" onclick="togglePlanTask('${t.id}')">
+                                        <div style="width: 28px; height: 28px; border-radius: 8px; background: ${isPlanned ? 'var(--green)' : 'transparent'}; border: 2px solid ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.2)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s;">
+                                            ${isPlanned ? '<i class="ph-bold ph-check" style="font-size: 16px; color: black;"></i>' : ''}
                                         </div>
-                                        <div style="flex: 1;">
-                                            <div style="font-weight: 600; font-size: 15px;">${t.text}</div>
-                                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                                <div style="font-size: 11px; color: var(--blue); font-weight: 700;">${t.subject}</div>
-                                                <div style="font-size: 10px; opacity: 0.5;">Scade: ${t.display_date}</div>
+                                        <div style="flex: 1; min-width: 0;">
+                                            <div style="font-weight: 700; font-size: 16px; color: white; margin-bottom: 4px; line-height: 1.3;">${t.text}</div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                                                <div style="font-size: 12px; color: ${subjectColor}; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">${t.subject}</div>
+                                                <div style="font-size: 11px; opacity: 0.5; font-weight: 600;">Scade: ${t.display_date}</div>
                                             </div>
                                         </div>
                                     </div>
                                 `;
-            }).join('') : '<div style="text-align: center; opacity: 0.5; padding: 20px;">Non ci sono compiti in sospeso. Ottimo lavoro!</div>'}
+            }).join('') : '<div style="text-align: center; opacity: 0.5; padding: 40px;">Non ci sono compiti in sospeso. Ottimo lavoro!</div>'}
                         </div>
 
-                        <button onclick="closeModal()" class="btn-primary">Aggiorna Agenda</button>
+                        <div style="display: flex; gap: 12px;">
+                            <button onclick="closeModal()" class="btn-primary" style="flex: 1; padding: 16px; font-size: 16px; font-weight: 700;">Salva Agenda</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showTasksBySubjectModal() {
+            const subjects = [...new Set(state.tasks.map(t => t.subject))].sort();
+
+            modalContainer.innerHTML = `
+                <div class="modal-overlay" onclick="closeModal(event)">
+                    <div class="modal-content glass-panel" style="max-width: 500px; padding: 24px; max-height: 85vh; overflow-y: auto;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; position: sticky; top: 0; background: rgba(30,30,30,0.8); backdrop-filter: blur(10px); padding: 10px; border-radius: 12px; z-index: 5;">
+                            <h2 style="margin:0;">Compiti per Materia</h2>
+                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 24px;">
+                            ${subjects.map(s => {
+                const subjectTasks = state.tasks.filter(t => t.subject === s);
+                const color = getSubjectColor(s);
+                return `
+                                    <div style="border-left: 4px solid ${color}; padding-left: 16px;">
+                                        <h3 style="color: ${color}; text-transform: uppercase; font-size: 14px; letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                                            <i class="ph-fill ph-book-open"></i>
+                                            ${s}
+                                            <span style="background: ${color}20; color: ${color}; font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 800; border: 1px solid ${color}40;">
+                                                ${subjectTasks.length}
+                                            </span>
+                                        </h3>
+                                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                                            ${subjectTasks.map(t => `
+                                                <div class="glass-list-item" style="margin-bottom: 0; background: rgba(255,255,255,0.03); padding: 12px; display: flex; align-items: center; gap: 12px;">
+                                                    <div onclick="toggleTask('${t.id}')" style="width: 18px; height: 18px; border: 2px solid ${t.done ? 'var(--green)' : 'rgba(255,255,255,0.2)'}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 5px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                                        ${t.done ? '<i class="ph-bold ph-check" style="font-size: 10px; color: black;"></i>' : ''}
+                                                    </div>
+                                                    <div style="flex: 1;">
+                                                        <div style="font-size: 14px; font-weight: 600; color: white; ${t.done ? 'opacity: 0.5; text-decoration: line-through;' : ''}">${t.text}</div>
+                                                        <div style="font-size: 10px; opacity: 0.5; margin-top: 2px;">Data: ${t.display_date}</div>
+                                                    </div>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                `;
+            }).join('')}
+                        </div>
+                        
+                        <button onclick="closeModal()" class="btn-primary" style="margin-top: 30px;">Chiudi</button>
                     </div>
                 </div>
             `;
