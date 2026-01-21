@@ -1411,10 +1411,12 @@
                         firstDay: 1, // Lunedì
                         height: 'auto',
                         validRange: {
-                            start: startOfWeek.toISOString().split('T')[0],
-                            end: new Date(endOfNextWeek.getTime() + 86400000).toISOString().split('T')[0] // exclusive end
+                            start: startOfWeek.toISOString().split('T')[0]
                         },
-                        headerToolbar: { left: 'title', center: '', right: '' }, // No navigation needed
+                        headerToolbar: { left: 'title', center: '', right: 'prev,next' },
+                        dayCellContent: function (arg) {
+                            return arg.dayNumberText.replace(/[a-z]/gi, '').trim();
+                        },
                         events: state.tasks
                             .filter(t => t.due_date && t.hasValidDate)
                             .map(t => ({
