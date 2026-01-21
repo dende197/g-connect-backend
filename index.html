@@ -1642,13 +1642,25 @@
         }
 
         // ⭐ Funzione Globale di Selezione
+        // ⭐ Funzione Globale di Selezione
         window.selectProfileGlobal = function (index, btnElement) {
             console.log("✅ CLICK BUTTON PROFILO:", index);
+
+            // 1. Disabilita TUTTI i bottoni nella modale per evitare doppi click
+            const allBtns = document.querySelectorAll('.modal-content button');
+            allBtns.forEach(b => {
+                b.disabled = true;
+                b.style.pointerEvents = 'none';
+                b.style.opacity = '0.5';
+            });
+
+            // 2. Feedback visivo sul bottone cliccato
             if (btnElement) {
-                btnElement.style.opacity = '0.5';
-                btnElement.innerHTML = '<div style="display:flex;align-items:center;gap:10px;"><i class="ph-bold ph-spinner ph-spin"></i> Attendi...</div>';
-                btnElement.onclick = null; // Prevent double click
+                btnElement.style.opacity = '1'; // Mantieni focus su questo
+                btnElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;gap:10px;"><i class="ph-bold ph-spinner ph-spin"></i> Caricamento Dati...</div>';
             }
+
+            // 3. Procedi
             performArgoSync(index);
         }
 
@@ -1722,11 +1734,17 @@
                     }
                 }
 
+                // Timeout 60s per connessioni lente
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+
                 const response = await fetch(`${API_BASE_URL}/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
 
                 const data = await response.json();
 
@@ -1832,7 +1850,19 @@
                     console.error("❌ Login fallito:", data);
                 }
             } catch (e) {
-                alert("❌ Errore:  " + e.message);
+                console.error("❌ Errore Login:", e);
+                if (e.name === 'AbortError') {
+                    alert("⚠️ Tempo scaduto! La connessione a DidUP è lenta o instabile. Riprova.");
+                } else {
+                    alert("❌ Errore durante il login: " + e.message);
+                }
+                // Riabilita bottoni modale se presente
+                const allBtns = document.querySelectorAll('.modal-content button');
+                allBtns.forEach(b => {
+                    b.disabled = false;
+                    b.style.pointerEvents = 'auto';
+                    b.style.opacity = '1';
+                });
             } finally {
                 btn.innerText = "Accedi";
                 btn.disabled = false;
