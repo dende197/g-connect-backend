@@ -1322,6 +1322,92 @@
             updatePlannerCounter();
         }
 
+        /* === 1) Sync eventi del calendario senza ricrearlo (anti-microscatto) === */
+        function syncCalendarEvents(calendar) {
+            if (!calendar) return;
+            calendar.batchRendering(() => {
+                calendar.removeAllEvents();
+                state.tasks
+                    .filter(t => t.due_date && t.hasValidDate)
+                    .forEach(t => {
+                        calendar.addEvent({
+                            title: `${t.subject}: ${t.text.substring(0, 30)}${t.text.length > 30 ? '...' : ''}`,
+                            start: t.due_date,
+                            color: t.done ? '#30D158' : '#0A84FF',
+                            textColor: t.done ? '#000' : '#fff',
+                            extendedProps: { fullText: t.text, subject: t.subject }
+                        });
+                    });
+            });
+        }
+
+        /* === 2) Aggiorna SOLO la sezione “Agenda della settimana” nel Planner === */
+        function updateWeeklyAgendaView() {
+            if (state.view !== 'planner') return;
+            const el = document.getElementById('weekly-agenda-widget');
+            if (!el) return;
+
+            const plannedWithDates = [];
+            Object.entries(state.plannedTasks || {}).forEach(([dateStr, taskIds]) => {
+                taskIds.forEach(id => {
+                    const task = state.tasks.find(t => t.id === id);
+                    if (task) plannedWithDates.push({ ...task, plannedDate: dateStr });
+                });
+            });
+
+            plannedWithDates.sort((a, b) => new Date(a.plannedDate) - new Date(b.plannedDate));
+            const dayNamesShort = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+
+            const html = plannedWithDates.length > 0
+                ? plannedWithDates.map(t => {
+                    const d = new Date(t.plannedDate);
+                    const dayLabel = `${dayNamesShort[d.getDay()]} ${d.getDate()}`;
+                    const subjectColor = getSubjectColor(t.subject);
+                    return `
+                                <div class="glass-list-item" style="display:flex; align-items:center; gap:12px; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
+                                    <div style="min-width:50px; font-size:11px; font-weight:800; color: var(--orange); text-transform: uppercase;">${dayLabel}</div>
+                                    <div 
+                                        class="task-checkbox ${t.done ? 'checked' : ''}"
+                                        data-task-toggle="${t.id}"
+                                        onclick="toggleTask('${t.id}')" 
+                                        style="width:20px; height:20px; border:2px solid ${t.done ? 'var(--green)' : subjectColor}; background:${t.done ? 'var(--green)' : 'transparent'}; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;">
+                                        ${t.done ? '<i class="ph-bold ph-check" style="font-size:12px; color:black;"></i>' : ''}
+                                    </div>
+                                    <div style="flex:1; min-width:0;">
+                                        <div data-task-text="${t.id}" style="font-size:14px; color:white; font-weight:500; ${t.done ? 'text-decoration: line-through; opacity: 0.5;' : ''}">
+                                            ${t.text}
+                                        </div>
+                                        <div style="font-size:10px; color:${subjectColor}; font-weight:700; text-transform:uppercase;">${t.subject}</div>
+                                    </div>
+                                </div>
+                            `;
+                }).join('')
+                : `<div style="text-align:center; opacity:0.5; font-size:13px; padding:10px;">Nessun compito pianificato.</div>`;
+
+            el.style.opacity = '0';
+            el.style.transition = 'opacity 0.15s ease-out';
+            setTimeout(() => {
+                el.innerHTML = html;
+                el.style.opacity = '1';
+            }, 100);
+        }
+
+        /* === 3) Notifica centralizzata per aggiornare tutto in tempo reale === */
+        function notifyPlannerChanged() {
+            // badge sul bottone Organizza Oggi e Dashboard
+            if (typeof updatePlannerCounter === 'function') updatePlannerCounter();
+            if (typeof updateHomeView === 'function') updateHomeView();
+
+            // lista "Agenda della settimana" in Planner
+            if (typeof updateWeeklyAgendaView === 'function') updateWeeklyAgendaView();
+
+            // colori/stato eventi calendario
+            const calendarEl = document.getElementById('calendar');
+            if (calendarEl && calendarEl._fullCalendar) {
+                syncCalendarEvents(calendarEl._fullCalendar);
+            }
+        }
+
         function logout() {
             if (confirm('Sei sicuro di voler disconnettere? I tuoi planner e feed saranno mantenuti.')) {
                 sessionManager.clear();
@@ -1747,7 +1833,10 @@
                 const calendarEl = document.getElementById('calendar');
                 if (calendarEl) {
                     const existingCalendar = calendarEl._fullCalendar;
-                    if (existingCalendar) existingCalendar.destroy();
+                    if (existingCalendar) {
+                        syncCalendarEvents(existingCalendar);
+                        return;
+                    }
 
                     // ⭐ Ottimizzazione: Mostra solo questa settimana e la prossima
                     const today = new Date();
@@ -1876,7 +1965,7 @@
                         <i class="ph-bold ph-plus" style="font-size: 14px;"></i>
                     </button>
                 </div>
-                <div class="card glass-panel" style="padding: 16px; background: rgba(255,255,255,0.05); margin-bottom: 24px;">
+                <div id="weekly-agenda-widget" class="card glass-panel" style="padding: 16px; background: rgba(255,255,255,0.05); margin-bottom: 24px;">
                     ${(() => {
                     // ⭐ Raccogli tutti i task pianificati con le loro date
                     const plannedWithDates = [];
@@ -1986,6 +2075,7 @@
 
             saveTasks();
             updateWeekDayButton(taskId, dateStr);
+            notifyPlannerChanged(); // ✅ aggiorna Planner e Home SUBITO
         }
 
         function updateWeekDayButton(taskId, dateStr) {
@@ -2663,11 +2753,12 @@
             if (t) {
                 t.done = !t.done;
                 saveTasks();
-                if (state.reminders.find(x => x.id === id)) {
+                if (state.reminders && state.reminders.find(x => x.id === id)) {
                     localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
                 }
 
                 updateTaskUI(id, t.done);
+                notifyPlannerChanged(); // ✅ aggiorna colore evento calendario + liste
 
                 const activeModal = document.querySelector('.modal-overlay');
                 if (!activeModal) {
@@ -2962,6 +3053,7 @@
             saveTasks();
             updatePlanTaskUI(id, state.plannedTasks[todayStr].includes(id));
             updatePlannerCounter();
+            notifyPlannerChanged(); // ✅ aggiorna Planner e Home SUBITO
         }
 
 
