@@ -676,7 +676,23 @@
                 state.isLoggedIn = true;
                 state.didup.connected = true;
 
-                // ⭐ Fetch Feed & Market on startup
+                // ⭐ Carica Feed & Market da cache IMMEDIATAMENTE (prima del fetch)
+                const cachedPosts = localStorage.getItem('argo_posts');
+                if (cachedPosts) {
+                    try {
+                        state.posts = JSON.parse(cachedPosts);
+                        console.log("📝 Feed caricato da cache:", state.posts.length);
+                    } catch (e) { state.posts = []; }
+                }
+                const cachedMarket = localStorage.getItem('argo_market');
+                if (cachedMarket) {
+                    try {
+                        state.marketItems = JSON.parse(cachedMarket);
+                        console.log("🛒 Market caricato da cache:", state.marketItems.length);
+                    } catch (e) { state.marketItems = []; }
+                }
+
+                // ⭐ Fetch Feed & Market on startup (aggiornerà con dati freschi)
                 await Promise.all([fetchFeed(), fetchMarket()]);
 
                 state.view = 'home';
@@ -708,9 +724,19 @@
                 const data = await res.json();
                 if (data.success) {
                     state.posts = data.data;
-                    console.log("📝 Feed caricato:", state.posts.length);
+                    // ⭐ Persisti feed in localStorage
+                    localStorage.setItem('argo_posts', JSON.stringify(state.posts));
+                    console.log("📝 Feed caricato e salvato:", state.posts.length);
                 }
-            } catch (e) { console.error("Errore fetch feed:", e); }
+            } catch (e) {
+                console.error("Errore fetch feed:", e);
+                // ⭐ Fallback: carica da localStorage se fetch fallisce
+                const cached = localStorage.getItem('argo_posts');
+                if (cached) {
+                    state.posts = JSON.parse(cached);
+                    console.log("📝 Feed caricato da cache:", state.posts.length);
+                }
+            }
         }
 
         async function fetchMarket() {
@@ -719,9 +745,19 @@
                 const data = await res.json();
                 if (data.success) {
                     state.marketItems = data.data;
-                    console.log("🛒 Market caricato:", state.marketItems.length);
+                    // ⭐ Persisti market in localStorage
+                    localStorage.setItem('argo_market', JSON.stringify(state.marketItems));
+                    console.log("🛒 Market caricato e salvato:", state.marketItems.length);
                 }
-            } catch (e) { console.error("Errore fetch market:", e); }
+            } catch (e) {
+                console.error("Errore fetch market:", e);
+                // ⭐ Fallback: carica da localStorage se fetch fallisce
+                const cached = localStorage.getItem('argo_market');
+                if (cached) {
+                    state.marketItems = JSON.parse(cached);
+                    console.log("🛒 Market caricato da cache:", state.marketItems.length);
+                }
+            }
         }
 
         async function submitPost(postData) {
@@ -995,19 +1031,20 @@
         function navigate(v) { state.view = v; render(); }
 
         function logout() {
-            if (confirm('Sei sicuro di voler disconnettere? Dovrai effettuare nuovamente il login.')) {
+            if (confirm('Sei sicuro di voler disconnettere? I tuoi planner e feed saranno mantenuti.')) {
                 sessionManager.clear();
                 state.isLoggedIn = false;
                 state.didup.connected = false;
-                state.user = { name: 'Andrea', class: '5B' };
+                state.user = { name: '', class: '' };
                 state.tasks = [];
                 state.voti = [];
                 state.promemoria = [];
                 state.isOffline = false;
                 state.lastSync = null;
                 state.view = 'login';
+                // ⭐ NON cancellare plannedTasks, stressLevels e posts - persistono tra sessioni
                 render();
-                console.log('✅ Logout completato');
+                console.log('✅ Logout completato - Planner e Feed preservati');
             }
         }
 
@@ -1548,13 +1585,28 @@
                 </div>
                 <div class="card glass-panel" style="padding: 16px; background: rgba(255,255,255,0.05); margin-bottom: 24px;">
                     ${(() => {
-                    const plannedThisWeek = state.tasks.filter(t => {
-                        return Object.values(state.plannedTasks).some(ids => ids.includes(t.id));
+                    // ⭐ Raccogli tutti i task pianificati con le loro date
+                    const plannedWithDates = [];
+                    Object.entries(state.plannedTasks).forEach(([dateStr, taskIds]) => {
+                        taskIds.forEach(id => {
+                            const task = state.tasks.find(t => t.id === id);
+                            if (task) {
+                                plannedWithDates.push({ ...task, plannedDate: dateStr });
+                            }
+                        });
                     });
 
-                    if (plannedThisWeek.length > 0) {
-                        return plannedThisWeek.map(t => `
+                    // Ordina per data pianificata
+                    plannedWithDates.sort((a, b) => new Date(a.plannedDate) - new Date(b.plannedDate));
+
+                    if (plannedWithDates.length > 0) {
+                        const dayNames = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+                        return plannedWithDates.map(t => {
+                            const d = new Date(t.plannedDate);
+                            const dayLabel = `${dayNames[d.getDay()]} ${d.getDate()}`;
+                            return `
                                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                    <div style="min-width: 50px; font-size: 11px; font-weight: 800; color: var(--orange); text-transform: uppercase;">${dayLabel}</div>
                                     <div onclick="toggleTask('${t.id}')" style="width: 20px; height: 20px; border: 2px solid ${t.done ? 'var(--green)' : getSubjectColor(t.subject)}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                                         ${t.done ? '<i class="ph-bold ph-check" style="font-size: 12px; color: black;"></i>' : ''}
                                     </div>
@@ -1563,7 +1615,8 @@
                                         <div style="font-size: 10px; color: ${getSubjectColor(t.subject)}; font-weight: 700; text-transform: uppercase;">${t.subject}</div>
                                     </div>
                                 </div>
-                            `).join('');
+                            `;
+                        }).join('');
                     } else {
                         return `<div style="text-align: center; opacity: 0.5; font-size: 13px; padding: 10px;">Nessun compito pianificato.</div>`;
                     }
@@ -1626,8 +1679,8 @@
                 state.plannedTasks[dateStr].push(taskId);
             }
             saveTasks();
-            render();
-            showPlanWeekModal(); // Refresh modal
+            // ⭐ Solo refresh modal, NO render() per evitare scatti
+            showPlanWeekModal();
         }
 
         function selectDay(day) {
@@ -2531,8 +2584,8 @@
             }
 
             saveTasks();
-            render();
-            showOrganizeStudyModal(); // Refresh modal
+            // ⭐ Solo refresh modal, NO render() per evitare scatti
+            showOrganizeStudyModal();
         }
 
         function startStudySession() {
