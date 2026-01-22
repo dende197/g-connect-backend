@@ -59,6 +59,15 @@
             outline: none;
         }
 
+        /* Calendar container: prevenire layout shift e velocizzare paint */
+        #calendar {
+            min-height: 320px;
+            /* assicura spazio, evita jump */
+            content-visibility: auto;
+            /* il browser salta paint finché non serve */
+            contain: layout style paint;
+        }
+
         /* ⚡ HARDWARE ACCELERATION */
         .task-checkbox,
         .plan-checkbox,
@@ -813,6 +822,9 @@
                 render();
             }
 
+            // ⭐ Precarica il calendario in background
+            preloadCalendar();
+
             // ⭐ LOG di debug per verificare persistenza
             console.log("📊 Stato caricato:", {
                 plannedTasks: Object.keys(state.plannedTasks).length,
@@ -1235,6 +1247,7 @@
 
         function navigate(v) {
             if (state.view !== v) {
+                if (v === 'planner') preloadCalendar(); // assicura che sia pronto
                 state.view = v;
                 render();
             }
@@ -1322,23 +1335,105 @@
             updatePlannerCounter();
         }
 
+        // 🔁 Cache/istanza globali
+        let calendarInstance = null;
+        let calendarHostEl = null;
+        let calendarPreloaded = false;
+
+        function buildCalendarEventsFromState() {
+            return state.tasks
+                .filter(t => t.due_date && t.hasValidDate)
+                .map(t => ({
+                    title: `${t.subject}: ${t.text.substring(0, 30)}${t.text.length > 30 ? '...' : ''}`,
+                    start: t.due_date,
+                    color: t.done ? '#30D158' : '#0A84FF',
+                    textColor: t.done ? '#000' : '#fff',
+                    extendedProps: { fullText: t.text, subject: t.subject }
+                }));
+        }
+
+        // Precarica il calendario off-screen
+        function preloadCalendar() {
+            if (calendarPreloaded || typeof FullCalendar === 'undefined') return;
+
+            // Contenitore off-screen
+            const hidden = document.createElement('div');
+            hidden.id = 'calendar-preload';
+            hidden.style.position = 'absolute';
+            hidden.style.left = '-100000px';
+            hidden.style.top = '0';
+            hidden.style.width = '800px'; // dimensioni plausibili per layout
+            document.body.appendChild(hidden);
+
+            // Crea istanza con eventi correnti
+            calendarInstance = new FullCalendar.Calendar(hidden, {
+                initialView: 'dayGridTwoWeeks',
+                views: { dayGridTwoWeeks: { type: 'dayGrid', duration: { weeks: 2 } } },
+                locale: 'it',
+                themeSystem: 'standard',
+                firstDay: 1,
+                height: 'auto',
+                headerToolbar: { left: 'title', center: '', right: 'prev,next' },
+                dayCellContent: (arg) => arg.dayNumberText.replace(/[a-z]/gi, '').trim(),
+                events: buildCalendarEventsFromState(),
+                eventClick: function (info) {
+                    const event = info.event;
+                    const modalContainer = getModalContainer();
+                    if (!modalContainer) return;
+                    modalContainer.innerHTML = `
+        <div class="modal-overlay" onclick="closeModal(event)">
+          <div class="modal-content glass-panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+              <h2 style="margin:0;">Dettaglio Compito</h2>
+              <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size:24px;"></i>
+            </div>
+            <div style="margin-bottom:12px;">
+              <div style="font-size:11px; color:var(--blue); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Materia</div>
+              <div style="font-size:18px; font-weight:600; color:white;">${event.extendedProps.subject}</div>
+            </div>
+            <div style="margin-bottom:12px;">
+              <div style="font-size:11px; color:var(--blue); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Descrizione</div>
+              <div style="font-size:16px; color:white; line-height:1.5;">${event.extendedProps.fullText}</div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:var(--blue); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Scadenza</div>
+              <div style="font-size:16px; color:white; display:flex; align-items:center; gap:6px;">
+                <i class="ph ph-calendar"></i>
+                ${new Date(event.start).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+                }
+            });
+
+            calendarInstance.render();
+            calendarHostEl = hidden;
+            calendarPreloaded = true;
+        }
+
         /* === 1) Sync eventi del calendario senza ricrearlo (anti-microscatto) === */
         function syncCalendarEvents(calendar) {
-            if (!calendar) return;
-            calendar.batchRendering(() => {
-                calendar.removeAllEvents();
-                state.tasks
-                    .filter(t => t.due_date && t.hasValidDate)
-                    .forEach(t => {
-                        calendar.addEvent({
-                            title: `${t.subject}: ${t.text.substring(0, 30)}${t.text.length > 30 ? '...' : ''}`,
-                            start: t.due_date,
-                            color: t.done ? '#30D158' : '#0A84FF',
-                            textColor: t.done ? '#000' : '#fff',
-                            extendedProps: { fullText: t.text, subject: t.subject }
-                        });
-                    });
+            const currentCalendar = calendar || calendarInstance;
+            if (!currentCalendar) return;
+            const evts = buildCalendarEventsFromState();
+            currentCalendar.batchRendering(() => {
+                currentCalendar.removeAllEvents();
+                evts.forEach(e => currentCalendar.addEvent(e));
             });
+        }
+
+        // Attacca l’istanza pre-caricata al contenitore visibile
+        function attachCalendarTo(containerEl) {
+            if (!containerEl || !calendarInstance || !calendarHostEl) return;
+            if (calendarHostEl.parentNode !== containerEl) {
+                containerEl.innerHTML = '';
+                containerEl.appendChild(calendarHostEl); // muove il nodo
+            }
+            // sync eventi correnti e ridimensiona
+            syncCalendarEvents(calendarInstance);
+            calendarInstance.updateSize();
         }
 
         /* === 2) Aggiorna SOLO la sezione “Agenda della settimana” nel Planner === */
@@ -1401,11 +1496,8 @@
             // lista "Agenda della settimana" in Planner
             if (typeof updateWeeklyAgendaView === 'function') updateWeeklyAgendaView();
 
-            // colori/stato eventi calendario
-            const calendarEl = document.getElementById('calendar');
-            if (calendarEl && calendarEl._fullCalendar) {
-                syncCalendarEvents(calendarEl._fullCalendar);
-            }
+            // colori/stato eventi calendario (usa istanza globale se disponibile)
+            syncCalendarEvents();
         }
 
         function logout() {
@@ -1831,106 +1923,8 @@
         function renderPlanner() {
             setTimeout(() => {
                 const calendarEl = document.getElementById('calendar');
-                if (calendarEl) {
-                    const existingCalendar = calendarEl._fullCalendar;
-                    if (existingCalendar) {
-                        syncCalendarEvents(existingCalendar);
-                        return;
-                    }
-
-                    // ⭐ Ottimizzazione: Mostra solo questa settimana e la prossima
-                    const today = new Date();
-
-                    // Inizio: Lunedì di questa settimana
-                    const day = today.getDay();
-                    const diffToMonday = today.getDate() - (day === 0 ? 6 : day - 1);
-                    const startOfWeek = new Date(new Date(today).setDate(diffToMonday));
-                    startOfWeek.setHours(0, 0, 0, 0);
-
-                    // Fine: Domenica della prossima settimana
-                    const endOfNextWeek = new Date(startOfWeek);
-                    endOfNextWeek.setDate(startOfWeek.getDate() + 13); // +14 days - 1
-                    endOfNextWeek.setHours(23, 59, 59, 999);
-
-                    const calendar = new FullCalendar.Calendar(calendarEl, {
-                        initialView: 'dayGridTwoWeeks',
-                        views: {
-                            dayGridTwoWeeks: {
-                                type: 'dayGrid',
-                                duration: { weeks: 2 }
-                            }
-                        },
-                        locale: 'it',
-                        themeSystem: 'standard',
-                        firstDay: 1, // Lunedì
-                        height: 'auto',
-                        validRange: {
-                            start: startOfWeek.toISOString().split('T')[0]
-                        },
-                        headerToolbar: { left: 'title', center: '', right: 'prev,next' },
-                        dayCellContent: function (arg) {
-                            return arg.dayNumberText.replace(/[a-z]/gi, '').trim();
-                        },
-                        events: state.tasks
-                            .filter(t => t.due_date && t.hasValidDate)
-                            .map(t => ({
-                                title: `${t.subject}: ${t.text.substring(0, 30)}${t.text.length > 30 ? '...' : ''}`,
-                                start: t.due_date,
-                                color: t.done ? '#30D158' : '#0A84FF',
-                                textColor: t.done ? '#000' : '#fff',
-                                extendedProps: {
-                                    fullText: t.text,
-                                    subject: t.subject
-                                }
-                            })),
-                        eventClick: function (info) {
-                            const event = info.event;
-                            modalContainer.innerHTML = `
-                                <div class="modal-overlay" onclick="closeModal(event)">
-                                    <div class="modal-content glass-panel">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                                            <h2 style="margin: 0;">Dettaglio Compito</h2>
-                                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
-                                        </div>
-                                        <div style="margin-bottom: 12px;">
-                                            <div style="font-size: 11px; color: var(--blue); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Materia</div>
-                                            <div style="font-size: 18px; font-weight: 600; color: white;">${event.extendedProps.subject}</div>
-                                        </div>
-                                        <div style="margin-bottom: 12px;">
-                                            <div style="font-size: 11px; color: var(--blue); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Descrizione</div>
-                                            <div style="font-size: 16px; color: white; line-height: 1.5;">${event.extendedProps.fullText}</div>
-                                        </div>
-                                        <div>
-                                            <div style="font-size: 11px; color: var(--blue); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Scadenza</div>
-                                            <div style="font-size: 16px; color: white; display: flex; align-items: center; gap: 6px;">
-                                                <i class="ph ph-calendar"></i>
-                                                ${new Date(event.start).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        },
-                        dateClick: function (info) {
-                            const tasksForDay = state.tasks.filter(t => {
-                                if (!t.due_date) return false;
-                                const taskDate = new Date(t.due_date);
-                                const clickedDate = new Date(info.dateStr);
-                                return taskDate.toDateString() === clickedDate.toDateString();
-                            });
-
-                            if (tasksForDay.length > 0) {
-                                const tasksList = tasksForDay.map(t => `• ${t.subject}: ${t.text}`).join('\\n');
-                                alert(`Compiti per ${info.dateStr}:\\n\\n${tasksList}`);
-                            } else {
-                                alert(`Nessun compito per ${info.dateStr}`);
-                            }
-                        }
-                    });
-                    calendar.render();
-                    calendarEl._fullCalendar = calendar;
-                }
-            }, 100);
+                if (calendarEl) attachCalendarTo(calendarEl);
+            }, 0);
 
             return `
             <div class="view" style="padding: 20px; padding-bottom: 100px;">
@@ -1949,7 +1943,7 @@
 
                 <h3 style="text-align: center; margin-bottom: 8px; font-size: 11px;">IL TUO CALENDARIO</h3>
                 <div style="background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 20px; padding: 10px; border: 1px solid rgba(255, 255, 255, 0.15);">
-                    <div id="calendar" style="font-size: 0.75em;"></div>
+                    <div id="calendar"></div>
                 </div>
 
                 <!-- WEEKLY PLAN SECTION (REORDERED) -->
@@ -1967,25 +1961,20 @@
                 </div>
                 <div id="weekly-agenda-widget" class="card glass-panel" style="padding: 16px; background: rgba(255,255,255,0.05); margin-bottom: 24px;">
                     ${(() => {
-                    // ⭐ Raccogli tutti i task pianificati con le loro date
                     const plannedWithDates = [];
                     Object.entries(state.plannedTasks).forEach(([dateStr, taskIds]) => {
                         taskIds.forEach(id => {
                             const task = state.tasks.find(t => t.id === id);
-                            if (task) {
-                                plannedWithDates.push({ ...task, plannedDate: dateStr });
-                            }
+                            if (task) plannedWithDates.push({ ...task, plannedDate: dateStr });
                         });
                     });
-
-                    // Ordina per data pianificata
                     plannedWithDates.sort((a, b) => new Date(a.plannedDate) - new Date(b.plannedDate));
-
                     if (plannedWithDates.length > 0) {
-                        const dayNames = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+                        const dayNamesShort = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
                         return plannedWithDates.map(t => {
                             const d = new Date(t.plannedDate);
-                            const dayLabel = `${dayNames[d.getDay()]} ${d.getDate()}`;
+                            const dayLabel = `${dayNamesShort[d.getDay()]} ${d.getDate()}`;
+                            const subjectColor = getSubjectColor(t.subject);
                             return `
                                 <div class="glass-list-item" style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
                                     <div style="min-width: 50px; font-size: 11px; font-weight: 800; color: var(--orange); text-transform: uppercase;">${dayLabel}</div>
@@ -1993,7 +1982,7 @@
                                         class="task-checkbox ${t.done ? 'checked' : ''}"
                                         data-task-toggle="${t.id}"
                                         onclick="toggleTask('${t.id}')" 
-                                        style="width: 20px; height: 20px; border: 2px solid ${t.done ? 'var(--green)' : getSubjectColor(t.subject)}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;">
+                                        style="width: 20px; height: 20px; border: 2px solid ${t.done ? 'var(--green)' : subjectColor}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;">
                                         ${t.done ? '<i class="ph-bold ph-check" style="font-size: 12px; color: black;"></i>' : ''}
                                     </div>
                                     <div style="flex: 1; min-width: 0;">
