@@ -64,12 +64,12 @@
         .plan-checkbox,
         .glass-list-item,
         .modal-content,
-        button {
+        button,
+        [data-task-id][data-date] {
             will-change: transform;
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
             backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
         }
 
         .task-checkbox,
@@ -79,8 +79,9 @@
         }
 
         .task-checkbox:active,
-        .plan-checkbox:active {
-            transform: scale(0.9) translateZ(0);
+        .plan-checkbox:active,
+        [data-task-id][data-date]:active {
+            transform: scale(0.9) translateZ(0) !important;
         }
 
         .glass-list-item {
@@ -93,16 +94,18 @@
             transform: scale(0.98) translateZ(0);
         }
 
-        /* ⭐ GLOBAL SMOOTH TRANSITIONS */
-        button,
-        .card,
-        .glass-panel {
-            transition: all 0.2s var(--ease-smooth);
-        }
-
         .modal-content {
             contain: layout style paint;
             isolation: isolate;
+        }
+
+        #app {
+            transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .view {
+            contain: layout style;
+            min-height: 100vh;
         }
 
         .modal-overlay {
@@ -1123,10 +1126,12 @@
             if (shouldRender) render();
         }
         function render() {
-            // Update nav
+            const previousView = state.previousView || '';
+            const currentView = state.view;
+
             document.querySelectorAll('.nav-item').forEach((el, idx) => {
                 const views = ['home', 'market', 'feed', 'planner', 'profile'];
-                if (views[idx] === state.view) el.classList.add('active');
+                if (views[idx] === currentView) el.classList.add('active');
                 else el.classList.remove('active');
             });
 
@@ -1135,17 +1140,120 @@
                 app.innerHTML = renderLogin();
             } else {
                 document.getElementById('bottom-nav').style.display = 'flex';
-                if (state.view === 'home') app.innerHTML = renderHome();
-                else if (state.view === 'search') app.innerHTML = renderSearch();
-                else if (state.view === 'market') app.innerHTML = renderMarket();
-                else if (state.view === 'feed') app.innerHTML = renderFeed();
-                else if (state.view === 'planner') app.innerHTML = renderPlanner();
-                else if (state.view === 'profile') app.innerHTML = renderProfile();
-                else if (state.view === 'chat') app.innerHTML = renderChat();
+
+                if (previousView !== currentView) {
+                    app.style.opacity = '0';
+                    app.style.transition = 'opacity 0.15s ease-out';
+
+                    requestAnimationFrame(() => {
+                        setTimeout(() => {
+                            if (currentView === 'home') app.innerHTML = renderHome();
+                            else if (currentView === 'search') app.innerHTML = renderSearch();
+                            else if (currentView === 'market') app.innerHTML = renderMarket();
+                            else if (currentView === 'feed') app.innerHTML = renderFeed();
+                            else if (currentView === 'planner') app.innerHTML = renderPlanner();
+                            else if (currentView === 'profile') app.innerHTML = renderProfile();
+                            else if (currentView === 'chat') app.innerHTML = renderChat();
+
+                            requestAnimationFrame(() => {
+                                app.style.opacity = '1';
+                            });
+                        }, 150);
+                    });
+                }
+            }
+
+            state.previousView = currentView;
+        }
+
+        function navigate(v) {
+            if (state.view !== v) {
+                state.view = v;
+                render();
             }
         }
 
-        function navigate(v) { state.view = v; render(); }
+        function updatePlanTaskUI(taskId, isPlanned) {
+            const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+            if (!taskElement) return;
+
+            const checkbox = taskElement.querySelector('.plan-checkbox, [data-plan-checkbox]');
+            const container = taskElement;
+
+            if (checkbox) {
+                if (isPlanned) {
+                    checkbox.style.background = 'var(--green, #30D158)';
+                    checkbox.style.borderColor = 'var(--green, #30D158)';
+                    checkbox.innerHTML = '<i class="ph-bold ph-check" style="font-size: 16px; color: black;"></i>';
+                } else {
+                    checkbox.style.background = 'transparent';
+                    checkbox.style.borderColor = 'rgba(255,255,255,0.2)';
+                    checkbox.innerHTML = '';
+                }
+
+                checkbox.style.transform = 'scale(0.85) translateZ(0)';
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        checkbox.style.transform = 'scale(1) translateZ(0)';
+                    }, 50);
+                });
+            }
+
+            if (container) {
+                container.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+                container.style.borderLeftColor = isPlanned ? 'var(--green, #30D158)' : 'rgba(255,255,255,0.05)';
+                container.style.background = isPlanned ? 'rgba(48, 209, 88, 0.08)' : 'rgba(255,255,255,0.03)';
+            }
+        }
+
+        function updatePlannerCounter() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const plannedIds = state.plannedTasks[todayStr] || [];
+            const counterEl = document.getElementById('planned-counter');
+
+            if (counterEl) {
+                counterEl.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+                counterEl.textContent = plannedIds.length;
+                counterEl.style.transform = 'scale(1.3) translateZ(0)';
+                setTimeout(() => {
+                    counterEl.style.transform = 'scale(1) translateZ(0)';
+                }, 200);
+            }
+        }
+
+        function updateHomeView() {
+            if (state.view !== 'home') return;
+
+            const plannerWidget = document.getElementById('today-planner-widget');
+            if (plannerWidget) {
+                const todayStr = new Date().toISOString().split('T')[0];
+                const todayPlanned = state.plannedTasks[todayStr] || [];
+                const plannedTasks = state.tasks.filter(t => todayPlanned.includes(t.id));
+
+                const tasksHTML = plannedTasks.length > 0 ?
+                    plannedTasks.map(t => {
+                        const subjectColor = getSubjectColor(t.subject);
+                        return `
+                            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 12px; border-left: 3px solid ${subjectColor};">
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="font-weight: 600; font-size: 14px; color: white; margin-bottom: 2px;">${t.text}</div>
+                                    <div style="font-size: 11px; color: ${subjectColor}; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${t.subject}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('') :
+                    '<div style="text-align: center; opacity: 0.5; font-size: 13px; padding: 10px;">Nessun compito pianificato.</div>';
+
+                plannerWidget.style.transition = 'opacity 0.2s ease-out';
+                plannerWidget.style.opacity = '0';
+                setTimeout(() => {
+                    plannerWidget.innerHTML = tasksHTML;
+                    plannerWidget.style.opacity = '1';
+                }, 200);
+            }
+
+            updatePlannerCounter();
+        }
 
         function logout() {
             if (confirm('Sei sicuro di voler disconnettere? I tuoi planner e feed saranno mantenuti.')) {
@@ -1340,42 +1448,29 @@
                     </button>
                 </div>
                 <div class="card glass-panel" onclick="navigate('planner')" style="padding: 20px; cursor: pointer; background: rgba(255,255,255,0.15);">
+                    <div id="today-planner-widget" style="display: flex; flex-direction: column; gap: 12px;">
                      ${(() => {
                     const todayStr = new Date().toISOString().split('T')[0];
                     const plannedIds = state.plannedTasks[todayStr] || [];
                     const plannedTasks = state.tasks.filter(t => plannedIds.includes(t.id));
 
                     if (plannedTasks.length > 0) {
-                        return `
-                                <div style="display: flex; flex-direction: column; gap: 12px;">
-                                    ${plannedTasks.map(t => `
-                                        <div class="glass-list-item" style="display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                                            <div 
-                                                class="task-checkbox ${t.done ? 'checked' : ''}"
-                                                data-task-toggle="${t.id}"
-                                                onclick="event.stopPropagation(); toggleTask('${t.id}')" 
-                                                style="width: 20px; height: 20px; border: 2px solid ${t.done ? 'var(--green)' : 'var(--orange)'}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                                                ${t.done ? '<i class="ph-bold ph-check" style="font-size: 12px; color: black;"></i>' : ''}
-                                            </div>
-                                            <div style="flex: 1;">
-                                                <span data-task-text="${t.id}" style="font-size: 15px; font-weight: 500; color: white; opacity: ${t.done ? 0.5 : 1}; text-decoration: ${t.done ? 'line-through' : 'none'}">${t.text}</span>
-                                                <div style="font-size: 11px; color: var(--blue); font-weight: 700;">${t.subject}</div>
-                                            </div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                             `;
-                    } else {
-                        return `
-                                <div onclick="event.stopPropagation(); showOrganizeStudyModal()" style="text-align: center; padding: 30px 10px; opacity: 0.8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;">
-                                    <div style="width: 56px; height: 56px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px dashed rgba(255,255,255,0.3);">
-                                        <i class="ph-bold ph-plus" style="font-size: 24px; color: white;"></i>
+                        return plannedTasks.map(t => {
+                            const subjectColor = getSubjectColor(t.subject);
+                            return `
+                                <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 12px; border-left: 3px solid ${subjectColor};">
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="font-weight: 600; font-size: 14px; color: white; margin-bottom: 2px;">${t.text}</div>
+                                        <div style="font-size: 11px; color: ${subjectColor}; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${t.subject}</div>
                                     </div>
-                                    <div style="font-weight: 500; font-size: 14px;">Tocca per pianificare la giornata</div>
                                 </div>
-                             `;
+                            `;
+                        }).join('');
+                    } else {
+                        return '<div style="text-align: center; opacity: 0.5; font-size: 13px; padding: 10px;">Nessun compito pianificato.</div>';
                     }
                 })()}
+                    </div>
                 </div>
             </div>
             `;
@@ -1789,8 +1884,12 @@
                     const isPlanned = state.plannedTasks[dateStr] && state.plannedTasks[dateStr].includes(t.id);
 
                     return `
-                                                    <div onclick="togglePlanDay('${t.id}', '${dateStr}')" style="flex:1; height: 32px; border-radius: 8px; background: ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; cursor: pointer; color: ${isPlanned ? 'white' : 'rgba(255,255,255,0.5)'};">
-                                                        ${dayLabel}
+                                                     <div 
+                                                        data-task-id="${t.id}" 
+                                                        data-date="${dateStr}"
+                                                        onclick="togglePlanDay('${t.id}', '${dateStr}')" 
+                                                        style="flex:1; height: 32px; border-radius: 8px; background: ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; cursor: pointer; color: ${isPlanned ? 'white' : 'rgba(255,255,255,0.5)'}; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+                                                        ${dayNames[d.getDay()]} ${d.getDate()}
                                                     </div>
                                                 `;
                 }).join('')}
@@ -1806,6 +1905,8 @@
         }
 
         function togglePlanDay(taskId, dateStr) {
+            if (event) event.stopPropagation();
+
             if (!state.plannedTasks[dateStr]) state.plannedTasks[dateStr] = [];
             const index = state.plannedTasks[dateStr].indexOf(taskId);
             if (index > -1) {
@@ -1813,9 +1914,35 @@
             } else {
                 state.plannedTasks[dateStr].push(taskId);
             }
+
             saveTasks();
-            // ⭐ Solo refresh modal, NO render() per evitare scatti
-            showPlanWeekModal();
+            updateWeekDayButton(taskId, dateStr);
+        }
+
+        function updateWeekDayButton(taskId, dateStr) {
+            const isPlanned = state.plannedTasks[dateStr] && state.plannedTasks[dateStr].includes(taskId);
+            const buttons = document.querySelectorAll(`[data-task-id="${taskId}"][data-date="${dateStr}"]`);
+
+            buttons.forEach(btn => {
+                btn.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+
+                if (isPlanned) {
+                    btn.style.background = 'var(--blue)';
+                    btn.style.borderColor = 'var(--blue)';
+                    btn.style.color = 'white';
+                } else {
+                    btn.style.background = 'rgba(255,255,255,0.05)';
+                    btn.style.borderColor = 'rgba(255,255,255,0.1)';
+                    btn.style.color = 'rgba(255,255,255,0.5)';
+                }
+
+                btn.style.transform = 'scale(0.85) translateZ(0)';
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        btn.style.transform = 'scale(1) translateZ(0)';
+                    }, 50);
+                });
+            });
         }
 
         function selectDay(day) {
@@ -2425,9 +2552,11 @@
                     modalOverlay.style.animation = 'modalFadeOut 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
                     setTimeout(() => {
                         modalContainer.innerHTML = '';
+                        updateHomeView();
                     }, 150);
                 } else {
                     modalContainer.innerHTML = '';
+                    updateHomeView();
                 }
             }
         }
@@ -2669,7 +2798,7 @@
                                             data-plan-checkbox
                                             data-task-id="${t.id}"
                                             data-color="${subjectColor}"
-                                            style="width: 28px; height: 28px; border-radius: 8px; background: ${isPlanned ? 'var(--green)' : 'transparent'}; border: 2px solid ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.2)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;">
+                                            style="width: 28px; height: 28px; border-radius: 8px; background: ${isPlanned ? 'var(--green)' : 'transparent'}; border: 2px solid ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.2)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
                                             ${isPlanned ? '<i class="ph-bold ph-check" style="font-size: 16px; color: black;"></i>' : ''}
                                         </div>
                                         <div style="flex: 1; min-width: 0;">
@@ -2723,11 +2852,11 @@
                                                         class="task-checkbox ${t.done ? 'checked' : ''}"
                                                         data-task-toggle="${t.id}"
                                                         onclick="toggleTask('${t.id}')" 
-                                                        style="width: 18px; height: 18px; border: 2px solid ${t.done ? 'var(--green, #10b981)' : 'rgba(255,255,255,0.2)'}; background: ${t.done ? 'var(--green, #10b981)' : 'transparent'}; border-radius: 5px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;">
+                                                        style="width: 18px; height: 18px; border: 2px solid ${t.done ? 'var(--green, #10b981)' : 'rgba(255,255,255,0.2)'}; background: ${t.done ? 'var(--green, #10b981)' : 'transparent'}; border-radius: 5px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
                                                         ${t.done ? '<i class="ph-bold ph-check" style="font-size: 10px; color: black;"></i>' : ''}
                                                     </div>
                                                     <div style="flex: 1;">
-                                                        <div data-task-text="${t.id}" style="font-size: 14px; font-weight: 600; color: white; ${t.done ? 'opacity: 0.5; text-decoration: line-through;' : ''}">${t.text}</div>
+                                                        <div data-task-text="${t.id}" style="font-size: 14px; font-weight: 600; color: white; ${t.done ? 'opacity: 0.5; text-decoration: line-through;' : ''} transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);">${t.text}</div>
                                                         <div style="font-size: 10px; opacity: 0.5; margin-top: 2px;">Data: ${t.display_date}</div>
                                                     </div>
                                                 </div>
@@ -2762,53 +2891,7 @@
             updatePlannerCounter();
         }
 
-        function updatePlanTaskUI(taskId, isPlanned) {
-            const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
-            if (!taskElement) return;
 
-            const checkbox = taskElement.querySelector('.plan-checkbox, [data-plan-checkbox]');
-            const container = taskElement;
-
-            if (checkbox) {
-                if (isPlanned) {
-                    checkbox.style.background = 'var(--green, #30D158)';
-                    checkbox.style.borderColor = 'var(--green, #30D158)';
-                    checkbox.innerHTML = '<i class="ph-bold ph-check" style="font-size: 16px; color: black;"></i>';
-                } else {
-                    checkbox.style.background = 'transparent';
-                    checkbox.style.borderColor = 'rgba(255,255,255,0.2)';
-                    checkbox.innerHTML = '';
-                }
-
-                checkbox.style.transform = 'scale(0.85) translateZ(0)';
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        checkbox.style.transform = 'scale(1) translateZ(0)';
-                    }, 50);
-                });
-            }
-
-            if (container) {
-                container.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
-                container.style.borderLeftColor = isPlanned ? 'var(--green, #30D158)' : 'rgba(255,255,255,0.05)';
-                container.style.background = isPlanned ? 'rgba(48, 209, 88, 0.08)' : 'rgba(255,255,255,0.03)';
-            }
-        }
-
-        function updatePlannerCounter() {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const plannedIds = state.plannedTasks[todayStr] || [];
-            const counterEl = document.getElementById('planned-counter');
-
-            if (counterEl) {
-                counterEl.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
-                counterEl.textContent = plannedIds.length;
-                counterEl.style.transform = 'scale(1.3) translateZ(0)';
-                setTimeout(() => {
-                    counterEl.style.transform = 'scale(1) translateZ(0)';
-                }, 200);
-            }
-        }
 
         function updateTaskUI(taskId, isDone) {
             const checkbox = document.querySelector(`[data-task-toggle="${taskId}"]`);
@@ -2925,7 +3008,5 @@
         }
     </script>
 </body>
-
-</html>
 
 </html>
