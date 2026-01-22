@@ -587,6 +587,26 @@
             return new Date();
         }
 
+        // Hash DJB2 semplice e stabile per ID deterministici
+        function djb2(str) {
+            let hash = 5381;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) + hash) + str.charCodeAt(i);
+                hash = hash & 0xffffffff;
+            }
+            return (hash >>> 0).toString(36);
+        }
+
+        function stableTaskId(raw) {
+            const subject = (raw.subject || raw.materia || 'Generico').trim().toLowerCase();
+            const text = (raw.text || raw.desCompito || 'Nessuna descrizione').trim().toLowerCase();
+            const rawDate = raw.datCompito || raw.due_date || raw.dataProva || raw.datGiorno || raw.date || '';
+            const d = parseArgoDate(rawDate);
+            const iso = !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
+            const key = `${subject}||${text}||${iso}`;
+            return 't_' + djb2(key);
+        }
+
         // ⭐ Calcola la media matematica dai voti di Argo
         function calcolaMedia(voti) {
             if (!voti || voti.length === 0) return null;
@@ -1062,25 +1082,36 @@
 
             saveTasksTimeout = setTimeout(() => {
                 try {
-                    const tasksToSave = state.tasks.map(t => ({
+                    const tasksToSave = (state.tasks || []).map(t => ({
                         id: t.id,
                         text: t.text,
                         subject: t.subject,
                         due_date: t.due_date,
                         display_date: t.display_date,
                         hasValidDate: t.hasValidDate,
-                        done: t.done
+                        done: !!t.done
                     }));
 
+                    const prevRaw = localStorage.getItem('argo_tasks');
+                    const prev = prevRaw ? JSON.parse(prevRaw) : null;
+                    const prevCount = Array.isArray(prev) ? prev.length : 0;
+
+                    if (tasksToSave.length === 0 && prevCount > 0) {
+                        console.warn("🛑 Anti-wipe: blocco salvataggio vuoto (cache aveva", prevCount, "tasks)");
+                        localStorage.setItem('argo_planned_tasks', JSON.stringify(state.plannedTasks || {}));
+                        localStorage.setItem('argo_stress_levels', JSON.stringify(state.stressLevels || {}));
+                        return;
+                    }
+
                     localStorage.setItem('argo_tasks', JSON.stringify(tasksToSave));
-                    localStorage.setItem('argo_planned_tasks', JSON.stringify(state.plannedTasks));
-                    localStorage.setItem('argo_stress_levels', JSON.stringify(state.stressLevels));
+                    localStorage.setItem('argo_planned_tasks', JSON.stringify(state.plannedTasks || {}));
+                    localStorage.setItem('argo_stress_levels', JSON.stringify(state.stressLevels || {}));
 
                     console.log("💾 Salvato:", tasksToSave.length, "tasks");
                 } catch (e) {
                     console.error("❌ Errore salvataggio:", e);
                 }
-            }, 100);
+            }, 150);
         }
 
 
@@ -1093,34 +1124,70 @@
             // ⭐ Recupera stato 'done' persistito
             const localTasks = JSON.parse(localStorage.getItem('argo_tasks') || '[]');
 
-            const formatted = newTasks.map(t => {
-                // ⭐ Gerarchia Affidabilità Date: Consegna > Prova > Pubblicazione
-                let rawDate = t.datCompito || t.due_date || t.dataProva || t.datGiorno || t.date;
-                let dateObj = parseArgoDate(rawDate);
-                let isoDate = dateObj.toISOString().split('T')[0];
+            // Pre-index locale per “match” (subject + text + due_date)
+            const localIndex = new Map();
+            for (const lt of localTasks) {
+                const key = `${(lt.subject || '').toLowerCase()}||${(lt.text || '').toLowerCase()}||${lt.due_date || ''}`;
+                localIndex.set(key, lt);
+            }
 
-                // ⭐ Cerca match per preservare done
-                const match = localTasks.find(l =>
-                    (l.id === t.id) ||
-                    (l.text === (t.text || t.desCompito) && l.subject === (t.subject || t.materia))
-                );
+            // Costruisci nuovi task formattati con ID STABILI
+            const formatted = newTasks.map(t => {
+                const rawDate = t.datCompito || t.due_date || t.dataProva || t.datGiorno || t.date;
+                const dateObj = parseArgoDate(rawDate);
+                const isoDate = !isNaN(dateObj.getTime()) ? dateObj.toISOString().split('T')[0] : '';
+
+                const text = t.text || t.desCompito || "Nessuna descrizione";
+                const subject = t.subject || t.materia || 'Generico';
+
+                // match locale per preservare done
+                const key = `${subject.toLowerCase()}||${text.toLowerCase()}||${isoDate}`;
+                const match = localIndex.get(key);
+
+                // ID stabile
+                const id = t.id || stableTaskId({ subject, text, due_date: isoDate });
 
                 return {
-                    id: t.id || Math.random().toString(36).substr(2, 9),
-                    text: t.text || t.desCompito || "Nessuna descrizione",
-                    subject: t.subject || t.materia || 'Generico',
+                    id,
+                    text,
+                    subject,
                     due_date: isoDate,
                     display_date: rawDate,
-                    dateObj: dateObj,
+                    dateObj,
                     hasValidDate: !isNaN(dateObj.getTime()) && dateObj.getTime() > 0,
-                    done: match ? match.done : (t.done || false)
+                    done: match ? !!match.done : !!t.done
                 };
             });
 
-            // ⭐ Filtra e Ordina - SOLO quelli con data valida e non scaduti
-            state.tasks = formatted
+            // Filtra e ordina
+            const nextTasks = formatted
                 .filter(t => t.hasValidDate && t.dateObj >= today)
                 .sort((a, b) => a.dateObj - b.dateObj);
+
+            // Migrazione plannedTasks: mappa oldId -> newId usando la stessa chiave
+            const newIndexByKey = new Map();
+            for (const nt of nextTasks) {
+                const key = `${nt.subject.toLowerCase()}||${nt.text.toLowerCase()}||${nt.due_date}`;
+                newIndexByKey.set(key, nt.id);
+            }
+            const idMapping = new Map();
+            for (const lt of localTasks) {
+                const key = `${(lt.subject || '').toLowerCase()}||${(lt.text || '').toLowerCase()}||${lt.due_date || ''}`;
+                const newId = newIndexByKey.get(key);
+                if (newId && lt.id && lt.id !== newId) {
+                    idMapping.set(lt.id, newId);
+                }
+            }
+
+            // Applica migrazione agli plannedTasks senza perdere niente
+            const migratedPlanned = {};
+            for (const [dateStr, ids] of Object.entries(state.plannedTasks || {})) {
+                const migratedIds = Array.from(new Set(ids.map(id => idMapping.get(id) || id)));
+                migratedPlanned[dateStr] = migratedIds;
+            }
+
+            state.tasks = nextTasks;
+            state.plannedTasks = migratedPlanned;
 
             saveTasks();
             if (shouldRender) render();
@@ -1856,6 +1923,8 @@
         }
 
         function showPlanWeekModal() {
+            const modalContainer = getModalContainer();
+            if (!modalContainer) return;
             modalContainer.innerHTML = `
                 <div class="modal-overlay" onclick="closeModal(event)">
                     <div class="modal-content glass-panel" style="max-width: 450px; padding: 24px;">
@@ -1889,7 +1958,7 @@
                                                         data-date="${dateStr}"
                                                         onclick="togglePlanDay('${t.id}', '${dateStr}')" 
                                                         style="flex:1; height: 32px; border-radius: 8px; background: ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; cursor: pointer; color: ${isPlanned ? 'white' : 'rgba(255,255,255,0.5)'}; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
-                                                        ${dayNames[d.getDay()]} ${d.getDate()}
+                                                        ${dayLabel}
                                                     </div>
                                                 `;
                 }).join('')}
@@ -2545,8 +2614,12 @@
             }
         }
 
+        function getModalContainer() { return document.getElementById('modals'); }
+
         function closeModal(e) {
             if (!e || e.target.classList.contains('modal-overlay')) {
+                const modalContainer = getModalContainer();
+                if (!modalContainer) return;
                 const modalOverlay = document.querySelector('.modal-overlay');
                 if (modalOverlay) {
                     modalOverlay.style.animation = 'modalFadeOut 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
@@ -3006,6 +3079,10 @@
                 </div>
             </div>`;
         }
+
+        // ⭐ Esposizione globale per garantire accessibilità da HTML
+        window.showPlanWeekModal = showPlanWeekModal;
+        window.closeModal = closeModal;
     </script>
 </body>
 
