@@ -50,6 +50,7 @@
             /* 🔄 TRANSITIONS */
             --ease-elastic: cubic-bezier(0.68, -0.55, 0.265, 1.55);
             --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         * {
@@ -58,17 +59,62 @@
             outline: none;
         }
 
+        /* ⭐ PERFORMANCE BOOST - Hardware Acceleration */
+        .task-checkbox,
+        .plan-checkbox,
+        .glass-list-item,
+        button {
+            will-change: transform, background-color, border-color;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+        }
+
+        /* ⭐ SMOOTH CHECKBOX TRANSITIONS */
+        .task-checkbox,
+        .plan-checkbox {
+            transition: all 0.25s var(--ease-out) !important;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .task-checkbox:active,
+        .plan-checkbox:active {
+            transform: scale(0.92) translateZ(0);
+        }
+
+        .task-checkbox i,
+        .plan-checkbox i {
+            transition: all 0.2s var(--ease-out);
+            transform: scale(0);
+            opacity: 0;
+        }
+
+        .task-checkbox.checked i,
+        .plan-checkbox.checked i {
+            transform: scale(1);
+            opacity: 1;
+        }
+
         /* ⭐ GLOBAL SMOOTH TRANSITIONS */
         button,
         .card,
         .glass-panel,
-        .glass-list-item,
         .modal-content {
             transition: all 0.2s var(--ease-smooth);
         }
 
+        .glass-list-item {
+            transition: background-color 0.25s var(--ease-out),
+                transform 0.2s var(--ease-out),
+                opacity 0.25s var(--ease-out);
+        }
+
+        .glass-list-item:active {
+            transform: scale(0.98);
+        }
+
         .modal-overlay {
-            animation: fadeIn 0.15s ease-out;
+            animation: fadeIn 0.2s ease-out;
         }
 
         @keyframes fadeIn {
@@ -79,6 +125,11 @@
             to {
                 opacity: 1;
             }
+        }
+
+        /* ⭐ PREVENT LAYOUT SHIFT */
+        .modal-content {
+            contain: layout style;
         }
 
         body {
@@ -2370,22 +2421,55 @@
         }
 
         function toggleTask(id) {
-            let t = state.tasks.find(x => x.id === id);
-            if (!t) t = state.reminders.find(x => x.id === id);
+            const task = state.tasks.find(t => t.id === id);
+            if (!task) return;
 
-            if (t) {
-                t.done = !t.done;
-                saveTasks();
-                if (state.reminders.find(x => x.id === id)) {
-                    localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
+            task.done = !task.done;
+            saveTasks();
+
+            // Update visivo immediato
+            const checkbox = document.querySelector(`[data-task-toggle="${id}"]`);
+            if (checkbox) {
+                const isChecked = task.done;
+                checkbox.style.transition = 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+
+                if (isChecked) {
+                    checkbox.style.background = 'var(--green, #10b981)';
+                    checkbox.style.borderColor = 'var(--green, #10b981)';
+                    checkbox.classList.add('checked');
+                    checkbox.innerHTML = '<i class="ph-bold ph-check" style="font-size: 10px; color: black;"></i>';
+                } else {
+                    checkbox.style.background = 'transparent';
+                    checkbox.style.borderColor = 'rgba(255,255,255,0.2)';
+                    checkbox.classList.remove('checked');
+                    checkbox.innerHTML = '';
                 }
 
-                // ⭐ Check if inside a modal - if so, just update that modal
+                // Scale animation
+                checkbox.style.transform = 'scale(0.85) translateZ(0)';
+                setTimeout(() => {
+                    checkbox.style.transform = 'scale(1) translateZ(0)';
+                }, 150);
+
+                // Update task text style
+                const taskItem = checkbox.closest('.glass-list-item');
+                if (taskItem) {
+                    const taskText = taskItem.querySelector('[data-task-text]');
+                    if (taskText) {
+                        taskText.style.transition = 'all 0.3s ease';
+                        if (task.done) {
+                            taskText.style.opacity = '0.5';
+                            taskText.style.textDecoration = 'line-through';
+                        } else {
+                            taskText.style.opacity = '1';
+                            taskText.style.textDecoration = 'none';
+                        }
+                    }
+                }
+            } else {
+                // Fallback: full render if element not found
                 const activeModal = document.querySelector('.modal-overlay');
-                if (activeModal) {
-                    // Don't re-render the whole page, just close modal or update it
-                    console.log("⚡ Task toggled inside modal - skipping full render");
-                } else {
+                if (!activeModal) {
                     render();
                 }
             }
@@ -2569,7 +2653,11 @@
                 const subjectColor = getSubjectColor(t.subject);
                 return `
                                     <div class="glass-list-item" style="margin-bottom: 0; padding: 18px; display: flex; align-items: center; gap: 16px; cursor: pointer; border-left: 4px solid ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.05)'}; background: ${isPlanned ? 'rgba(48, 209, 88, 0.08)' : 'rgba(255,255,255,0.03)'};" onclick="togglePlanTask('${t.id}')">
-                                        <div style="width: 28px; height: 28px; border-radius: 8px; background: ${isPlanned ? 'var(--green)' : 'transparent'}; border: 2px solid ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.2)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s;">
+                                        <div 
+                                            class="plan-checkbox ${isPlanned ? 'checked' : ''}"
+                                            data-task-id="${t.id}"
+                                            data-color="${subjectColor}"
+                                            style="width: 28px; height: 28px; border-radius: 8px; background: ${isPlanned ? 'var(--green)' : 'transparent'}; border: 2px solid ${isPlanned ? 'var(--green)' : 'rgba(255,255,255,0.2)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;">
                                             ${isPlanned ? '<i class="ph-bold ph-check" style="font-size: 16px; color: black;"></i>' : ''}
                                         </div>
                                         <div style="flex: 1; min-width: 0;">
@@ -2619,11 +2707,15 @@
                                         <div style="display: flex; flex-direction: column; gap: 10px;">
                                             ${subjectTasks.map(t => `
                                                 <div class="glass-list-item" style="margin-bottom: 0; background: rgba(255,255,255,0.03); padding: 12px; display: flex; align-items: center; gap: 12px;">
-                                                    <div onclick="toggleTask('${t.id}')" style="width: 18px; height: 18px; border: 2px solid ${t.done ? 'var(--green)' : 'rgba(255,255,255,0.2)'}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 5px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                                    <div 
+                                                        class="task-checkbox ${t.done ? 'checked' : ''}"
+                                                        data-task-toggle="${t.id}"
+                                                        onclick="toggleTask('${t.id}')" 
+                                                        style="width: 18px; height: 18px; border: 2px solid ${t.done ? 'var(--green, #10b981)' : 'rgba(255,255,255,0.2)'}; background: ${t.done ? 'var(--green, #10b981)' : 'transparent'}; border-radius: 5px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;">
                                                         ${t.done ? '<i class="ph-bold ph-check" style="font-size: 10px; color: black;"></i>' : ''}
                                                     </div>
                                                     <div style="flex: 1;">
-                                                        <div style="font-size: 14px; font-weight: 600; color: white; ${t.done ? 'opacity: 0.5; text-decoration: line-through;' : ''}">${t.text}</div>
+                                                        <div data-task-text style="font-size: 14px; font-weight: 600; color: white; ${t.done ? 'opacity: 0.5; text-decoration: line-through;' : ''}">${t.text}</div>
                                                         <div style="font-size: 10px; opacity: 0.5; margin-top: 2px;">Data: ${t.display_date}</div>
                                                     </div>
                                                 </div>
@@ -2652,8 +2744,41 @@
             }
 
             saveTasks();
-            // ⭐ Solo refresh modal, NO render() per evitare scatti
-            showOrganizeStudyModal();
+            // ⭐ Update solo l'elemento cliccato invece di ri-creare tutto
+            updatePlanCheckbox(id, state.plannedTasks[todayStr].includes(id));
+        }
+
+        // ⭐ NUOVA FUNZIONE: Update visivo singolo elemento
+        function updatePlanCheckbox(taskId, isPlanned) {
+            const checkbox = document.querySelector(`[data-task-id="${taskId}"]`);
+            if (!checkbox) {
+                // Fallback: se non trova l'elemento, refresh modal
+                showOrganizeStudyModal();
+                return;
+            }
+
+            const color = checkbox.getAttribute('data-color') || 'var(--green)';
+
+            // Smooth transition
+            checkbox.style.transition = 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+
+            if (isPlanned) {
+                checkbox.style.background = color;
+                checkbox.style.borderColor = color;
+                checkbox.classList.add('checked');
+                checkbox.innerHTML = '<i class="ph-bold ph-check" style="font-size: 16px; color: black;"></i>';
+            } else {
+                checkbox.style.background = 'transparent';
+                checkbox.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                checkbox.classList.remove('checked');
+                checkbox.innerHTML = '';
+            }
+
+            // Visual feedback
+            checkbox.style.transform = 'scale(0.9) translateZ(0)';
+            setTimeout(() => {
+                checkbox.style.transform = 'scale(1) translateZ(0)';
+            }, 150);
         }
 
         function startStudySession() {
