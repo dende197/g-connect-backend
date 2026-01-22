@@ -58,6 +58,29 @@
             outline: none;
         }
 
+        /* ⭐ GLOBAL SMOOTH TRANSITIONS */
+        button,
+        .card,
+        .glass-panel,
+        .glass-list-item,
+        .modal-content {
+            transition: all 0.2s var(--ease-smooth);
+        }
+
+        .modal-overlay {
+            animation: fadeIn 0.15s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
         body {
             font-family: 'Outfit', -apple-system, sans-serif;
             background: black;
@@ -705,8 +728,27 @@
                 console.log("❌ No session - showing login");
                 state.isLoggedIn = false;
                 state.view = 'login';
+
+                // ⭐ Carica comunque i dati locali (feed/market potrebbero essere cached)
+                const cachedPosts = localStorage.getItem('argo_posts');
+                if (cachedPosts) {
+                    try { state.posts = JSON.parse(cachedPosts); } catch (e) { state.posts = []; }
+                }
+                const cachedMarket = localStorage.getItem('argo_market');
+                if (cachedMarket) {
+                    try { state.marketItems = JSON.parse(cachedMarket); } catch (e) { state.marketItems = []; }
+                }
+
                 render();
             }
+
+            // ⭐ LOG di debug per verificare persistenza
+            console.log("📊 Stato caricato:", {
+                plannedTasks: Object.keys(state.plannedTasks).length,
+                stressLevels: Object.keys(state.stressLevels).length,
+                posts: state.posts.length,
+                tasks: state.tasks.length
+            });
         });
 
         function updateOfflineBadge() {
@@ -768,8 +810,17 @@
                     body: JSON.stringify(postData)
                 });
                 const data = await res.json();
-                if (data.success) state.posts = data.data;
-            } catch (e) { console.error("Errore submit post:", e); }
+                if (data.success) {
+                    state.posts = data.data;
+                    // ⭐ Persisti subito in localStorage
+                    localStorage.setItem('argo_posts', JSON.stringify(state.posts));
+                    console.log("📝 Post pubblicato e salvato");
+                    render();
+                }
+            } catch (e) {
+                console.error("Errore submit post:", e);
+                alert("Errore nella pubblicazione. Riprova.");
+            }
         }
 
         async function submitItem(itemData) {
@@ -780,8 +831,17 @@
                     body: JSON.stringify(itemData)
                 });
                 const data = await res.json();
-                if (data.success) state.marketItems = data.data;
-            } catch (e) { console.error("Errore submit item:", e); }
+                if (data.success) {
+                    state.marketItems = data.data;
+                    // ⭐ Persisti subito in localStorage
+                    localStorage.setItem('argo_market', JSON.stringify(state.marketItems));
+                    console.log("🛒 Item pubblicato e salvato");
+                    render();
+                }
+            } catch (e) {
+                console.error("Errore submit item:", e);
+                alert("Errore nella pubblicazione. Riprova.");
+            }
         }
 
         async function performSync(sessionData) {
@@ -2319,7 +2379,15 @@
                 if (state.reminders.find(x => x.id === id)) {
                     localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
                 }
-                render();
+
+                // ⭐ Check if inside a modal - if so, just update that modal
+                const activeModal = document.querySelector('.modal-overlay');
+                if (activeModal) {
+                    // Don't re-render the whole page, just close modal or update it
+                    console.log("⚡ Task toggled inside modal - skipping full render");
+                } else {
+                    render();
+                }
             }
         }
 
