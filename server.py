@@ -608,78 +608,98 @@ def health():
 
 @app.route('/api/posts', methods=['GET', 'POST'])
 def handle_posts():
-    if not supabase:
-        return jsonify({"success": False, "error": "Supabase not configured"}), 500
+    # Supabase mode
+    if supabase:
+        if request.method == 'GET':
+            try:
+                resp = supabase.table("posts").select("*").order("created_at", desc=True).limit(100).execute()
+                return jsonify({"success": True, "data": resp.data or []}), 200
+            except Exception as e:
+                debug_log("⚠️ /api/posts GET (Supabase) error, falling back", str(e))
+                # Fall through to JSON fallback
+        else:
+            try:
+                new_post = request.json or {}
+                if not new_post.get("text"):
+                    return jsonify({"success": False, "error": "Missing text"}), 400
+                payload = {
+                    "author_id": new_post.get("authorId") or new_post.get("author_id"),
+                    "author_name": new_post.get("author") or new_post.get("author_name"),
+                    "class": new_post.get("class"),
+                    "text": new_post.get("text"),
+                    "image": new_post.get("image"),
+                    "anon": bool(new_post.get("anon", False)),
+                }
+                supabase.table("posts").insert(payload).execute()
+                resp = supabase.table("posts").select("*").order("created_at", desc=True).limit(100).execute()
+                return jsonify({"success": True, "data": resp.data or []}), 200
+            except Exception as e:
+                debug_log("⚠️ /api/posts POST (Supabase) error, falling back", str(e))
+                # Fall through to JSON fallback
 
-    if request.method == 'GET':
-        try:
-            # latest first
-            resp = supabase.table("posts").select("*").order("created_at", desc=True).limit(100).execute()
-            return jsonify({"success": True, "data": resp.data or []}), 200
-        except Exception as e:
-            debug_log("⚠️ /api/posts GET error", str(e))
-            return jsonify({"success": False, "error": str(e)}), 500
-
-    # POST
+    # JSON fallback mode
     try:
-        new_post = request.json or {}
-        # minimal validation
-        if not new_post.get("text"):
-            return jsonify({"success": False, "error": "Missing text"}), 400
-
-        # keep only allowed fields
-        payload = {
-            "author_id": new_post.get("authorId") or new_post.get("author_id"),
-            "author_name": new_post.get("author") or new_post.get("author_name"),
-            "class": new_post.get("class"),
-            "text": new_post.get("text"),
-            "image": new_post.get("image"),
-            "anon": bool(new_post.get("anon", False)),
-        }
-
-        supabase.table("posts").insert(payload).execute()
-
-        # return updated list
-        resp = supabase.table("posts").select("*").order("created_at", desc=True).limit(100).execute()
-        return jsonify({"success": True, "data": resp.data or []}), 200
-
+        if request.method == 'GET':
+            data = load_json_file(POSTS_FILE, [])
+            return jsonify({"success": True, "data": data}), 200
+        else:
+            new_post = request.json or {}
+            if 'id' not in new_post:
+                new_post['id'] = int(datetime.now().timestamp() * 1000)
+            posts = load_json_file(POSTS_FILE, [])
+            posts.insert(0, new_post)
+            posts = posts[:100]
+            save_json_file(POSTS_FILE, posts)
+            return jsonify({"success": True, "data": posts}), 200
     except Exception as e:
-        debug_log("⚠️ /api/posts POST error", str(e))
+        debug_log("⚠️ /api/posts fallback error", str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/market', methods=['GET', 'POST'])
 def handle_market():
-    if not supabase:
-        return jsonify({"success": False, "error": "Supabase not configured"}), 500
+    # Supabase mode
+    if supabase:
+        if request.method == 'GET':
+            try:
+                resp = supabase.table("market_items").select("*").order("created_at", desc=True).limit(200).execute()
+                return jsonify({"success": True, "data": resp.data or []}), 200
+            except Exception as e:
+                debug_log("⚠️ /api/market GET (Supabase) error, falling back", str(e))
+                # Fall through to JSON fallback
+        else:
+            try:
+                new_item = request.json or {}
+                if not new_item.get("title") or not new_item.get("price"):
+                    return jsonify({"success": False, "error": "Missing title/price"}), 400
+                payload = {
+                    "seller_id": new_item.get("sellerId") or new_item.get("seller_id"),
+                    "seller_name": new_item.get("seller") or new_item.get("seller_name"),
+                    "title": new_item.get("title"),
+                    "price": new_item.get("price"),
+                    "image": new_item.get("image"),
+                }
+                supabase.table("market_items").insert(payload).execute()
+                resp = supabase.table("market_items").select("*").order("created_at", desc=True).limit(200).execute()
+                return jsonify({"success": True, "data": resp.data or []}), 200
+            except Exception as e:
+                debug_log("⚠️ /api/market POST (Supabase) error, falling back", str(e))
+                # Fall through to JSON fallback
 
-    if request.method == 'GET':
-        try:
-            resp = supabase.table("market_items").select("*").order("created_at", desc=True).limit(200).execute()
-            return jsonify({"success": True, "data": resp.data or []}), 200
-        except Exception as e:
-            debug_log("⚠️ /api/market GET error", str(e))
-            return jsonify({"success": False, "error": str(e)}), 500
-
+    # JSON fallback mode
     try:
-        new_item = request.json or {}
-        if not new_item.get("title") or not new_item.get("price"):
-            return jsonify({"success": False, "error": "Missing title/price"}), 400
-
-        payload = {
-            "seller_id": new_item.get("sellerId") or new_item.get("seller_id"),
-            "seller_name": new_item.get("seller") or new_item.get("seller_name"),
-            "title": new_item.get("title"),
-            "price": new_item.get("price"),
-            "image": new_item.get("image"),
-        }
-
-        supabase.table("market_items").insert(payload).execute()
-
-        resp = supabase.table("market_items").select("*").order("created_at", desc=True).limit(200).execute()
-        return jsonify({"success": True, "data": resp.data or []}), 200
-
+        if request.method == 'GET':
+            items = load_json_file(MARKET_FILE, [])
+            return jsonify({"success": True, "data": items}), 200
+        else:
+            new_item = request.json or {}
+            if 'id' not in new_item:
+                new_item['id'] = int(datetime.now().timestamp() * 1000)
+            items = load_json_file(MARKET_FILE, [])
+            items.insert(0, new_item)
+            save_json_file(MARKET_FILE, items)
+            return jsonify({"success": True, "data": items}), 200
     except Exception as e:
-        debug_log("⚠️ /api/market POST error", str(e))
+        debug_log("⚠️ /api/market fallback error", str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ============= CHAT (Supabase) =============

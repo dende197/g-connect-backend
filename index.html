@@ -838,6 +838,48 @@
             return await sha256Hex(`${x}|${y}`);
         }
 
+        // === Outbox for publish offline/errore: posts & market ===
+        function enqueueOutbox(kind, item) {
+            const key = lsKey(`outbox_${kind}`);
+            const list = JSON.parse(localStorage.getItem(key) || '[]');
+            list.push(item);
+            localStorage.setItem(key, JSON.stringify(list));
+        }
+
+        async function flushOutbox() {
+            for (const kind of ['posts', 'market']) {
+                const key = lsKey(`outbox_${kind}`);
+                const list = JSON.parse(localStorage.getItem(key) || '[]');
+                if (!list.length) continue;
+                const endpoint = kind === 'posts' ? `${API_BASE_URL}/api/posts` : `${API_BASE_URL}/api/market`;
+                const kept = [];
+                for (const it of list) {
+                    try {
+                        const res = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(it)
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            if (kind === 'posts') {
+                                state.posts = data.data || state.posts;
+                                localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
+                            } else {
+                                state.marketItems = data.data || state.marketItems;
+                                localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
+                            }
+                        } else {
+                            kept.push(it); // keep for next time
+                        }
+                    } catch (e) {
+                        kept.push(it);
+                    }
+                }
+                localStorage.setItem(key, JSON.stringify(kept));
+            }
+        }
+
         // 🆕 PERSISTENT SESSION MANAGER
         const sessionManager = {
             save(sessionData) {
@@ -986,6 +1028,9 @@
                     } catch (e) { state.marketItems = []; }
                 }
 
+                // ⭐ Flush outbox (tentativi offline)
+                await flushOutbox();
+
                 // ⭐ Fetch Feed & Market on startup (aggiornerà con dati freschi)
                 await Promise.all([fetchFeed(), fetchMarket()]);
 
@@ -1036,19 +1081,16 @@
                 const res = await fetch(`${API_BASE_URL}/api/posts`);
                 const data = await res.json();
                 if (data.success) {
-                    state.posts = data.data;
-                    // ⭐ Persisti feed globally (shared across profiles on this device)
+                    state.posts = data.data || [];
                     localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
-                    console.log("📝 Feed caricato e salvato globalmente:", state.posts.length);
+                    console.log("📝 Feed (server) → cache global:", state.posts.length);
+                } else {
+                    throw new Error(data.error || 'failed');
                 }
             } catch (e) {
-                console.error("Errore fetch feed:", e);
-                // ⭐ Fallback: carica da cache globale se fetch fallisce
+                console.warn("Feed offline/errore, uso cache:", e.message);
                 const cached = localStorage.getItem(globalKey('posts'));
-                if (cached) {
-                    state.posts = JSON.parse(cached);
-                    console.log("📝 Feed caricato da cache globale:", state.posts.length);
-                }
+                state.posts = cached ? JSON.parse(cached) : [];
             }
         }
 
@@ -1057,23 +1099,25 @@
                 const res = await fetch(`${API_BASE_URL}/api/market`);
                 const data = await res.json();
                 if (data.success) {
-                    state.marketItems = data.data;
-                    // ⭐ Persisti market globally
+                    state.marketItems = data.data || [];
                     localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
-                    console.log("🛒 Market caricato e salvato globalmente:", state.marketItems.length);
+                    console.log("🛒 Market (server) → cache global:", state.marketItems.length);
+                } else {
+                    throw new Error(data.error || 'failed');
                 }
             } catch (e) {
-                console.error("Errore fetch market:", e);
-                // ⭐ Fallback: carica da cache globale
+                console.warn("Market offline/errore, uso cache:", e.message);
                 const cached = localStorage.getItem(globalKey('market'));
-                if (cached) {
-                    state.marketItems = JSON.parse(cached);
-                    console.log("🛒 Market caricato da cache globale:", state.marketItems.length);
-                }
+                state.marketItems = cached ? JSON.parse(cached) : [];
             }
         }
 
         async function submitPost(postData) {
+            // optimistic: aggiorna subito UI/cache
+            state.posts = [postData, ...state.posts].slice(0, 100);
+            localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
+            render();
+
             try {
                 const res = await fetch(`${API_BASE_URL}/api/posts`, {
                     method: 'POST',
@@ -1082,19 +1126,24 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    state.posts = data.data;
-                    // ⭐ Persisti subito in cache globale
+                    state.posts = data.data || state.posts;
                     localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
-                    console.log("📝 Post pubblicato e salvato globalmente");
-                    render();
+                    console.log("📝 Post pubblicato (server) e cache allineata");
+                } else {
+                    throw new Error(data.error || 'failed');
                 }
             } catch (e) {
-                console.error("Errore submit post:", e);
-                alert("Errore nella pubblicazione. Riprova.");
+                console.warn("Post → outbox (offline/errore):", e.message);
+                enqueueOutbox('posts', postData);
+                alert("Sei offline o il server non risponde: il post verrà inviato alla prossima connessione.");
             }
         }
 
         async function submitItem(itemData) {
+            state.marketItems = [itemData, ...state.marketItems];
+            localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
+            render();
+
             try {
                 const res = await fetch(`${API_BASE_URL}/api/market`, {
                     method: 'POST',
@@ -1103,15 +1152,16 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    state.marketItems = data.data;
-                    // ⭐ Persisti subito in cache globale
+                    state.marketItems = data.data || state.marketItems;
                     localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
-                    console.log("🛒 Item pubblicato e salvato globalmente");
-                    render();
+                    console.log("🛒 Item pubblicato (server) e cache allineata");
+                } else {
+                    throw new Error(data.error || 'failed');
                 }
             } catch (e) {
-                console.error("Errore submit item:", e);
-                alert("Errore nella pubblicazione. Riprova.");
+                console.warn("Market → outbox (offline/errore):", e.message);
+                enqueueOutbox('market', itemData);
+                alert("Sei offline o il server non risponde: l'oggetto verrà pubblicato alla prossima connessione.");
             }
         }
 
