@@ -212,12 +212,7 @@
             }
         }
 
-        .view {
-            contain: layout style;
-            min-height: 100vh;
-        }
 
-        /* Assicurati che html abbia background: elimina bande bianche su iOS */
         html,
         body {
             margin: 0;
@@ -240,7 +235,6 @@
 
         /* ✅ body scrolla (iOS friendly) */
         body {
-            font-family: 'Outfit', -apple-system, sans-serif;
             overflow-y: auto;
             overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
@@ -251,6 +245,7 @@
             min-height: 100dvh;
 
             color: var(--text-main);
+            font-family: 'Outfit', -apple-system, sans-serif;
         }
 
         /* ✅ #app NON deve più fare scroll */
@@ -263,11 +258,9 @@
             /* safe area: solo padding, non height */
             padding-top: env(safe-area-inset-top, 0px);
             padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
-            /* spazio per bottom nav + safe area */
             transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* Ogni view occupa praticamente tutto lo spazio “utile” */
         .view {
             contain: layout style;
             min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 96px);
