@@ -780,13 +780,13 @@
         }
 
         const DIRECTORY = [
-            { name: 'Alessandro Russo', class: '5B', status: 'online' },
-            { name: 'Sofia Bianchi', class: '3A', status: 'offline' },
-            { name: 'Luca Esposito', class: '4C', status: 'online' },
-            { name: 'Giulia Conti', class: '5B', status: 'offline' },
-            { name: 'Matteo Ferri', class: '2A', status: 'online' },
-            { name: 'Chiara Romano', class: '1B', status: 'offline' },
-            { name: 'Proff. Esposito', class: 'Docente', status: 'online' }
+            { name: 'Alessandro Russo', id: 'demo:alessandro:0', class: '5B', status: 'online' },
+            { name: 'Sofia Bianchi', id: 'demo:sofia:0', class: '3A', status: 'offline' },
+            { name: 'Luca Esposito', id: 'demo:luca:0', class: '4C', status: 'online' },
+            { name: 'Giulia Conti', id: 'demo:giulia:0', class: '5B', status: 'offline' },
+            { name: 'Matteo Ferri', id: 'demo:matteo:0', class: '2A', status: 'online' },
+            { name: 'Chiara Romano', id: 'demo:chiara:0', class: '1B', status: 'offline' },
+            { name: 'Proff. Esposito', id: 'demo:esposito:docente', class: 'Docente', status: 'online' }
         ];
 
         // ---------------------------------------------
@@ -795,6 +795,49 @@
         // Inserisci l'URL di Render (es: "https://g-connect-backend.onrender.com") se deploy su Netlify.
         const API_BASE_URL = "https://g-connect-backend.onrender.com";
         // ---------------------------------------------
+        // 🆕 MULTI-PROFILE NAMESPACING UTILS
+        function getActiveProfileKey() {
+            const s = sessionManager.load();
+            // Se non loggato, usa un namespace pubblico (guest)
+            if (!s || !sessionManager.isLoggedIn()) return 'guest';
+
+            const school = s.schoolCode || 'noschool';
+            const user = (s.userName || s.username || 'nouser').toLowerCase();
+            const idx = (s.profileIndex ?? 0);
+
+            // Chiave stabile per profilo: p:codice_scuola:nome_utente:indice_profilo
+            return `p:${school}:${user}:${idx}`;
+        }
+
+        function lsKey(name) {
+            return `${getActiveProfileKey()}:${name}`;
+        }
+
+        function getUserId() {
+            const s = sessionManager.load();
+            if (!s) return 'guest';
+            const school = s.schoolCode || 'noschool';
+            const user = (s.userName || s.username || 'nouser').toLowerCase();
+            const idx = (s.profileIndex ?? 0);
+            return `${school}:${user}:${idx}`;
+        }
+
+        function globalKey(name) {
+            return `global:${name}`;
+        }
+
+        // Hashing for deterministic chat threads
+        async function sha256Hex(input) {
+            const enc = new TextEncoder().encode(input);
+            const buf = await crypto.subtle.digest('SHA-256', enc);
+            return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function getThreadId(userA, userB) {
+            const [x, y] = [userA, userB].sort();
+            return await sha256Hex(`${x}|${y}`);
+        }
+
         // 🆕 PERSISTENT SESSION MANAGER
         const sessionManager = {
             save(sessionData) {
@@ -821,10 +864,8 @@
             },
             clear() {
                 localStorage.removeItem('argo_session');
-                localStorage.removeItem('argo_tasks');
                 localStorage.removeItem('argo_is_logged_in');
-                localStorage.removeItem('argo_user'); // ⭐ Per persistere user
-                console.log("🗑️ Sessione cancellata");
+                console.log("🗑️ Sessione terminata (dati profilo rimangono in localStorage)");
             }
         };
 
@@ -852,8 +893,8 @@
             reminders: [],
             syncing: false,
             selectedDay: new Date().getDate(),
-            stressLevels: JSON.parse(localStorage.getItem('argo_stress_levels') || '{}'),
-            plannedTasks: JSON.parse(localStorage.getItem('argo_planned_tasks') || '{}')
+            stressLevels: JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}'),
+            plannedTasks: JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}')
         };
 
         const app = document.getElementById('app');
@@ -870,7 +911,7 @@
                 console.log("✅ Sessione valida trovata!");
 
                 // ⭐ Carica tasks con done persistito e ricostruisci dateObj
-                const cachedTasks = localStorage.getItem('argo_tasks');
+                const cachedTasks = localStorage.getItem(lsKey('tasks'));
                 if (cachedTasks) {
                     try {
                         const parsed = JSON.parse(cachedTasks);
@@ -882,7 +923,7 @@
                             }
                             return t;
                         });
-                        console.log("📦 Compiti caricati:", state.tasks.length);
+                        console.log("📦 Compiti caricati da cache profilo:", state.tasks.length);
                     } catch (e) {
                         console.error("Errore cache tasks:", e);
                         state.tasks = [];
@@ -890,36 +931,36 @@
                 }
 
                 // ⭐ Carica user da localStorage
-                const cachedUser = localStorage.getItem('argo_user');
+                const cachedUser = localStorage.getItem(lsKey('user'));
                 if (cachedUser) {
                     try {
                         state.user = JSON.parse(cachedUser);
-                        console.log("👤 Utente caricato:", state.user.name);
+                        console.log("👤 Utente caricato da cache profilo:", state.user.name);
                     } catch (e) {
                         console.error("Errore caricamento user:", e);
                     }
                 } else if (savedSession.student) {
                     state.user = savedSession.student;
-                    localStorage.setItem('argo_user', JSON.stringify(state.user));
+                    localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
                 }
 
                 // ⭐ Carica voti e promemoria da localStorage
-                const cachedVoti = localStorage.getItem('argo_voti');
+                const cachedVoti = localStorage.getItem(lsKey('voti'));
                 if (cachedVoti) {
                     try {
                         state.voti = JSON.parse(cachedVoti);
-                        console.log("📊 Voti caricati da cache:", state.voti.length);
+                        console.log("📊 Voti caricati da cache profilo:", state.voti.length);
                     } catch (e) {
                         console.error("Errore caricamento voti:", e);
                         state.voti = [];
                     }
                 }
 
-                const cachedProm = localStorage.getItem('argo_promemoria');
+                const cachedProm = localStorage.getItem(lsKey('promemoria'));
                 if (cachedProm) {
                     try {
                         state.promemoria = JSON.parse(cachedProm);
-                        console.log("📢 Promemoria caricati da cache:", state.promemoria.length);
+                        console.log("📢 Promemoria caricati da cache profilo:", state.promemoria.length);
                     } catch (e) {
                         console.error("Errore caricamento promemoria:", e);
                         state.promemoria = [];
@@ -930,18 +971,18 @@
                 state.didup.connected = true;
 
                 // ⭐ Carica Feed & Market da cache IMMEDIATAMENTE (prima del fetch)
-                const cachedPosts = localStorage.getItem('argo_posts');
+                const cachedPosts = localStorage.getItem(globalKey('posts'));
                 if (cachedPosts) {
                     try {
                         state.posts = JSON.parse(cachedPosts);
-                        console.log("📝 Feed caricato da cache:", state.posts.length);
+                        console.log("📝 Feed caricato da cache globale:", state.posts.length);
                     } catch (e) { state.posts = []; }
                 }
-                const cachedMarket = localStorage.getItem('argo_market');
+                const cachedMarket = localStorage.getItem(globalKey('market'));
                 if (cachedMarket) {
                     try {
                         state.marketItems = JSON.parse(cachedMarket);
-                        console.log("🛒 Market caricato da cache:", state.marketItems.length);
+                        console.log("🛒 Market caricato da cache globale:", state.marketItems.length);
                     } catch (e) { state.marketItems = []; }
                 }
 
@@ -960,11 +1001,11 @@
                 state.view = 'login';
 
                 // ⭐ Carica comunque i dati locali (feed/market potrebbero essere cached)
-                const cachedPosts = localStorage.getItem('argo_posts');
+                const cachedPosts = localStorage.getItem(globalKey('posts'));
                 if (cachedPosts) {
                     try { state.posts = JSON.parse(cachedPosts); } catch (e) { state.posts = []; }
                 }
-                const cachedMarket = localStorage.getItem('argo_market');
+                const cachedMarket = localStorage.getItem(globalKey('market'));
                 if (cachedMarket) {
                     try { state.marketItems = JSON.parse(cachedMarket); } catch (e) { state.marketItems = []; }
                 }
@@ -996,17 +1037,17 @@
                 const data = await res.json();
                 if (data.success) {
                     state.posts = data.data;
-                    // ⭐ Persisti feed in localStorage
-                    localStorage.setItem('argo_posts', JSON.stringify(state.posts));
-                    console.log("📝 Feed caricato e salvato:", state.posts.length);
+                    // ⭐ Persisti feed globally (shared across profiles on this device)
+                    localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
+                    console.log("📝 Feed caricato e salvato globalmente:", state.posts.length);
                 }
             } catch (e) {
                 console.error("Errore fetch feed:", e);
-                // ⭐ Fallback: carica da localStorage se fetch fallisce
-                const cached = localStorage.getItem('argo_posts');
+                // ⭐ Fallback: carica da cache globale se fetch fallisce
+                const cached = localStorage.getItem(globalKey('posts'));
                 if (cached) {
                     state.posts = JSON.parse(cached);
-                    console.log("📝 Feed caricato da cache:", state.posts.length);
+                    console.log("📝 Feed caricato da cache globale:", state.posts.length);
                 }
             }
         }
@@ -1017,17 +1058,17 @@
                 const data = await res.json();
                 if (data.success) {
                     state.marketItems = data.data;
-                    // ⭐ Persisti market in localStorage
-                    localStorage.setItem('argo_market', JSON.stringify(state.marketItems));
-                    console.log("🛒 Market caricato e salvato:", state.marketItems.length);
+                    // ⭐ Persisti market globally
+                    localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
+                    console.log("🛒 Market caricato e salvato globalmente:", state.marketItems.length);
                 }
             } catch (e) {
                 console.error("Errore fetch market:", e);
-                // ⭐ Fallback: carica da localStorage se fetch fallisce
-                const cached = localStorage.getItem('argo_market');
+                // ⭐ Fallback: carica da cache globale
+                const cached = localStorage.getItem(globalKey('market'));
                 if (cached) {
                     state.marketItems = JSON.parse(cached);
-                    console.log("🛒 Market caricato da cache:", state.marketItems.length);
+                    console.log("🛒 Market caricato da cache globale:", state.marketItems.length);
                 }
             }
         }
@@ -1042,9 +1083,9 @@
                 const data = await res.json();
                 if (data.success) {
                     state.posts = data.data;
-                    // ⭐ Persisti subito in localStorage
-                    localStorage.setItem('argo_posts', JSON.stringify(state.posts));
-                    console.log("📝 Post pubblicato e salvato");
+                    // ⭐ Persisti subito in cache globale
+                    localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
+                    console.log("📝 Post pubblicato e salvato globalmente");
                     render();
                 }
             } catch (e) {
@@ -1063,9 +1104,9 @@
                 const data = await res.json();
                 if (data.success) {
                     state.marketItems = data.data;
-                    // ⭐ Persisti subito in localStorage
-                    localStorage.setItem('argo_market', JSON.stringify(state.marketItems));
-                    console.log("🛒 Item pubblicato e salvato");
+                    // ⭐ Persisti subito in cache globale
+                    localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
+                    console.log("🛒 Item pubblicato e salvato globalmente");
                     render();
                 }
             } catch (e) {
@@ -1131,14 +1172,14 @@
                     // ⭐ CRITICO: Aggiorna voti e salva SEMPRE
                     if (data.voti !== undefined) {
                         state.voti = Array.isArray(data.voti) ? data.voti : [];
-                        localStorage.setItem('argo_voti', JSON.stringify(state.voti));
+                        localStorage.setItem(lsKey('voti'), JSON.stringify(state.voti));
                     }
 
                     // ⭐ CRITICO: Aggiorna promemoria e salva SEMPRE
                     const promemoriaData = data.promemoria || data.announcements;
                     if (promemoriaData !== undefined) {
                         state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
-                        localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
+                        localStorage.setItem(lsKey('promemoria'), JSON.stringify(state.promemoria));
                     }
 
                     state.lastSync = new Date().toLocaleTimeString();
@@ -1204,17 +1245,17 @@
                     if (data.tasks) updateTasks(data.tasks, true);
                     if (data.voti !== undefined) {
                         state.voti = Array.isArray(data.voti) ? data.voti : [];
-                        localStorage.setItem('argo_voti', JSON.stringify(state.voti));
+                        localStorage.setItem(lsKey('voti'), JSON.stringify(state.voti));
                     }
                     const promemoriaData = data.promemoria || data.announcements;
                     if (promemoriaData !== undefined) {
                         state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
-                        localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
+                        localStorage.setItem(lsKey('promemoria'), JSON.stringify(state.promemoria));
                     }
 
                     if (data.student) {
                         state.user = data.student;
-                        localStorage.setItem('argo_user', JSON.stringify(state.user));
+                        localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
                     }
 
                     state.isOffline = false;
@@ -1251,22 +1292,22 @@
                         done: !!t.done
                     }));
 
-                    const prevRaw = localStorage.getItem('argo_tasks');
+                    const prevRaw = localStorage.getItem(lsKey('tasks'));
                     const prev = prevRaw ? JSON.parse(prevRaw) : null;
                     const prevCount = Array.isArray(prev) ? prev.length : 0;
 
                     if (tasksToSave.length === 0 && prevCount > 0) {
                         console.warn("🛑 Anti-wipe: blocco salvataggio vuoto (cache aveva", prevCount, "tasks)");
-                        localStorage.setItem('argo_planned_tasks', JSON.stringify(state.plannedTasks || {}));
-                        localStorage.setItem('argo_stress_levels', JSON.stringify(state.stressLevels || {}));
+                        localStorage.setItem(lsKey('planned_tasks'), JSON.stringify(state.plannedTasks || {}));
+                        localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels || {}));
                         return;
                     }
 
-                    localStorage.setItem('argo_tasks', JSON.stringify(tasksToSave));
-                    localStorage.setItem('argo_planned_tasks', JSON.stringify(state.plannedTasks || {}));
-                    localStorage.setItem('argo_stress_levels', JSON.stringify(state.stressLevels || {}));
+                    localStorage.setItem(lsKey('tasks'), JSON.stringify(tasksToSave));
+                    localStorage.setItem(lsKey('planned_tasks'), JSON.stringify(state.plannedTasks || {}));
+                    localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels || {}));
 
-                    console.log("💾 Salvato:", tasksToSave.length, "tasks");
+                    console.log("💾 Salvato profilo:", tasksToSave.length, "tasks");
                 } catch (e) {
                     console.error("❌ Errore salvataggio:", e);
                 }
@@ -1281,7 +1322,7 @@
             today.setHours(0, 0, 0, 0);
 
             // ⭐ Recupera stato 'done' persistito
-            const localTasks = JSON.parse(localStorage.getItem('argo_tasks') || '[]');
+            const localTasks = JSON.parse(localStorage.getItem(lsKey('tasks')) || '[]');
 
             // Pre-index locale per “match” (subject + text + due_date)
             const localIndex = new Map();
@@ -2267,7 +2308,7 @@
             // ⭐ DEBUG: Log completo per capire cosa c'è
             console.log("🎓 renderVoti chiamato - state.voti:", state.voti);
             console.log("🎓 renderVoti chiamato - state.grades:", state.grades);
-            console.log("🎓 renderVoti chiamato - localStorage argo_voti:", localStorage.getItem('argo_voti'));
+            console.log("🎓 renderVoti chiamato - localStorage argo_voti:", localStorage.getItem(lsKey('voti')));
 
             // ⭐ Prova prima voti, poi grades
             const votiData = (state.voti && state.voti.length > 0) ? state.voti :
@@ -2288,7 +2329,7 @@
                             <strong>Debug Info:</strong><br>
                             state.voti.length: ${state.voti?.length || 0}<br>
                             state.grades.length: ${state.grades?.length || 0}<br>
-                            localStorage: ${localStorage.getItem('argo_voti') ? 'Presente' : 'Vuoto'}
+                            localStorage: ${localStorage.getItem(lsKey('voti')) ? 'Presente' : 'Vuoto'}
                         </div>
                     </div>`;
             }
@@ -2712,7 +2753,7 @@
                     // ⭐ Salva user
                     if (data.student) {
                         state.user = data.student;
-                        localStorage.setItem('argo_user', JSON.stringify(state.user));
+                        localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
                         console.log("💾 User salvato:", state.user.name);
                     }
 
@@ -2730,7 +2771,7 @@
 
                     if (data.voti !== undefined) {
                         state.voti = Array.isArray(data.voti) ? data.voti : [];
-                        localStorage.setItem('argo_voti', JSON.stringify(state.voti));
+                        localStorage.setItem(lsKey('voti'), JSON.stringify(state.voti));
                         console.log("✅ Voti caricati e salvati:", state.voti.length);
                         console.log("✅ Voti salvati - contenuto completo:", JSON.stringify(state.voti));
                         if (state.voti.length === 0) {
@@ -2748,7 +2789,7 @@
                     const promemoriaData = data.promemoria || data.announcements;
                     if (promemoriaData !== undefined) {
                         state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
-                        localStorage.setItem('argo_promemoria', JSON.stringify(state.promemoria));
+                        localStorage.setItem(lsKey('promemoria'), JSON.stringify(state.promemoria));
                         console.log("✅ Promemoria caricati e salvati:", state.promemoria.length);
                         if (state.promemoria.length === 0) {
                             console.warn("⚠️ ATTENZIONE: Array promemoria vuoto - il backend NON sta recuperando i promemoria da DidUP");
@@ -2801,6 +2842,7 @@
                 const newPost = {
                     id: Date.now(),
                     author: isAnon ? "Studente" : (state.user.name || "Utente"),
+                    authorId: getUserId(),
                     class: isAnon ? "5B" : (state.user.class || "5B"),
                     text: text,
                     likes: 0,
@@ -2826,7 +2868,8 @@
                     title: title,
                     price: price,
                     image: imgPreview ? imgPreview.src : null,
-                    seller: state.user.name || "Utente"
+                    seller: state.user.name || "Utente",
+                    sellerId: getUserId()
                 };
                 await submitItem(newItem);
                 closeModal();
@@ -2863,19 +2906,84 @@
             }
         }
 
-        function openChat(u) {
-            state.currentChatUser = u;
-            if (!state.messages[u]) state.messages[u] = [];
+        async function openChat(name) {
+            const userObj = DIRECTORY.find(u => u.name === name);
+            if (!userObj) return;
+
+            state.currentChatUser = name;
+            state.currentChatId = userObj.id;
+
+            const myId = getUserId();
+            const threadId = await getThreadId(myId, userObj.id);
+            state.currentThreadId = threadId;
+
             navigate('chat');
+
+            // Fetch history from server
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/messages/thread/${threadId}`);
+                const data = await res.json();
+                if (data.success) {
+                    // Map Supabase fields to frontend state
+                    // Supabase returns { sender_id, text, created_at, ... }
+                    state.messages[name] = data.data.map(m => ({
+                        text: m.text,
+                        me: m.sender_id === myId,
+                        timestamp: m.created_at
+                    }));
+                    render();
+                    setTimeout(() => {
+                        const history = document.getElementById('chat-history');
+                        if (history) history.scrollTop = history.scrollHeight;
+                    }, 50);
+                }
+            } catch (e) {
+                console.error("Errore fetch chat:", e);
+                if (!state.messages[name]) state.messages[name] = [];
+            }
         }
 
-        function sendMessage() {
+        async function sendMessage() {
             const input = document.getElementById('msg-input');
             const txt = input.value;
-            if (txt) {
-                state.messages[state.currentChatUser].push({ text: txt, me: true });
+            if (txt && state.currentThreadId) {
+                const myId = getUserId();
+                const myName = state.user.name || "Io";
+
+                const payload = {
+                    threadId: state.currentThreadId,
+                    senderId: myId,
+                    senderName: myName,
+                    receiverId: state.currentChatId,
+                    text: txt
+                };
+
+                // Add instantly to UI for responsiveness
+                if (!state.messages[state.currentChatUser]) state.messages[state.currentChatUser] = [];
+                state.messages[state.currentChatUser].push({ text: txt, me: true, timestamp: new Date().toISOString() });
                 input.value = '';
                 render();
+
+                try {
+                    const res = await fetch(`${API_BASE_URL}/api/messages`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        // Refresh with server order
+                        state.messages[state.currentChatUser] = data.data.map(m => ({
+                            text: m.text,
+                            me: m.sender_id === myId,
+                            timestamp: m.created_at
+                        }));
+                        render();
+                    }
+                } catch (e) {
+                    console.error("Errore invio messaggio:", e);
+                }
+
                 setTimeout(() => {
                     const history = document.getElementById('chat-history');
                     if (history) history.scrollTop = history.scrollHeight;
@@ -2893,7 +3001,7 @@
                 t.done = !t.done;
                 saveTasks();
                 if (state.reminders && state.reminders.find(x => x.id === id)) {
-                    localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
+                    localStorage.setItem(lsKey('reminders'), JSON.stringify(state.reminders));
                 }
 
                 updateTaskUI(id, t.done);
@@ -2926,7 +3034,7 @@
                     text: text,
                     done: false
                 });
-                localStorage.setItem('argo_reminders', JSON.stringify(state.reminders));
+                localStorage.setItem(lsKey('reminders'), JSON.stringify(state.reminders));
                 render();
             }
         }

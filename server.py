@@ -11,6 +11,12 @@ import base64
 from hashlib import sha256
 from datetime import datetime
 
+# ✅ NEW: Supabase
+from supabase import create_client, Client
+from dotenv import load_dotenv
+
+load_dotenv() # Load local .env if present
+
 # ============= CONSTANTS =============
 CHALLENGE_URL = "https://auth.portaleargo.it/oauth2/auth"
 LOGIN_URL = "https://www.portaleargo.it/auth/sso/login"
@@ -65,6 +71,20 @@ def debug_log(message, data=None):
             else:
                 print(str(data)[:2000])
         print(f"{'='*60}\n")
+
+# ✅ NEW: Supabase client init
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
+supabase: Client | None = None
+if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+        debug_log("✅ Supabase configured and connected")
+    except Exception as e:
+        debug_log("❌ Error initializing Supabase client", str(e))
+else:
+    debug_log("⚠️ Supabase NOT configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
 # ============= PERSISTENCE CONFIG =============
 POSTS_FILE = "posts.json"
 MARKET_FILE = "market.json"
@@ -588,47 +608,136 @@ def health():
 
 @app.route('/api/posts', methods=['GET', 'POST'])
 def handle_posts():
+    if not supabase:
+        return jsonify({"success": False, "error": "Supabase not configured"}), 500
+
     if request.method == 'GET':
-        posts = load_json_file(POSTS_FILE, [])
-        return jsonify({"success": True, "data": posts}), 200
-    
-    if request.method == 'POST':
-        new_post = request.json
-        if not new_post:
-            return jsonify({"success": False, "error": "No data"}), 400
-            
-        posts = load_json_file(POSTS_FILE, [])
-        # Add timestamp/ID if missing
-        if 'id' not in new_post:
-            new_post['id'] = int(datetime.now().timestamp() * 1000)
-        
-        # Prepend to keep latest first
-        posts.insert(0, new_post)
-        
-        # Limit to last 100 posts to avoid file bloat
-        posts = posts[:100]
-        
-        save_json_file(POSTS_FILE, posts)
-        return jsonify({"success": True, "data": posts}), 200
+        try:
+            # latest first
+            resp = supabase.table("posts").select("*").order("created_at", desc=True).limit(100).execute()
+            return jsonify({"success": True, "data": resp.data or []}), 200
+        except Exception as e:
+            debug_log("⚠️ /api/posts GET error", str(e))
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    # POST
+    try:
+        new_post = request.json or {}
+        # minimal validation
+        if not new_post.get("text"):
+            return jsonify({"success": False, "error": "Missing text"}), 400
+
+        # keep only allowed fields
+        payload = {
+            "author_id": new_post.get("authorId") or new_post.get("author_id"),
+            "author_name": new_post.get("author") or new_post.get("author_name"),
+            "class": new_post.get("class"),
+            "text": new_post.get("text"),
+            "image": new_post.get("image"),
+            "anon": bool(new_post.get("anon", False)),
+        }
+
+        supabase.table("posts").insert(payload).execute()
+
+        # return updated list
+        resp = supabase.table("posts").select("*").order("created_at", desc=True).limit(100).execute()
+        return jsonify({"success": True, "data": resp.data or []}), 200
+
+    except Exception as e:
+        debug_log("⚠️ /api/posts POST error", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/market', methods=['GET', 'POST'])
 def handle_market():
+    if not supabase:
+        return jsonify({"success": False, "error": "Supabase not configured"}), 500
+
     if request.method == 'GET':
-        items = load_json_file(MARKET_FILE, [])
-        return jsonify({"success": True, "data": items}), 200
-        
-    if request.method == 'POST':
-        new_item = request.json
-        if not new_item:
-            return jsonify({"success": False, "error": "No data"}), 400
-            
-        items = load_json_file(MARKET_FILE, [])
-        if 'id' not in new_item:
-            new_item['id'] = int(datetime.now().timestamp() * 1000)
-            
-        items.insert(0, new_item)
-        save_json_file(MARKET_FILE, items)
-        return jsonify({"success": True, "data": items}), 200
+        try:
+            resp = supabase.table("market_items").select("*").order("created_at", desc=True).limit(200).execute()
+            return jsonify({"success": True, "data": resp.data or []}), 200
+        except Exception as e:
+            debug_log("⚠️ /api/market GET error", str(e))
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    try:
+        new_item = request.json or {}
+        if not new_item.get("title") or not new_item.get("price"):
+            return jsonify({"success": False, "error": "Missing title/price"}), 400
+
+        payload = {
+            "seller_id": new_item.get("sellerId") or new_item.get("seller_id"),
+            "seller_name": new_item.get("seller") or new_item.get("seller_name"),
+            "title": new_item.get("title"),
+            "price": new_item.get("price"),
+            "image": new_item.get("image"),
+        }
+
+        supabase.table("market_items").insert(payload).execute()
+
+        resp = supabase.table("market_items").select("*").order("created_at", desc=True).limit(200).execute()
+        return jsonify({"success": True, "data": resp.data or []}), 200
+
+    except Exception as e:
+        debug_log("⚠️ /api/market POST error", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ============= CHAT (Supabase) =============
+
+@app.route('/api/messages/thread/<thread_id>', methods=['GET'])
+def get_thread_messages(thread_id):
+    if not supabase:
+        return jsonify({"success": False, "error": "Supabase not configured"}), 500
+
+    try:
+        resp = (
+            supabase.table("chat_messages")
+            .select("*")
+            .eq("thread_id", thread_id)
+            .order("created_at", desc=False)
+            .limit(500)
+            .execute()
+        )
+        return jsonify({"success": True, "data": resp.data or []}), 200
+    except Exception as e:
+        debug_log("⚠️ get_thread_messages error", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/messages', methods=['POST'])
+def post_message():
+    if not supabase:
+        return jsonify({"success": False, "error": "Supabase not configured"}), 500
+
+    try:
+        msg = request.json or {}
+        required = ["threadId", "senderId", "receiverId", "text"]
+        if not all(msg.get(k) for k in required):
+            return jsonify({"success": False, "error": "Missing fields"}), 400
+
+        payload = {
+            "thread_id": msg["threadId"],
+            "sender_id": msg["senderId"],
+            "sender_name": msg.get("senderName"),
+            "receiver_id": msg["receiverId"],
+            "text": msg["text"],
+        }
+
+        supabase.table("chat_messages").insert(payload).execute()
+
+        # return updated thread
+        resp = (
+            supabase.table("chat_messages")
+            .select("*")
+            .eq("thread_id", msg["threadId"])
+            .order("created_at", desc=False)
+            .limit(500)
+            .execute()
+        )
+        return jsonify({"success": True, "data": resp.data or []}), 200
+
+    except Exception as e:
+        debug_log("⚠️ post_message error", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -763,6 +872,21 @@ def login():
              student_name = f"{p.get('alunno', {}).get('desNome', '')} {p.get('alunno', {}).get('desCognome', '')}".strip() or username
              student_class = p.get('desClasse', 'DidUP')
 
+        # ✅ NEW: Register/Update Profile in Supabase for Directory
+        if supabase:
+            try:
+                profile_id = f"{school_code}:{username.lower()}:{target_index}"
+                profile_payload = {
+                    "id": profile_id,
+                    "name": student_name,
+                    "class": student_class,
+                    "last_active": datetime.now().isoformat()
+                }
+                supabase.table("profiles").upsert(profile_payload).execute()
+                debug_log(f"👤 Profile sync'd to Supabase: {profile_id}")
+            except Exception as e_prof:
+                debug_log("⚠️ Profile sync failed (non-fatal)", str(e_prof))
+
         # Risposta finale
         response_data = {
             "success": True,
@@ -886,6 +1010,15 @@ def sync_data():
             announcements_data = extract_promemoria(dashboard_data)
         except:
              pass
+
+        # ✅ NEW: Update Profile Activity in Supabase during Sync
+        if supabase:
+            try:
+                profile_id = f"{school}:{user.lower()}:{profile_index}"
+                supabase.table("profiles").update({"last_active": datetime.now().isoformat()}).eq("id", profile_id).execute()
+                debug_log(f"👤 Profile activity updated: {profile_id}")
+            except Exception as e_sync_prof:
+                debug_log("⚠️ Profile sync update failed (non-fatal)", str(e_sync_prof))
         
         # Return
         return jsonify({
