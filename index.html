@@ -1075,22 +1075,49 @@
             }
         }
 
+        // ✅ Normalize server(Supabase) records to frontend format
+        function normalizePost(p) {
+            return {
+                id: p?.id ?? Date.now(),
+                author: p?.author ?? p?.author_name ?? "Utente",
+                authorId: p?.authorId ?? p?.author_id ?? null,
+                class: p?.class ?? "5B",
+                text: p?.text ?? "",
+                image: p?.image ?? null,
+                anon: !!(p?.anon ?? false),
+                likes: typeof p?.likes === 'number' ? p.likes : 0,
+                liked: !!(p?.liked ?? false),
+                comments: Array.isArray(p?.comments) ? p.comments : []
+            };
+        }
+
+        function normalizeMarketItem(i) {
+            return {
+                id: i?.id ?? Date.now(),
+                title: i?.title ?? "",
+                price: i?.price ?? "",
+                image: i?.image ?? null,
+                seller: i?.seller ?? i?.seller_name ?? "Utente",
+                sellerId: i?.sellerId ?? i?.seller_id ?? null
+            };
+        }
+
         // ⭐ PERSISTENCE HELPERS (New API)
         async function fetchFeed() {
             try {
                 const res = await fetch(`${API_BASE_URL}/api/posts`);
                 const data = await res.json();
                 if (data.success) {
-                    state.posts = data.data || [];
+                    state.posts = (data.data || []).map(normalizePost);
                     localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
-                    console.log("📝 Feed (server) → cache global:", state.posts.length);
+                    console.log("📝 Feed (server) → cache global & normalized:", state.posts.length);
                 } else {
                     throw new Error(data.error || 'failed');
                 }
             } catch (e) {
                 console.warn("Feed offline/errore, uso cache:", e.message);
                 const cached = localStorage.getItem(globalKey('posts'));
-                state.posts = cached ? JSON.parse(cached) : [];
+                state.posts = cached ? JSON.parse(cached).map(normalizePost) : [];
             }
         }
 
@@ -1099,16 +1126,16 @@
                 const res = await fetch(`${API_BASE_URL}/api/market`);
                 const data = await res.json();
                 if (data.success) {
-                    state.marketItems = data.data || [];
+                    state.marketItems = (data.data || []).map(normalizeMarketItem);
                     localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
-                    console.log("🛒 Market (server) → cache global:", state.marketItems.length);
+                    console.log("🛒 Market (server) → cache global & normalized:", state.marketItems.length);
                 } else {
                     throw new Error(data.error || 'failed');
                 }
             } catch (e) {
                 console.warn("Market offline/errore, uso cache:", e.message);
                 const cached = localStorage.getItem(globalKey('market'));
-                state.marketItems = cached ? JSON.parse(cached) : [];
+                state.marketItems = cached ? JSON.parse(cached).map(normalizeMarketItem) : [];
             }
         }
 
@@ -2053,7 +2080,7 @@
             if (state.feed.search) {
                 const q = state.feed.search.toLowerCase();
                 displayPosts = displayPosts.filter(p =>
-                    p.author.toLowerCase().includes(q) ||
+                    (p.author || '').toLowerCase().includes(q) ||
                     p.text.toLowerCase().includes(q)
                 );
             }
@@ -2125,7 +2152,7 @@
                 ${displayPosts.length > 0 ? displayPosts.map(post => `
                     <div class="card">
                         <div style="display:flex; gap:12px; margin-bottom:12px;">
-                            <div style="width:40px; height:40px; background:${post.anon ? '#333' : 'var(--blue)'}; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700;">${post.anon ? '?' : post.author[0]}</div>
+                            <div style="width:40px; height:40px; background:${post.anon ? '#333' : 'var(--blue)'}; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700;">${post.anon ? '?' : ((post.author && post.author.length) ? post.author[0] : '?')}</div>
                             <div>
                                 <div style="font-weight:700;">${post.anon ? 'Anonimo' : post.author}</div>
                                 <div style="font-size:12px; opacity:0.6;">${post.anon ? 'Studente' : post.class}</div>
