@@ -214,7 +214,7 @@
 
         .view {
             contain: layout style;
-            min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 96px);
+            min-height: 100vh;
         }
 
         /* Assicurati che html abbia background: elimina bande bianche su iOS */
@@ -238,36 +238,40 @@
             -webkit-transform: translateZ(0);
         }
 
-        /* ✅ Body full-height, no scroll (iOS stable) */
+        /* ✅ body scrolla (iOS friendly) */
         body {
             font-family: 'Outfit', -apple-system, sans-serif;
-            margin: 0;
-            padding: 0;
-            width: 100vw;
-            height: 100dvh;
-            overflow: hidden;
-
-            color: var(--text-main);
-            background: linear-gradient(to bottom, #000000 0%, #0a1128 100%);
-            background-attachment: fixed;
-        }
-
-        /* ✅ #app fa lo scroll */
-        #app {
-            width: 100%;
-            height: 100%;
-            max-width: 100vw;
-
             overflow-y: auto;
             overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
-            scroll-behavior: smooth;
 
-            padding-top: calc(var(--safe-top) + 8px);
-            padding-bottom: calc(110px + var(--safe-bottom));
+            /* Usa unità viewport robuste */
+            min-height: 100vh;
+            min-height: 100svh;
+            min-height: 100dvh;
+
+            color: var(--text-main);
+        }
+
+        /* ✅ #app NON deve più fare scroll */
+        #app {
+            height: auto;
+            overflow: visible;
+            width: 100%;
+            max-width: 100vw;
+
+            /* safe area: solo padding, non height */
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+            /* spazio per bottom nav + safe area */
             transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
+        /* Ogni view occupa praticamente tutto lo spazio “utile” */
+        .view {
+            contain: layout style;
+            min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 96px);
+        }
 
         /* Bottom nav: “isola” sopra la home indicator, identica tra Android e iOS */
         #bottom-nav {
@@ -1071,49 +1075,22 @@
             }
         }
 
-        // ✅ Normalize server(Supabase) records to frontend format
-        function normalizePost(p) {
-            return {
-                id: p?.id ?? Date.now(),
-                author: p?.author ?? p?.author_name ?? "Utente",
-                authorId: p?.authorId ?? p?.author_id ?? null,
-                class: p?.class ?? "5B",
-                text: p?.text ?? "",
-                image: p?.image ?? null,
-                anon: !!(p?.anon ?? false),
-                likes: typeof p?.likes === 'number' ? p.likes : 0,
-                liked: !!(p?.liked ?? false),
-                comments: Array.isArray(p?.comments) ? p.comments : []
-            };
-        }
-
-        function normalizeMarketItem(i) {
-            return {
-                id: i?.id ?? Date.now(),
-                title: i?.title ?? "",
-                price: i?.price ?? "",
-                image: i?.image ?? null,
-                seller: i?.seller ?? i?.seller_name ?? "Utente",
-                sellerId: i?.sellerId ?? i?.seller_id ?? null
-            };
-        }
-
         // ⭐ PERSISTENCE HELPERS (New API)
         async function fetchFeed() {
             try {
                 const res = await fetch(`${API_BASE_URL}/api/posts`);
                 const data = await res.json();
                 if (data.success) {
-                    state.posts = (data.data || []).map(normalizePost);
+                    state.posts = data.data || [];
                     localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
-                    console.log("📝 Feed (server) → cache global & normalized:", state.posts.length);
+                    console.log("📝 Feed (server) → cache global:", state.posts.length);
                 } else {
                     throw new Error(data.error || 'failed');
                 }
             } catch (e) {
                 console.warn("Feed offline/errore, uso cache:", e.message);
                 const cached = localStorage.getItem(globalKey('posts'));
-                state.posts = cached ? JSON.parse(cached).map(normalizePost) : [];
+                state.posts = cached ? JSON.parse(cached) : [];
             }
         }
 
@@ -1122,16 +1099,16 @@
                 const res = await fetch(`${API_BASE_URL}/api/market`);
                 const data = await res.json();
                 if (data.success) {
-                    state.marketItems = (data.data || []).map(normalizeMarketItem);
+                    state.marketItems = data.data || [];
                     localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
-                    console.log("🛒 Market (server) → cache global & normalized:", state.marketItems.length);
+                    console.log("🛒 Market (server) → cache global:", state.marketItems.length);
                 } else {
                     throw new Error(data.error || 'failed');
                 }
             } catch (e) {
                 console.warn("Market offline/errore, uso cache:", e.message);
                 const cached = localStorage.getItem(globalKey('market'));
-                state.marketItems = cached ? JSON.parse(cached).map(normalizeMarketItem) : [];
+                state.marketItems = cached ? JSON.parse(cached) : [];
             }
         }
 
@@ -1510,8 +1487,7 @@
             if (state.view !== v) {
                 state.view = v;
                 render();
-                // ✅ Reset scroll on #app (the scrolling container)
-                if (app) app.scrollTop = 0;
+                window.scrollTo(0, 0); // Reset scroll position on the body
             }
         }
 
@@ -2049,7 +2025,7 @@
                 ${filtered.map(u => `
                     <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor:pointer;">
                         <div style="position: relative; margin-right: 16px;">
-                            <div style="width: 50px; height: 50px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;">${(u.name && u.name.length) ? u.name[0] : '?'}</div>
+                            <div style="width: 50px; height: 50px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;">${u.name[0]}</div>
                             ${u.status === 'online' ? `<div style="position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; background: var(--green); border: 2px solid black; border-radius: 50%;"></div>` : ''}
                         </div>
                         <div style="flex: 1;">
@@ -2077,7 +2053,7 @@
             if (state.feed.search) {
                 const q = state.feed.search.toLowerCase();
                 displayPosts = displayPosts.filter(p =>
-                    (p.author || '').toLowerCase().includes(q) ||
+                    p.author.toLowerCase().includes(q) ||
                     p.text.toLowerCase().includes(q)
                 );
             }
@@ -2134,7 +2110,7 @@
                         </div>
                         ${foundUsers.map(u => `
                              <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 16px; margin-bottom: 8px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05);">
-                                <div style="width: 36px; height: 36px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 12px; border: 1px solid rgba(255,255,255,0.1);">${(u.name && u.name.length) ? u.name[0] : '?'}</div>
+                                <div style="width: 36px; height: 36px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 12px; border: 1px solid rgba(255,255,255,0.1);">${u.name[0]}</div>
                                 <div style="flex:1;">
                                     <div style="font-weight: 600; font-size: 15px;">${u.name}</div>
                                     <div style="color: var(--text-secondary); font-size: 11px;">Classe ${u.class}</div>
@@ -2149,7 +2125,7 @@
                 ${displayPosts.length > 0 ? displayPosts.map(post => `
                     <div class="card">
                         <div style="display:flex; gap:12px; margin-bottom:12px;">
-                            <div style="width:40px; height:40px; background:${post.anon ? '#333' : 'var(--blue)'}; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700;">${post.anon ? '?' : ((post.author && post.author.length) ? post.author[0] : '?')}</div>
+                            <div style="width:40px; height:40px; background:${post.anon ? '#333' : 'var(--blue)'}; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700;">${post.anon ? '?' : post.author[0]}</div>
                             <div>
                                 <div style="font-weight:700;">${post.anon ? 'Anonimo' : post.author}</div>
                                 <div style="font-size:12px; opacity:0.6;">${post.anon ? 'Studente' : post.class}</div>
@@ -3192,7 +3168,7 @@
                 if (r.type === 'person') {
                     return `
                         <div class="glass-list-item" style="margin-bottom: 0; display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 36px; height: 36px; background: var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">${(r.name && r.name.length) ? r.name[0] : '?'}</div>
+                            <div style="width: 36px; height: 36px; background: var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">${r.name[0]}</div>
                             <div>
                                 <div style="font-weight: 600;">${r.name}</div>
                                 <div style="font-size: 11px; color: var(--text-muted);">${r.class}</div>
