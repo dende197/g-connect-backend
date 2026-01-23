@@ -214,7 +214,7 @@
 
         .view {
             contain: layout style;
-            min-height: 100vh;
+            min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 96px);
         }
 
         /* Assicurati che html abbia background: elimina bande bianche su iOS */
@@ -238,40 +238,36 @@
             -webkit-transform: translateZ(0);
         }
 
-        /* ✅ body scrolla (iOS friendly) */
+        /* ✅ Body full-height, no scroll (iOS stable) */
         body {
             font-family: 'Outfit', -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100dvh;
+            overflow: hidden;
+
+            color: var(--text-main);
+            background: linear-gradient(to bottom, #000000 0%, #0a1128 100%);
+            background-attachment: fixed;
+        }
+
+        /* ✅ #app fa lo scroll */
+        #app {
+            width: 100%;
+            height: 100%;
+            max-width: 100vw;
+
             overflow-y: auto;
             overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
 
-            /* Usa unità viewport robuste */
-            min-height: 100vh;
-            min-height: 100svh;
-            min-height: 100dvh;
-
-            color: var(--text-main);
-        }
-
-        /* ✅ #app NON deve più fare scroll */
-        #app {
-            height: auto;
-            overflow: visible;
-            width: 100%;
-            max-width: 100vw;
-
-            /* safe area: solo padding, non height */
-            padding-top: env(safe-area-inset-top, 0px);
-            padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
-            /* spazio per bottom nav + safe area */
+            padding-top: calc(var(--safe-top) + 8px);
+            padding-bottom: calc(110px + var(--safe-bottom));
             transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* Ogni view occupa praticamente tutto lo spazio “utile” */
-        .view {
-            contain: layout style;
-            min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 96px);
-        }
 
         /* Bottom nav: “isola” sopra la home indicator, identica tra Android e iOS */
         #bottom-nav {
@@ -1514,7 +1510,8 @@
             if (state.view !== v) {
                 state.view = v;
                 render();
-                window.scrollTo(0, 0); // Reset scroll position on the body
+                // ✅ Reset scroll on #app (the scrolling container)
+                if (app) app.scrollTop = 0;
             }
         }
 
@@ -2052,7 +2049,7 @@
                 ${filtered.map(u => `
                     <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor:pointer;">
                         <div style="position: relative; margin-right: 16px;">
-                            <div style="width: 50px; height: 50px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;">${u.name[0]}</div>
+                            <div style="width: 50px; height: 50px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;">${(u.name && u.name.length) ? u.name[0] : '?'}</div>
                             ${u.status === 'online' ? `<div style="position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; background: var(--green); border: 2px solid black; border-radius: 50%;"></div>` : ''}
                         </div>
                         <div style="flex: 1;">
@@ -2137,7 +2134,7 @@
                         </div>
                         ${foundUsers.map(u => `
                              <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 16px; margin-bottom: 8px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05);">
-                                <div style="width: 36px; height: 36px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 12px; border: 1px solid rgba(255,255,255,0.1);">${u.name[0]}</div>
+                                <div style="width: 36px; height: 36px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 12px; border: 1px solid rgba(255,255,255,0.1);">${(u.name && u.name.length) ? u.name[0] : '?'}</div>
                                 <div style="flex:1;">
                                     <div style="font-weight: 600; font-size: 15px;">${u.name}</div>
                                     <div style="color: var(--text-secondary); font-size: 11px;">Classe ${u.class}</div>
@@ -3195,7 +3192,7 @@
                 if (r.type === 'person') {
                     return `
                         <div class="glass-list-item" style="margin-bottom: 0; display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 36px; height: 36px; background: var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">${r.name[0]}</div>
+                            <div style="width: 36px; height: 36px; background: var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">${(r.name && r.name.length) ? r.name[0] : '?'}</div>
                             <div>
                                 <div style="font-weight: 600;">${r.name}</div>
                                 <div style="font-size: 11px; color: var(--text-muted);">${r.class}</div>
