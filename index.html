@@ -218,42 +218,52 @@
         }
 
         /* Assicurati che html abbia background: elimina bande bianche su iOS */
-        html {
-            background: #000;
-            height: 100%;
-        }
-
-        /* Body full-height, usa 100dvh (viewport dinamico) e gestisci safe-area */
+        html,
         body {
-            font-family: 'Outfit', -apple-system, sans-serif;
             margin: 0;
             padding: 0;
-            width: 100vw;
-            min-height: 100dvh;
-            height: 100dvh;
-            overflow: hidden;
-            /* lo scroll lo fa #app */
-
-            color: var(--text-main);
-            background: linear-gradient(to bottom, #000000 0%, #0a1128 100%);
-            background-attachment: fixed;
-        }
-
-        /* Wrapper scrollabile: aggiungi padding-top e bottom per non coprire status/home bar */
-        #app {
             width: 100%;
             height: 100%;
-            max-width: 100vw;
+            background: #000;
+        }
 
+        /* Sfondo sempre fullscreen, elimina bande anche se iOS stretch-a */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: linear-gradient(to bottom, #000000 0%, #0a1128 100%);
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+        }
+
+        /* ✅ body scrolla (iOS friendly) */
+        body {
+            font-family: 'Outfit', -apple-system, sans-serif;
             overflow-y: auto;
             overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
-            scroll-behavior: smooth;
 
-            padding-top: calc(var(--safe-top) + 8px);
-            /* spazio per orologio / notch */
-            padding-bottom: calc(96px + var(--safe-bottom));
-            /* altezza nav (~72) + margine */
+            /* Usa unità viewport robuste */
+            min-height: 100vh;
+            min-height: 100svh;
+            min-height: 100dvh;
+
+            color: var(--text-main);
+        }
+
+        /* ✅ #app NON deve più fare scroll */
+        #app {
+            height: auto;
+            overflow: visible;
+            width: 100%;
+            max-width: 100vw;
+
+            /* safe area: solo padding, non height */
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+            /* spazio per bottom nav + safe area */
             transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
@@ -267,7 +277,7 @@
         #bottom-nav {
             position: fixed;
             left: 50%;
-            bottom: calc(var(--safe-bottom) + 16px);
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
             /* subito sopra home indicator */
             transform: translateX(-50%);
 
@@ -1386,6 +1396,7 @@
             if (state.view !== v) {
                 state.view = v;
                 render();
+                window.scrollTo(0, 0); // Reset scroll position on the body
             }
         }
 
