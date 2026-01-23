@@ -935,8 +935,8 @@
             reminders: [],
             syncing: false,
             selectedDay: new Date().getDate(),
-            stressLevels: JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}'),
-            plannedTasks: JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}')
+            stressLevels: {},
+            plannedTasks: {}
         };
 
         const app = document.getElementById('app');
@@ -1008,6 +1008,12 @@
                         state.promemoria = [];
                     }
                 }
+
+                // ⭐ RE-HYDRATE: Carica planner dal namespace del profilo
+                state.plannedTasks = JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}');
+                state.stressLevels = JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}');
+                state.reminders = JSON.parse(localStorage.getItem(lsKey('reminders')) || '[]');
+                console.log("🧩 Planner re-idratato dal profilo:", Object.keys(state.plannedTasks).length, "giorni pianificati");
 
                 state.isLoggedIn = true;
                 state.didup.connected = true;
@@ -1353,6 +1359,11 @@
         let saveTasksTimeout = null;
 
         function saveTasks() {
+            if (!sessionManager.isLoggedIn() || !sessionManager.load()) {
+                console.warn("🔒 skip saveTasks: non loggato (evito scritture guest)");
+                return;
+            }
+
             if (saveTasksTimeout) {
                 clearTimeout(saveTasksTimeout);
             }
@@ -2833,6 +2844,12 @@
                         localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
                         console.log("💾 User salvato:", state.user.name);
                     }
+
+                    // ⭐ RE-HYDRATE: Carica planner dal namespace del nuovo profilo
+                    state.plannedTasks = JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}');
+                    state.stressLevels = JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}');
+                    state.reminders = JSON.parse(localStorage.getItem(lsKey('reminders')) || '[]');
+                    console.log("🧩 Planner re-idratato dopo login:", Object.keys(state.plannedTasks).length, "giorni");
 
                     // ⭐ Carica compiti con updateTasks per preservare date
                     if (data.tasks && data.tasks.length > 0) {
