@@ -11,6 +11,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/main.min.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 
@@ -61,11 +62,88 @@
 
         /* Calendar container: prevenire layout shift e velocizzare paint */
         #calendar {
-            min-height: 320px;
-            /* assicura spazio, evita jump */
+            min-height: 340px;
+            /* spazio minimo, evita jump */
             content-visibility: auto;
             /* il browser salta paint finché non serve */
             contain: layout style paint;
+        }
+
+        /* 🗓️ FullCalendar Overrides - Glass Aesthetic */
+        .fc-theme-standard td,
+        .fc-theme-standard th,
+        .fc-scrollgrid {
+            border: none !important;
+        }
+
+        .fc-col-header-cell-cushion {
+            color: rgba(255, 255, 255, 0.6) !important;
+            text-transform: uppercase;
+            font-size: 11px !important;
+            font-weight: 800;
+            padding: 8px 0 !important;
+        }
+
+        .fc-toolbar-title {
+            color: var(--text-main) !important;
+            font-size: 18px !important;
+            letter-spacing: -0.01em;
+        }
+
+        .fc-daygrid-day-frame {
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 2px;
+            min-height: 62px !important;
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .fc-daygrid-day-number {
+            color: rgba(255, 255, 255, 0.8) !important;
+            font-weight: 700 !important;
+            padding: 6px !important;
+        }
+
+        .fc-daygrid-day.fc-day-today .fc-daygrid-day-frame {
+            background: rgba(37, 99, 235, 0.18);
+            border: 1px solid rgba(37, 99, 235, 0.45);
+        }
+
+        .fc .fc-button-primary {
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: white;
+            backdrop-filter: blur(8px);
+        }
+
+        .fc .fc-button-primary:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .fc .fc-button-active {
+            background: var(--primary) !important;
+            color: white !important;
+        }
+
+        .fc-event,
+        .fc-daygrid-event {
+            border: none !important;
+            border-radius: 10px !important;
+            padding: 6px 8px !important;
+            font-size: 12px !important;
+            line-height: 1.35 !important;
+            color: #fff !important;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+        }
+
+        .fc-daygrid-dot-event .fc-event-title {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* ⚡ HARDWARE ACCELERATION */
@@ -822,9 +900,6 @@
                 render();
             }
 
-            // ⭐ Precarica il calendario in background
-            preloadCalendar();
-
             // ⭐ LOG di debug per verificare persistenza
             console.log("📊 Stato caricato:", {
                 plannedTasks: Object.keys(state.plannedTasks).length,
@@ -1247,7 +1322,6 @@
 
         function navigate(v) {
             if (state.view !== v) {
-                if (v === 'planner') preloadCalendar(); // assicura che sia pronto
                 state.view = v;
                 render();
             }
@@ -1335,105 +1409,105 @@
             updatePlannerCounter();
         }
 
-        // 🔁 Cache/istanza globali
-        let calendarInstance = null;
-        let calendarHostEl = null;
-        let calendarPreloaded = false;
-
         function buildCalendarEventsFromState() {
-            return state.tasks
+            return (state.tasks || [])
                 .filter(t => t.due_date && t.hasValidDate)
-                .map(t => ({
-                    title: `${t.subject}: ${t.text.substring(0, 30)}${t.text.length > 30 ? '...' : ''}`,
-                    start: t.due_date,
-                    color: t.done ? '#30D158' : '#0A84FF',
-                    textColor: t.done ? '#000' : '#fff',
-                    extendedProps: { fullText: t.text, subject: t.subject }
-                }));
+                .map(t => {
+                    const color = getSubjectColor(t.subject || 'Generico');
+                    return {
+                        title: `${t.subject}: ${t.text.substring(0, 48)}${t.text.length > 48 ? '...' : ''}`,
+                        start: t.due_date, // ISO yyyy-mm-dd
+                        color: t.done ? '#30D158' : color,
+                        textColor: t.done ? '#000' : '#fff',
+                        extendedProps: { fullText: t.text, subject: t.subject }
+                    };
+                });
         }
 
-        // Precarica il calendario off-screen
-        function preloadCalendar() {
-            if (calendarPreloaded || typeof FullCalendar === 'undefined') return;
+        function initPlannerCalendar() {
+            const calendarEl = document.getElementById('calendar');
+            if (!calendarEl) return;
 
-            // Contenitore off-screen
-            const hidden = document.createElement('div');
-            hidden.id = 'calendar-preload';
-            hidden.style.position = 'absolute';
-            hidden.style.left = '-100000px';
-            hidden.style.top = '0';
-            hidden.style.width = '800px'; // dimensioni plausibili per layout
-            document.body.appendChild(hidden);
+            // Se già creato, aggiorna solo gli eventi per evitare qualsiasi scatto
+            if (calendarEl._fullCalendar) {
+                const cal = calendarEl._fullCalendar;
+                syncCalendarEvents(cal);
+                cal.updateSize();
+                return;
+            }
 
-            // Crea istanza con eventi correnti
-            calendarInstance = new FullCalendar.Calendar(hidden, {
+            // Calcola Monday di questa settimana e fine della prossima (range visivo 2 settimane)
+            const today = new Date();
+            const d = today.getDay(); // 0=Sun, 1=Mon...
+            const diffToMonday = today.getDate() - (d === 0 ? 6 : d - 1);
+            const startOfWeek = new Date(new Date(today).setDate(diffToMonday));
+            startOfWeek.setHours(0, 0, 0, 0);
+
+            // Crea una vista dayGrid di 2 settimane
+            const calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridTwoWeeks',
-                views: { dayGridTwoWeeks: { type: 'dayGrid', duration: { weeks: 2 } } },
+                views: {
+                    dayGridTwoWeeks: {
+                        type: 'dayGrid',
+                        duration: { weeks: 2 }
+                    }
+                },
                 locale: 'it',
                 themeSystem: 'standard',
-                firstDay: 1,
+                firstDay: 1, // Lunedì
                 height: 'auto',
+                validRange: { start: startOfWeek.toISOString().split('T')[0] },
                 headerToolbar: { left: 'title', center: '', right: 'prev,next' },
-                dayCellContent: (arg) => arg.dayNumberText.replace(/[a-z]/gi, '').trim(),
+                dayCellContent: function (arg) {
+                    // Rimuove eventuali lettere dal numero giorno (es. "1 dom")
+                    return arg.dayNumberText.replace(/[a-z]/gi, '').trim();
+                },
                 events: buildCalendarEventsFromState(),
                 eventClick: function (info) {
+                    // Modale dettaglio compito nello stile app
                     const event = info.event;
-                    const modalContainer = getModalContainer();
-                    if (!modalContainer) return;
-                    modalContainer.innerHTML = `
-        <div class="modal-overlay" onclick="closeModal(event)">
-          <div class="modal-content glass-panel">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-              <h2 style="margin:0;">Dettaglio Compito</h2>
-              <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size:24px;"></i>
-            </div>
-            <div style="margin-bottom:12px;">
-              <div style="font-size:11px; color:var(--blue); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Materia</div>
-              <div style="font-size:18px; font-weight:600; color:white;">${event.extendedProps.subject}</div>
-            </div>
-            <div style="margin-bottom:12px;">
-              <div style="font-size:11px; color:var(--blue); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Descrizione</div>
-              <div style="font-size:16px; color:white; line-height:1.5;">${event.extendedProps.fullText}</div>
-            </div>
-            <div>
-              <div style="font-size:11px; color:var(--blue); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Scadenza</div>
-              <div style="font-size:16px; color:white; display:flex; align-items:center; gap:6px;">
-                <i class="ph ph-calendar"></i>
-                ${new Date(event.start).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
+                    const container = getModalContainer();
+                    if (!container) return;
+                    container.innerHTML = `
+                        <div class="modal-overlay" onclick="closeModal(event)">
+                            <div class="modal-content glass-panel">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                                    <h2 style="margin:0;">Dettaglio Compito</h2>
+                                    <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size:24px;"></i>
+                                </div>
+                                <div style="margin-bottom:12px;">
+                                    <div style="font-size:11px; color: var(--blue); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Materia</div>
+                                    <div style="font-size:18px; font-weight:600; color:white;">${event.extendedProps.subject}</div>
+                                </div>
+                                <div style="margin-bottom:12px;">
+                                    <div style="font-size:11px; color: var(--blue); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Descrizione</div>
+                                    <div style="font-size:16px; color:white; line-height:1.5;">${event.extendedProps.fullText}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size:11px; color: var(--blue); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Scadenza</div>
+                                    <div style="font-size:16px; color:white; display:flex; align-items:center; gap:6px;">
+                                        <i class="ph ph-calendar"></i>
+                                        ${new Date(event.start).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
                 }
             });
 
-            calendarInstance.render();
-            calendarHostEl = hidden;
-            calendarPreloaded = true;
+            calendar.render();
+            calendarEl._fullCalendar = calendar;
         }
 
-        /* === 1) Sync eventi del calendario senza ricrearlo (anti-microscatto) === */
+        // Aggiorna rapidamente tutti gli eventi senza ricreare il calendario
         function syncCalendarEvents(calendar) {
-            const currentCalendar = calendar || calendarInstance;
-            if (!currentCalendar) return;
+            if (!calendar) return;
             const evts = buildCalendarEventsFromState();
-            currentCalendar.batchRendering(() => {
-                currentCalendar.removeAllEvents();
-                evts.forEach(e => currentCalendar.addEvent(e));
+            calendar.batchRendering(() => {
+                calendar.removeAllEvents();
+                evts.forEach(e => calendar.addEvent(e));
             });
-        }
-
-        // Attacca l’istanza pre-caricata al contenitore visibile
-        function attachCalendarTo(containerEl) {
-            if (!containerEl || !calendarInstance || !calendarHostEl) return;
-            if (calendarHostEl.parentNode !== containerEl) {
-                containerEl.innerHTML = '';
-                containerEl.appendChild(calendarHostEl); // muove il nodo
-            }
-            // sync eventi correnti e ridimensiona
-            syncCalendarEvents(calendarInstance);
-            calendarInstance.updateSize();
         }
 
         /* === 2) Aggiorna SOLO la sezione “Agenda della settimana” nel Planner === */
@@ -1496,8 +1570,12 @@
             // lista "Agenda della settimana" in Planner
             if (typeof updateWeeklyAgendaView === 'function') updateWeeklyAgendaView();
 
-            // colori/stato eventi calendario (usa istanza globale se disponibile)
-            syncCalendarEvents();
+            // colori/stato eventi calendario
+            const calendarEl = document.getElementById('calendar');
+            if (calendarEl && calendarEl._fullCalendar) {
+                syncCalendarEvents(calendarEl._fullCalendar);
+                calendarEl._fullCalendar.updateSize();
+            }
         }
 
         function logout() {
@@ -1922,8 +2000,7 @@
 
         function renderPlanner() {
             setTimeout(() => {
-                const calendarEl = document.getElementById('calendar');
-                if (calendarEl) attachCalendarTo(calendarEl);
+                initPlannerCalendar();
             }, 0);
 
             return `
