@@ -840,30 +840,49 @@
         }
 
         async function flushOutbox() {
-            for (const kind of ['posts', 'market']) {
+            for (const kind of ['posts', 'market', 'planner']) {
                 const key = lsKey(`outbox_${kind}`);
                 const list = JSON.parse(localStorage.getItem(key) || '[]');
                 if (!list.length) continue;
-                const endpoint = kind === 'posts' ? `${API_BASE_URL}/api/posts` : `${API_BASE_URL}/api/market`;
+
                 const kept = [];
                 for (const it of list) {
                     try {
-                        const res = await fetch(endpoint, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(it)
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            if (kind === 'posts') {
-                                state.posts = data.data || state.posts;
-                                localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
+                        if (kind === 'planner') {
+                            const userId = it.userId;
+                            const res = await fetch(`${API_BASE_URL}/api/planner/${encodeURIComponent(userId)}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(it.payload)
+                            });
+                            const data = await res.json().catch(() => ({ success: false }));
+                            if (data.success) {
+                                state.plannedTasks = it.payload.plannedTasks || state.plannedTasks;
+                                state.stressLevels = it.payload.stressLevels || state.stressLevels;
+                                localStorage.setItem(lsKey('planned_tasks'), JSON.stringify(state.plannedTasks));
+                                localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels));
                             } else {
-                                state.marketItems = data.data || state.marketItems;
-                                localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
+                                kept.push(it);
                             }
                         } else {
-                            kept.push(it); // keep for next time
+                            const endpoint = kind === 'posts' ? `${API_BASE_URL}/api/posts` : `${API_BASE_URL}/api/market`;
+                            const res = await fetch(endpoint, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(it)
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                                if (kind === 'posts') {
+                                    state.posts = data.data || state.posts;
+                                    localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
+                                } else {
+                                    state.marketItems = data.data || state.marketItems;
+                                    localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
+                                }
+                            } else {
+                                kept.push(it);
+                            }
                         }
                     } catch (e) {
                         kept.push(it);
@@ -1008,6 +1027,9 @@
                 state.reminders = JSON.parse(localStorage.getItem(lsKey('reminders')) || '[]');
                 console.log("🧩 Planner re-idratato dal profilo:", Object.keys(state.plannedTasks).length, "giorni pianificati");
 
+                // 2) Sincronizza da server (source of truth)
+                await fetchPlannerRemote();
+
                 state.isLoggedIn = true;
                 state.didup.connected = true;
 
@@ -1027,11 +1049,11 @@
                     } catch (e) { state.marketItems = []; }
                 }
 
-                // ⭐ Flush outbox (tentativi offline)
-                await flushOutbox();
+                // 2) Sincronizza da server (source of truth)
+                await fetchPlannerRemote();
 
-                // ⭐ Fetch Feed & Market on startup (aggiornerà con dati freschi)
-                await Promise.all([fetchFeed(), fetchMarket()]);
+                // 3) Flush outbox (ora includerà anche planner)
+                await flushOutbox();
 
                 state.view = 'home';
                 render();
@@ -1135,6 +1157,53 @@
                 console.warn("Market offline/errore, uso cache:", e.message);
                 const cached = localStorage.getItem(globalKey('market'));
                 state.marketItems = cached ? JSON.parse(cached).map(normalizeMarketItem) : [];
+            }
+        }
+
+        // Carica planner dal server per il profilo attivo
+        async function fetchPlannerRemote() {
+            const userId = getUserId();
+            if (!sessionManager.isLoggedIn() || !userId || userId === 'guest') return;
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/planner/${encodeURIComponent(userId)}`);
+                const data = await res.json();
+                if (data.success && data.data) {
+                    state.plannedTasks = data.data.plannedTasks || {};
+                    state.stressLevels = data.data.stressLevels || {};
+                    // Cache locale per accesso offline
+                    localStorage.setItem(lsKey('planned_tasks'), JSON.stringify(state.plannedTasks));
+                    localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels));
+                    console.log("✅ Planner remoto caricato → cache locale aggiornata");
+                    notifyPlannerChanged(); // aggiorna UI
+                }
+            } catch (e) {
+                console.warn("Planner remote fetch failed:", e.message);
+                // Fallback: usa cache locale già caricata
+            }
+        }
+
+        // Salva planner sul server quando cambia
+        async function savePlannerRemote() {
+            const userId = getUserId();
+            if (!sessionManager.isLoggedIn() || !userId || userId === 'guest') return;
+
+            const payload = {
+                plannedTasks: state.plannedTasks || {},
+                stressLevels: state.stressLevels || {}
+            };
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/planner/${encodeURIComponent(userId)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                console.log("✅ Planner salvato sul server");
+            } catch (e) {
+                console.warn("Planner remote save failed, aggiungo a outbox:", e.message);
+                enqueueOutbox('planner', { userId, payload });
             }
         }
 
@@ -2335,6 +2404,7 @@
             }
 
             saveTasks();
+            savePlannerRemote();
             updateWeekDayButton(taskId, dateStr);
             notifyPlannerChanged(); // ✅ aggiorna Planner e Home SUBITO
         }
@@ -2844,6 +2914,9 @@
                     state.reminders = JSON.parse(localStorage.getItem(lsKey('reminders')) || '[]');
                     console.log("🧩 Planner re-idratato dopo login:", Object.keys(state.plannedTasks).length, "giorni");
 
+                    // ⭐ Sincronizza da server (source of truth)
+                    await fetchPlannerRemote();
+
                     // ⭐ Carica compiti con updateTasks per preservare date
                     if (data.tasks && data.tasks.length > 0) {
                         updateTasks(data.tasks, false);
@@ -3090,8 +3163,8 @@
                 if (state.reminders && state.reminders.find(x => x.id === id)) {
                     localStorage.setItem(lsKey('reminders'), JSON.stringify(state.reminders));
                 }
-
-                updateTaskUI(id, t.done);
+                savePlannerRemote();
+                updatePlanTaskUI(id, t.done); // Use t.done for the isPlanned argument
                 notifyPlannerChanged(); // ✅ aggiorna colore evento calendario + liste
 
                 const activeModal = document.querySelector('.modal-overlay');
@@ -3265,6 +3338,7 @@
             const todayStr = new Date().toISOString().split('T')[0];
             state.stressLevels[todayStr] = lv;
             saveTasks();
+            savePlannerRemote();
             render();
             showStressModal(); // Refresh modal
         }
@@ -3385,6 +3459,7 @@
             }
 
             saveTasks();
+            savePlannerRemote();
             updatePlanTaskUI(id, state.plannedTasks[todayStr].includes(id));
             updatePlannerCounter();
             notifyPlannerChanged(); // ✅ aggiorna Planner e Home SUBITO
