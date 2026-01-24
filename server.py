@@ -13,9 +13,18 @@ from datetime import datetime
 
 from planner_routes import register_planner_routes
 
+# CREA UNA SOLA ISTANZA DI FLASK
 app = Flask(__name__)
-CORS(app)
 
+# CORS: configura una sola volta con i domini corretti
+CORS(app, origins=[
+    "https://*.netlify.app",
+    "http://127.0.0.1:*",
+    "http://localhost:*",
+    "*"
+])
+
+# REGISTRA LE ROUTE DEL PLANNER SULL'ISTANZA 'app'
 register_planner_routes(app)
 
 # ✅ NEW: Supabase
@@ -33,15 +42,6 @@ CLIENT_ID = "72fd6dea-d0ab-4bb9-8eaa-3ac24c84886c"
 ENDPOINT = "https://www.portaleargo.it/appfamiglia/api/rest/"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36"
 
-app = Flask(__name__)
-
-# CORS configuration
-CORS(app, origins=[
-    "https://*.netlify.app",
-    "http://127.0.0.1:*",
-    "http://localhost:*",
-    "*"
-])
 
 # ============= CONFIGURAZIONE DEBUG =============
 DEBUG_MODE = True  # Imposta False in produzione
@@ -1102,6 +1102,8 @@ def index():
     <ul>
         <li>POST /login - Autenticazione e recupero dati</li>
         <li>POST /sync - Sincronizzazione</li>
+        <li>GET /api/planner/&lt;user_id&gt; - Recupera dati planner personale</li>
+        <li>POST /api/messages - Invia messaggio chat</li>
         <li>POST /debug/dashboard - Visualizza dashboard RAW (DEBUG)</li>
         <li>GET /health - Health check</li>
     </ul>
