@@ -1,3 +1,6 @@
+from planner_routes import register_planner_routes
+app = Flask(__name__)
+register_planner_routes(app)
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import argofamiglia
