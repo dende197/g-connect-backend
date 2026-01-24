@@ -323,18 +323,6 @@
             padding: 12px;
             color: rgba(255, 255, 255, 0.4);
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            transition: all .3s ease;
-            cursor: pointer;
-        }
-
-        .nav-item i {
-            font-size: 24px;
-        }
-
-        .nav-item.active {
-            color: white;
         }
 
         .btn-primary {
@@ -2078,7 +2066,7 @@
                         <div>
                             <div style="position: relative;">
                                 <i class="ph ph-magnifying-glass" style="position:absolute; left:12px; top:10px; color: var(--text-muted); font-size:18px;"></i>
-                                <input type="text" placeholder="Cerca..." onfocus="navigate('feed')" style="padding-left:38px; margin-bottom:0; height:38px;">
+                                <input type="text" placeholder="Cerca persone o materie..." onfocus="navigate('search')" style="padding-left:38px; margin-bottom:0; height:38px;">
                             </div>
                         </div>
                         <div>
@@ -2246,42 +2234,83 @@
             <div class="view" style="padding-top: 0;">
                 <div style="display:flex; align-items:center; gap:10px; margin: 10px 0; padding: 0 12px;">
                      <button onclick="navigate('home')" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;"><i class="ph ph-arrow-left"></i></button>
-                     <h1 style="margin:0; text-align:left;">Community</h1>
+                     <h1 style="margin:0; text-align:left;">Ricerca Globale</h1>
                 </div>
-                <div style="position: relative; padding: 0 12px; margin-bottom: 16px;">
+                <div style="position: relative; padding: 0 12px; margin-bottom: 24px;">
                     <i class="ph ph-magnifying-glass" style="position: absolute; left: 26px; top: 12px; color: var(--text-muted); font-size: 20px;"></i>
-                    <input id="search-input" type="text" placeholder="Cerca studente..." oninput="filterStudents(this.value)" style="padding-left: 44px; margin-bottom: 0; background:rgba(255,255,255,0.1);">
+                    <input id="search-input" type="text" placeholder="Cerca studenti o materie..." oninput="filterContent(this.value)" style="padding-left: 44px; margin-bottom: 0; background:rgba(255,255,255,0.1); border-radius:18px;">
                 </div>
-                <div id="student-list" style="padding: 0 12px;"></div>
+                <div id="search-results" style="padding: 0 12px;">
+                    <div style="text-align:center; padding: 40px; color: var(--text-muted); opacity:0.6;">
+                        <i class="ph ph-sparkle" style="font-size:32px; margin-bottom:12px; display:block;"></i>
+                        Inizia a scrivere per cercare...
+                    </div>
+                </div>
             </div>`;
         }
 
-        function filterStudents(q) {
-            const list = document.getElementById('student-list');
+        function filterContent(q) {
+            const list = document.getElementById('search-results');
             if (!list) return;
-            const filtered = (typeof DIRECTORY !== 'undefined' ? DIRECTORY : []).filter(u => u.name.toLowerCase().includes(q.toLowerCase()));
-            if (filtered.length === 0) {
-                list.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--text-muted);">Nessun utente trovato</div>`;
+            if (!q.trim()) {
+                list.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--text-muted); opacity:0.6;"><i class="ph ph-sparkle" style="font-size:32px; margin-bottom:12px; display:block;"></i>Inizia a scrivere per cercare...</div>`;
                 return;
             }
-            list.innerHTML = `
-                ${q === '' ? `<h3 style="margin-bottom: 12px; text-align:left; color:var(--text-muted); font-size:14px; text-transform:uppercase;">Suggeriti</h3>` : ''}
-                ${filtered.map(u => `
-                    <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 18px; margin-bottom: 10px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05);">
+
+            const query = q.toLowerCase();
+
+            // 1. Filtraggio Studenti
+            const filteredUsers = (typeof DIRECTORY !== 'undefined' ? DIRECTORY : []).filter(u =>
+                u.name.toLowerCase().includes(query) || (u.class && u.class.toLowerCase().includes(query))
+            );
+
+            // 2. Filtraggio Compiti per Materia
+            const filteredTasks = (state.tasks || []).filter(t =>
+                (t.subject && t.subject.toLowerCase().includes(query)) ||
+                (t.text && t.text.toLowerCase().includes(query))
+            );
+
+            let html = '';
+
+            // Sezione Compiti/Materie (Priorità richiesta)
+            if (filteredTasks.length > 0) {
+                html += `<h3 style="margin-bottom: 12px; text-align:left; color:var(--orange); font-size:12px; text-transform:uppercase; letter-spacing:1px;">Compiti e Materie</h3>`;
+                html += filteredTasks.map(t => {
+                    const color = getSubjectColor(t.subject);
+                    return `
+                    <div onclick="navigate('planner')" style="display: flex; align-items: center; padding: 14px; background: rgba(255,255,255,0.05); border-radius: 18px; margin-bottom: 10px; border-left: 4px solid ${color};">
+                        <div style="flex: 1; text-align:left;">
+                            <div style="font-weight: 700; font-size: 15px; color:white;">${t.text}</div>
+                            <div style="color: ${color}; font-size: 11px; font-weight:800; text-transform:uppercase;">${t.subject}</div>
+                        </div>
+                        <i class="ph ph-caret-right" style="color:rgba(255,255,255,0.2);"></i>
+                    </div>`;
+                }).join('');
+            }
+
+            // Sezione Persone
+            if (filteredUsers.length > 0) {
+                html += `<h3 style="margin: 20px 0 12px 0; text-align:left; color:var(--blue); font-size:12px; text-transform:uppercase; letter-spacing:1px;">Persone</h3>`;
+                html += filteredUsers.map(u => `
+                    <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 18px; margin-bottom: 10px; cursor:pointer;">
                         <div style="position: relative; margin-right: 12px;">
-                            ${renderAvatar(u.name, 48)}
-                            ${u.status === 'online' ? `<div style="position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; background: var(--green); border: 2px solid black; border-radius: 50%;"></div>` : ''}
+                            ${renderAvatar(u.name, 44)}
+                            ${u.status === 'online' ? `<div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; background: var(--green); border: 2px solid black; border-radius: 50%;"></div>` : ''}
                         </div>
                         <div style="flex: 1; text-align:left;">
-                            <div style="font-weight: 600; font-size: 16px; color:white;">${u.name}</div>
+                            <div style="font-weight: 600; font-size: 15px; color:white;">${u.name}</div>
                             <div style="color: var(--text-muted); font-size: 12px;">Classe ${u.class}</div>
                         </div>
-                        <button style="background: rgba(37, 99, 235, 0.15); width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: none; color: var(--blue);">
-                            <i class="ph-fill ph-chat-circle" style="font-size: 20px;"></i>
-                        </button>
+                        <i class="ph ph-chat-circle" style="font-size: 20px; color: var(--blue); opacity:0.8;"></i>
                     </div>
-                `).join('')}
-            `;
+                `).join('');
+            }
+
+            if (html === '') {
+                html = `<div style="text-align:center; padding: 40px; color: var(--text-muted);">Nessun risultato trovato per "${q}"</div>`;
+            }
+
+            list.innerHTML = html;
         }
 
         function renderFeed() {
@@ -2479,31 +2508,59 @@
             }).join('');
         }
 
-        /* Stress modal with simple chart */
         function showStressModal() {
             const todayStr = new Date().toISOString().split('T')[0];
             const currentLevel = state.stressLevels[todayStr] || 0;
             const modalContainer = getModalContainer();
             if (!modalContainer) return;
+
+            // Sorting history entries
+            const history = Object.entries(state.stressLevels)
+                .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+                .slice(0, 7);
+
             modalContainer.innerHTML = `
             <div class="modal-overlay" onclick="closeModal(event)">
-              <div class="modal-content glass-panel" style="max-width: 420px; text-align:center;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
-                    <h2 style="margin:0;">Stress Giornaliero</h2>
-                    <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px; color:white;"></i>
+                <div class="modal-content glass-panel" style="max-width: 440px; padding: 24px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
+                        <h2 style="margin:0; color:white;">Stress Monitor</h2>
+                        <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px; color:white;"></i>
+                    </div>
+                    
+                    <div style="text-align:center; margin-bottom: 24px;">
+                        <p style="opacity:0.8; font-size:14px; color:white; margin-bottom:16px;">Come ti senti oggi? Registra il tuo livello per vedere il trend settimanale.</p>
+                        <div style="display:flex; gap:10px;">
+                            ${[1, 2, 3, 4, 5].map(lv => `
+                                <button onclick="setStressLevel(${lv})" style="flex:1; height:48px; border-radius:14px; border:1.5px solid ${currentLevel === lv ? 'var(--blue)' : 'rgba(255,255,255,0.1)'}; background:${currentLevel === lv ? 'rgba(37, 99, 235, 0.2)' : 'rgba(255,255,255,0.03)'}; color:${currentLevel === lv ? 'var(--blue)' : 'white'}; font-weight:800; font-size:18px; cursor:pointer; transition:all 0.2s;">${lv}</button>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="card" style="padding:16px; background:rgba(0,0,0,0.2); border-radius:18px; margin-bottom:24px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                            <span style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Trend Settimanale</span>
+                            <span style="font-size:11px; color:var(--blue); font-weight:700;">LIVE</span>
+                        </div>
+                        <canvas id="stressChart" width="360" height="150" style="width:100%; height:150px;"></canvas>
+                    </div>
+
+                    <div style="text-align:left;">
+                        <h3 style="font-size:12px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Cronologia Recente</h3>
+                        ${history.map(([date, lv]) => {
+                const d = new Date(date);
+                const label = d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
+                return `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+                                <span style="font-size:14px; color:rgba(255,255,255,0.8);">${label}</span>
+                                <div style="display:flex; gap:4px;">
+                                    ${Array.from({ length: 5 }).map((_, i) => `<div style="width:8px; height:8px; border-radius:50%; background:${i < lv ? 'var(--blue)' : 'rgba(255,255,255,0.1)'};"></div>`).join('')}
+                                </div>
+                            </div>`;
+            }).join('')}
+                    </div>
+
+                    <button onclick="closeModal()" class="btn-secondary" style="margin-top:24px; width:100%; height:44px; border-radius:12px; background:rgba(255,255,255,0.05); color:white; border:none; font-weight:700; cursor:pointer;">Fatto</button>
                 </div>
-                <p style="opacity:0.8; font-size:14px; margin-bottom:20px; color:white; text-align:left;">Come ti senti oggi? Registra il tuo livello di stress e guarda l'andamento degli ultimi 14 giorni.</p>
-                <div style="display:flex; gap:10px; margin-bottom:24px;">
-                    ${[1, 2, 3, 4, 5].map(lv => `
-                      <button onclick="setStressLevel(${lv})" style="flex:1; height:44px; border-radius:12px; border:1px solid rgba(255,255,255,0.2); background:${currentLevel === lv ? 'var(--blue)' : 'rgba(255,255,255,0.05)'}; color:white; font-weight:700; cursor:pointer;">${lv}</button>
-                    `).join('')}
-                </div>
-                <div class="card" style="padding:16px; background:rgba(0,0,0,0.3); border-radius:20px;">
-                    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:12px; text-align:left;">Andamento Storico</div>
-                    <canvas id="stressChart" width="320" height="120" style="width:100%; height:120px;"></canvas>
-                </div>
-                <button onclick="closeModal()" class="btn-primary" style="margin-top:20px; width:100%;">Chiudi</button>
-              </div>
             </div>`;
             setTimeout(drawStressChart, 100);
         }
@@ -2524,31 +2581,48 @@
             const h = canvas.height;
             ctx.clearRect(0, 0, w, h);
 
+            const days = 7;
             const points = [];
-            const days = 13;
-            for (let i = days; i >= 0; i--) {
+            for (let i = days - 1; i >= 0; i--) {
                 const d = new Date();
                 d.setDate(d.getDate() - i);
                 const key = d.toISOString().split('T')[0];
                 const val = state.stressLevels[key] || 0;
                 points.push({
-                    x: 20 + (days - i) * ((w - 40) / days),
-                    y: h - 20 - (val * (h - 40) / 5)
+                    x: 30 + ((days - 1 - i) * (w - 60) / (days - 1)),
+                    y: h - 30 - (val * (h - 60) / 5),
+                    val: val
                 });
             }
 
-            // Axes
-            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            // Grid lines (y-axis)
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
             ctx.lineWidth = 1;
+            for (let i = 1; i <= 5; i++) {
+                const y = h - 30 - (i * (h - 60) / 5);
+                ctx.beginPath();
+                ctx.moveTo(30, y); ctx.lineTo(w - 30, y);
+                ctx.stroke();
+            }
+
+            // Area gradient
+            const grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, 'rgba(37, 99, 235, 0.2)');
+            grad.addColorStop(1, 'rgba(37, 99, 235, 0)');
+
+            ctx.fillStyle = grad;
             ctx.beginPath();
-            ctx.moveTo(20, 10); ctx.lineTo(20, h - 20);
-            ctx.lineTo(w - 10, h - 20);
-            ctx.stroke();
+            ctx.moveTo(points[0].x, h - 30);
+            points.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.lineTo(points[points.length - 1].x, h - 30);
+            ctx.closePath();
+            ctx.fill();
 
             // Line
             ctx.strokeStyle = 'var(--blue)';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 4;
             ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
             ctx.beginPath();
             points.forEach((p, i) => {
                 if (i === 0) ctx.moveTo(p.x, p.y);
@@ -2556,12 +2630,22 @@
             });
             ctx.stroke();
 
+            // Glow
+            ctx.shadowBlur = 15; ctx.shadowColor = 'var(--blue)';
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
             // Dots
-            ctx.fillStyle = 'var(--blue)';
             points.forEach(p => {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-                ctx.fill();
+                if (p.val > 0) {
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'var(--blue)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
             });
         }
         function showPlanWeekModal() {
@@ -2834,6 +2918,67 @@
         }
 
         /* --- Modals --- */
+
+        function openNewPostModal() {
+            const modalContainer = getModalContainer();
+            if (!modalContainer) return;
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" onclick="closeModal(event)">
+                <div class="modal-content glass-panel" style="max-width: 500px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h2 style="margin:0; color:white;">Crea Post</h2>
+                        <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px; color:white;"></i>
+                    </div>
+                    
+                    <textarea id="new-post-text" placeholder="A cosa stai pensando?" style="height:110px; margin-bottom:16px; width:100%; border-radius:14px;"></textarea>
+                    
+                    <!-- Poll Creator Section -->
+                    <div id="poll-creator-ui" style="display:none; margin-bottom:16px; background:rgba(255,255,255,0.05); padding:16px; border-radius:14px; border:1px solid rgba(255,255,255,0.1);">
+                        <div style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-bottom:12px;">Opzioni Sondaggio</div>
+                        <div id="poll-options-container" style="display:flex; flex-direction:column; gap:8px;">
+                            <input class="poll-opt-input" placeholder="Opzione 1" style="margin-bottom:0; background:rgba(255,255,255,0.08);">
+                            <input class="poll-opt-input" placeholder="Opzione 2" style="margin-bottom:0; background:rgba(255,255,255,0.08);">
+                        </div>
+                        <button onclick="addPollOption()" style="background:none; border:none; color:var(--blue); font-size:13px; font-weight:700; margin-top:10px; cursor:pointer;">+ Aggiungi Opzione</button>
+                    </div>
+
+                    <div style="display:flex; gap:10px; margin-bottom:20px;">
+                        <button onclick="togglePollCreatorUI()" style="flex:1; background:rgba(37, 99, 235, 0.1); border:1px solid rgba(37, 99, 235, 0.2); height:44px; border-radius:12px; color:var(--blue); display:flex; align-items:center; justify-content:center; gap:8px; font-weight:600; cursor:pointer;">
+                            <i class="ph ph-chart-bar"></i> Sondaggio
+                        </button>
+                        <label style="flex:1; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); height:44px; border-radius:12px; color:white; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:600; cursor:pointer;">
+                            <i class="ph ph-image"></i> Foto
+                            <input type="file" id="post-image-input" accept="image/*" style="display:none;" onchange="handleImagePreview(this)">
+                        </label>
+                    </div>
+
+                    <div id="image-preview" style="margin-bottom:16px;"></div>
+
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
+                        <input type="checkbox" id="post-anon-toggle" style="width:20px; height:20px; cursor:pointer;">
+                        <label for="post-anon-toggle" style="color:white; font-size:14px; cursor:pointer;">Pubblica in forma anonima</label>
+                    </div>
+
+                    <button onclick="publishPost()" class="btn-primary" style="width:100%; height:50px; font-size:16px;">Pubblica Post</button>
+                </div>
+            </div>`;
+        }
+
+        function togglePollCreatorUI() {
+            const ui = document.getElementById('poll-creator-ui');
+            if (ui) ui.style.display = ui.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function addPollOption() {
+            const container = document.getElementById('poll-options-container');
+            if (!container) return;
+            const input = document.createElement('input');
+            input.className = 'poll-opt-input';
+            input.placeholder = `Opzione ${container.children.length + 1}`;
+            input.style.marginBottom = '0';
+            input.style.background = 'rgba(255,255,255,0.08)';
+            container.appendChild(input);
+        }
 
         function openArgoLogin() {
             const modalContainer = getModalContainer();
@@ -3183,27 +3328,49 @@
         }
 
         async function publishPost() {
-            const text = document.getElementById('new-post-text').value;
-            const isAnon = document.getElementById('post-anon-toggle').checked;
+            const textEl = document.getElementById('new-post-text');
+            const text = textEl ? textEl.value.trim() : "";
+            const isAnon = document.getElementById('post-anon-toggle')?.checked || false;
             const imgPreview = document.querySelector('#image-preview img');
+            const pollUI = document.getElementById('poll-creator-ui');
+            const isPoll = pollUI && pollUI.style.display === 'block';
 
-            if (text) {
-                const newPost = {
-                    id: Date.now(),
-                    author: isAnon ? "Studente" : (state.user.name || "Utente"),
-                    authorId: getUserId(),
-                    class: isAnon ? "5B" : (state.user.class || "5B"),
-                    text: text,
-                    likes: 0,
-                    liked: false,
-                    anon: isAnon,
-                    image: imgPreview ? imgPreview.src : null,
-                    comments: []
-                };
-                await submitPost(newPost);
-                closeModal();
-                render();
+            if (!text && !imgPreview) return;
+
+            const newPost = {
+                id: Date.now(),
+                author: isAnon ? "Studente" : (state.user.name || "Utente"),
+                authorId: getUserId(),
+                class: isAnon ? "Studente" : (state.user.class || "5B"),
+                text: text,
+                likes: 0,
+                liked: false,
+                anon: isAnon,
+                type: isPoll ? 'poll' : 'text',
+                image: imgPreview ? imgPreview.src : null,
+                comments: [],
+                pinned: false
+            };
+
+            if (isPoll) {
+                const optInputs = document.querySelectorAll('.poll-opt-input');
+                newPost.pollOptions = Array.from(optInputs).map(i => i.value.trim()).filter(v => v !== '');
+                newPost.pollVotes = {};
+                newPost.pollOptions.forEach(o => newPost.pollVotes[o] = 0);
             }
+
+            // Aggiungi localmente per feedback immediato
+            state.posts.unshift(newPost);
+
+            // Invia al server
+            try {
+                await submitPost(newPost);
+            } catch (e) {
+                console.error("Errore invio post:", e);
+            }
+
+            closeModal();
+            render();
         }
 
         async function publishItem() {
@@ -3396,140 +3563,6 @@
         function setFeedClass(c) {
             state.feed.classFilter = c;
             render();
-        }
-        function showSearchModal() {
-            modalContainer.innerHTML = `
-                <div class="modal-overlay" onclick="closeModal(event)">
-                    <div class="modal-content glass-panel" style="max-width: 400px; padding: 24px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2 style="margin:0;">Cerca</h2>
-                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
-                        </div>
-                        
-                        <div style="display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none;">
-                            <div onclick="setSearchFilter('tutti')" id="filter-tutti" class="search-filter-pill active">Tutti</div>
-                            <div onclick="setSearchFilter('alunni')" id="filter-alunni" class="search-filter-pill">Alunni</div>
-                            <div onclick="setSearchFilter('professori')" id="filter-professori" class="search-filter-pill">Professori</div>
-                            <div onclick="setSearchFilter('materie')" id="filter-materie" class="search-filter-pill">Materie</div>
-                        </div>
-
-                        <div class="search-bar" style="margin-bottom: 20px; background: rgba(255,255,255,0.1);">
-                            <i class="ph-bold ph-magnifying-glass"></i>
-                            <input type="text" id="global-search-input" placeholder="Cerca..." oninput="performGlobalSearch(this.value)" style="background: transparent; border: none; color: white; width: 100%; padding: 8px;">
-                        </div>
-
-                        <div id="search-results" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
-                            <div style="text-align: center; opacity: 0.5; padding: 20px;">Inizia a scrivere per cercare...</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            state.activeSearchFilter = 'tutti';
-        }
-
-        function setSearchFilter(f) {
-            state.activeSearchFilter = f;
-            document.querySelectorAll('.search-filter-pill').forEach(p => p.classList.remove('active'));
-            document.getElementById(`filter-${f}`).classList.add('active');
-            performGlobalSearch(document.getElementById('global-search-input').value);
-        }
-
-        function performGlobalSearch(q) {
-            const resultsEl = document.getElementById('search-results');
-            if (!q || q.length < 2) {
-                resultsEl.innerHTML = '<div style="text-align: center; opacity: 0.5; padding: 20px;">Inizia a scrivere per cercare...</div>';
-                return;
-            }
-
-            let results = [];
-            const query = q.toLowerCase();
-
-            if (state.activeSearchFilter === 'tutti' || state.activeSearchFilter === 'alunni' || state.activeSearchFilter === 'professori') {
-                const dirResults = DIRECTORY.filter(person => {
-                    if (state.activeSearchFilter === 'alunni' && person.class === 'Docente') return false;
-                    if (state.activeSearchFilter === 'professori' && person.class !== 'Docente') return false;
-                    return person.name.toLowerCase().includes(query);
-                });
-                results = results.concat(dirResults.map(p => ({ type: 'person', ...p })));
-            }
-
-            if (state.activeSearchFilter === 'tutti' || state.activeSearchFilter === 'materie') {
-                const taskResults = state.tasks.filter(t => t.subject.toLowerCase().includes(query) || t.text.toLowerCase().includes(query));
-                results = results.concat(taskResults.map(t => ({ type: 'task', ...t })));
-            }
-
-            if (results.length === 0) {
-                resultsEl.innerHTML = '<div style="text-align: center; opacity: 0.5; padding: 20px;">Nessun risultato trovato</div>';
-                return;
-            }
-
-            resultsEl.innerHTML = results.map(r => {
-                if (r.type === 'person') {
-                    return `
-                        <div class="glass-list-item" style="margin-bottom: 0; display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 36px; height: 36px; background: var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">${r.name[0]}</div>
-                            <div>
-                                <div style="font-weight: 600;">${r.name}</div>
-                                <div style="font-size: 11px; color: var(--text-muted);">${r.class}</div>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    return `
-                        <div class="glass-list-item" style="margin-bottom: 0;">
-                            <div style="font-size: 11px; color: var(--blue); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">${r.subject}</div>
-                            <div style="font-weight: 500;">${r.text}</div>
-                            <div style="font-size: 10px; color: var(--orange); margin-top: 4px;">Scadenza: ${r.due_date}</div>
-                        </div>
-                    `;
-                }
-            }).join('');
-        }
-
-        function showStressModal() {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const currentLevel = state.stressLevels[todayStr] || 0;
-
-            modalContainer.innerHTML = `
-                <div class="modal-overlay" onclick="closeModal(event)">
-                    <div class="modal-content glass-panel" style="max-width: 400px; padding: 24px; text-align: center;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2 style="margin:0;">Stress Giornaliero</h2>
-                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
-                        </div>
-                        <p style="opacity: 0.7; margin-bottom: 24px;">Come ti senti oggi? Registrare il tuo livello di stress ci aiuta a ottimizzare il tuo planner.</p>
-                        
-                        <div style="display: flex; justify-content: space-between; gap: 10px; margin-bottom: 30px;">
-                            ${[1, 2, 3, 4, 5].map(lv => {
-                const colors = ['', '#4ade80', '#fbbf24', '#f87171', '#ef4444', '#7f1d1d'];
-                const color = colors[lv];
-                const isActive = currentLevel === lv;
-                return `
-                                    <div onclick="setStressLevel(${lv})" style="flex: 1; aspect-ratio: 1; border-radius: 12px; background: ${isActive ? color : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isActive ? color : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; transform: ${isActive ? 'scale(1.1)' : 'scale(1)'};">
-                                        <span style="font-size: 20px; font-weight: 800; color: ${isActive ? 'white' : 'rgba(255,255,255,0.3)'};">${lv}</span>
-                                    </div>
-                                `;
-            }).join('')}
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px; opacity: 0.5;">
-                            <div style="text-align: left;"><i class="ph ph-leaf"></i> Rilassato</div>
-                            <div style="text-align: right;">Esaurito <i class="ph ph-fire"></i></div>
-                        </div>
-
-                        <button onclick="closeModal()" class="btn-primary" style="margin-top: 24px;">Conferma</button>
-                    </div>
-                </div>
-            `;
-        }
-
-        function setStressLevel(lv) {
-            const todayStr = new Date().toISOString().split('T')[0];
-            state.stressLevels[todayStr] = lv;
-            saveTasks();
-            savePlannerRemote();
-            render();
-            showStressModal(); // Refresh modal
         }
 
         function showOrganizeStudyModal() {
