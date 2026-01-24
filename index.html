@@ -1171,10 +1171,37 @@
                 if (data.success && data.data) {
                     state.plannedTasks = data.data.plannedTasks || {};
                     state.stressLevels = data.data.stressLevels || {};
+                    const details = data.data.plannedDetails || {};
+
                     // Cache locale per accesso offline
                     localStorage.setItem(lsKey('planned_tasks'), JSON.stringify(state.plannedTasks));
                     localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels));
-                    console.log("✅ Planner remoto caricato → cache locale aggiornata");
+
+                    // Se i compiti non sono ancora caricati (o mancano alcuni ID), idrata con snapshot
+                    const plannedIds = [...new Set(Object.values(state.plannedTasks).flat())];
+                    const missing = plannedIds.filter(id => !state.tasks.find(t => t.id === id));
+                    if (missing.length && details && Object.keys(details).length) {
+                        missing.forEach(id => {
+                            const d = details[id];
+                            if (!d) return;
+                            const dateObj = parseArgoDate(d.due_date);
+                            state.tasks.push({
+                                id,
+                                text: d.text,
+                                subject: d.subject,
+                                due_date: d.due_date,
+                                display_date: d.due_date,
+                                dateObj,
+                                hasValidDate: !isNaN(dateObj.getTime()),
+                                done: false
+                            });
+                        });
+                        // ordina e salva
+                        state.tasks.sort((a, b) => (a.dateObj || 0) - (b.dateObj || 0));
+                        saveTasks();
+                    }
+
+                    console.log("✅ Planner remoto caricato → cache locale aggiornata (idratazione:", missing?.length || 0, "items)");
                     notifyPlannerChanged(); // aggiorna UI
                 }
             } catch (e) {
@@ -1188,9 +1215,29 @@
             const userId = getUserId();
             if (!sessionManager.isLoggedIn() || !userId || userId === 'guest') return;
 
+            // Costruisci uno snapshot minimale dei compiti pianificati (per render su altri device)
+            const plannedDetails = {};
+            try {
+                for (const [dateStr, ids] of Object.entries(state.plannedTasks || {})) {
+                    ids.forEach(id => {
+                        const t = state.tasks.find(x => x.id === id);
+                        if (t) {
+                            plannedDetails[id] = {
+                                text: t.text,
+                                subject: t.subject,
+                                due_date: t.due_date
+                            };
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn("build plannedDetails failed:", e.message);
+            }
+
             const payload = {
                 plannedTasks: state.plannedTasks || {},
-                stressLevels: state.stressLevels || {}
+                stressLevels: state.stressLevels || {},
+                plannedDetails
             };
 
             try {
