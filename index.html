@@ -17,47 +17,36 @@
 
     <style>
         :root {
-            /* Safe area variables (iOS notch / home indicator) */
             --safe-top: env(safe-area-inset-top, 0px);
             --safe-bottom: env(safe-area-inset-bottom, 0px);
-            --safe-left: env(safe-area-inset-left, 0px);
             --safe-right: env(safe-area-inset-right, 0px);
 
-            /* 🌌 COSMIC PALETTE - LIQUID GLASS V2 */
+            /* Palette */
             --bg-deep: #000000;
-            --bg-gradient: linear-gradient(135deg, #020617 0%, #0a1128 100%);
-
-            /* 💎 GLASS SURFACES */
-            --glass-base: rgba(10, 15, 30, 0.65);
-            /* Darker, more satin */
-            --glass-border: rgba(255, 255, 255, 0.12);
-            --glass-highlight: rgba(255, 255, 255, 0.18);
-            --glass-detail: rgba(255, 255, 255, 0.05);
-
-            /* 🌈 ACCENTS */
-            --primary: #2563eb;
-            /* Vivid Blue */
-            --primary-glow: rgba(37, 99, 235, 0.6);
-            --secondary: #3b82f6;
-            /* Lighter Blue */
-            --accent-grad: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-            /* Deep Blue Gradient */
-
-            /* 🎨 TEXT */
             --text-main: #ffffff;
             --text-muted: #94a3b8;
             --text-dim: #64748b;
 
-            /* 📐 SHAPES */
+            /* Accents */
+            --primary: #2563eb;
+            --primary-glow: rgba(37, 99, 235, 0.6);
+            --secondary: #3b82f6;
+            --blue: #0A84FF;
+            --green: #30D158;
+            --yellow: #F5D90A;
+            --red: #FF453A;
+            --orange: #FF9F0A;
+
+            /* Glass */
+            --glass-base: rgba(255, 255, 255, 0.22);
+            --glass-border: rgba(255, 255, 255, 0.25);
+            --glass-panel: rgba(255, 255, 255, 0.25);
+
+            /* Radius */
             --radius-xl: 36px;
             --radius-lg: 28px;
             --radius-md: 18px;
             --radius-sm: 14px;
-
-            /* 🔄 TRANSITIONS */
-            --ease-elastic: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         * {
@@ -220,6 +209,8 @@
             width: 100%;
             height: 100%;
             background: #000;
+            color: var(--text-main);
+            font-family: 'Outfit', -apple-system, sans-serif;
         }
 
         /* Sfondo sempre fullscreen, elimina bande anche se iOS stretch-a */
@@ -230,35 +221,23 @@
             z-index: -1;
             background: linear-gradient(to bottom, #000000 0%, #0a1128 100%);
             transform: translateZ(0);
-            -webkit-transform: translateZ(0);
         }
 
-        /* ✅ body scrolla (iOS friendly) */
         body {
             overflow-y: auto;
             overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
-
-            /* Usa unità viewport robuste */
-            min-height: 100vh;
-            min-height: 100svh;
             min-height: 100dvh;
-
-            color: var(--text-main);
-            font-family: 'Outfit', -apple-system, sans-serif;
         }
 
-        /* ✅ #app NON deve più fare scroll */
         #app {
             height: auto;
             overflow: visible;
             width: 100%;
             max-width: 100vw;
-
-            /* safe area: solo padding, non height */
-            padding-top: env(safe-area-inset-top, 0px);
-            padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
-            transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+            padding-top: var(--safe-top);
+            padding-bottom: calc(140px + var(--safe-bottom));
+            transition: opacity 0.15s ease-out;
         }
 
         .view {
@@ -266,50 +245,174 @@
             min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 96px);
         }
 
-        /* Bottom nav: “isola” sopra la home indicator, identica tra Android e iOS */
+        /* Cards */
+        .card {
+            background: var(--glass-base);
+            backdrop-filter: blur(30px) saturate(120%);
+            -webkit-backdrop-filter: blur(30px) saturate(120%);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-panel {
+            background: var(--glass-panel);
+            backdrop-filter: blur(50px) saturate(100%);
+            -webkit-backdrop-filter: blur(50px) saturate(100%);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: var(--radius-xl);
+        }
+
+        /* Avatar circolare (fallback iniziale) */
+        .avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 999px;
+            overflow: hidden;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.10);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .avatar-fallback {
+            font-weight: 800;
+            color: white;
+        }
+
+        /* Bottom Nav */
         #bottom-nav {
             position: fixed;
+            bottom: 28px;
             left: 50%;
-            bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
-            /* subito sopra home indicator */
             transform: translateX(-50%);
-
             width: auto;
             min-width: 300px;
-            max-width: 640px;
-
             padding: 8px 24px;
             height: 72px;
-
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(30px) saturate(180%);
             -webkit-backdrop-filter: blur(30px) saturate(180%);
-
-            border-radius: 100px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-top: 1px solid rgba(255, 255, 255, 0.2);
-
+            border-radius: 100px;
             display: flex;
             gap: 20px;
             align-items: center;
             justify-content: space-between;
-
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
             z-index: 1000;
         }
 
-        /* Badge offline sotto la notch */
-        #offline-badge {
-            position: fixed;
-            top: calc(10px + var(--safe-top));
-            right: calc(10px + var(--safe-right));
+        .nav-item {
+            background: none;
+            border: none;
+            padding: 12px;
+            color: rgba(255, 255, 255, 0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all .3s ease;
+            cursor: pointer;
         }
 
-        /* Modali: aggiungi spazio in basso per home indicator */
+        .nav-item i {
+            font-size: 24px;
+        }
+
+        .nav-item.active {
+            color: white;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            font-size: 15px;
+            width: 100%;
+            cursor: pointer;
+            transition: all .3s;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            padding: 12px;
+            font-size: 15px;
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            transition: all .2s;
+            backdrop-filter: blur(10px);
+        }
+
+        input:focus,
+        textarea:focus {
+            border-color: var(--primary);
+            background: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(12px);
+            z-index: 2000;
+            display: flex;
+            justify-content: flex-end;
+            flex-direction: column;
+        }
+
         .modal-content {
-            padding-bottom: calc(24px + var(--safe-bottom));
-            contain: layout style paint;
-            isolation: isolate;
+            background: linear-gradient(180deg, rgba(15, 23, 30, 0.95) 0%, #000 100%);
+            border-top: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            padding: 24px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.8);
+        }
+
+        .offline-badge {
+            position: fixed;
+            top: calc(10px + var(--safe-top));
+            right: 10px;
+            background: rgba(255, 159, 10, 0.15);
+            border: 1px solid var(--orange);
+            color: #fb923c;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            display: none;
+            backdrop-filter: blur(10px);
+        }
+
+        .offline-badge.show {
+            display: block;
         }
 
         /* ✨ TYPOGRAPHY - ENTERED */
@@ -1930,8 +2033,7 @@
         }
 
         function getSubjectColor(subject) {
-            if (!subject) return 'var(--blue)';
-            const s = subject.toLowerCase();
+            const s = (subject || '').toLowerCase();
             if (s.includes('ita')) return '#FF3B30'; // Red
             if (s.includes('mat')) return '#007AFF'; // Blue
             if (s.includes('ing')) return '#5856D6'; // Indigo
@@ -1941,246 +2043,241 @@
             if (s.includes('arte')) return '#FF2D55'; // Pink
             if (s.includes('ed')) return '#5AC8FA'; // Light Blue
             if (s.includes('rel')) return '#FFCC00'; // Yellow
+            return '#60a5fa'; // Default fallback color
+        }
 
-            // Fallback: Hash-based color
-            let hash = 0;
-            for (let i = 0; i < subject.length; i++) {
-                hash = subject.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            return `hsl(${Math.abs(hash) % 360}, 70%, 60%)`;
+        function renderAvatar(displayName, size = 44) {
+            const name = (displayName || 'Utente').trim();
+            const letter = name ? name[0].toUpperCase() : '?';
+            return `<div style="width:${size}px; height:${size}px; background: linear-gradient(135deg, var(--blue), #4f46e5); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: ${size * 0.45}px; color: white; border: 1.5px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); flex-shrink: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${letter}</div>`;
         }
 
         function renderHome() {
-            // Count completed tasks for today
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayTasks = state.tasks.filter(t => {
-                if (!t.dateObj) return false;
-                const d = new Date(t.dateObj);
-                d.setHours(0, 0, 0, 0);
-                return d.getTime() === today.getTime();
-            });
-            const completedToday = todayTasks.filter(t => t.done).length;
-            const totalToday = todayTasks.length;
+            const todayStr = new Date().toISOString().split('T')[0];
+            const plannedTodayCount = (state.plannedTasks[todayStr] || []).length;
+            const media = calcolaMedia(state.voti);
+            const m = media ? parseFloat(media) : 0;
+            const percent = (m / 10) * 188;
+
+            let mediaColor = 'var(--red)';
+            if (m >= 6.0) mediaColor = 'var(--green)';
+            else if (m >= 5.0 && m < 6.0) mediaColor = 'var(--yellow)';
 
             return `
             <div class="view">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                    <div>
-                        <!-- Removed Greeting as requested -->
-                        <h1 style="color: white; text-align: left;">Dashboard</h1>
-                    </div>
-                    <div style="display: flex; gap: 12px;">
-                        <div onclick="showSearchModal()" style="width: 44px; height: 44px; background: rgba(255,255,255,0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor:pointer;" title="Cerca">
-                            <i class="ph-bold ph-magnifying-glass" style="font-size: 20px;"></i>
+                <!-- Header: Avatar + Nome + Search centrale -->
+                <div class="card" style="padding:16px; margin-bottom:16px;">
+                    <div style="display:grid; grid-template-columns: auto 1fr auto; align-items:center; gap:14px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            ${renderAvatar(state.user.name, 44)}
+                            <div>
+                               <div style="font-size:16px; font-weight:700; color:white;">${state.user.name || 'Utente'}</div>
+                               <div style="font-size:12px; color:var(--text-muted);">Classe ${state.user.class || '-'}</div>
+                            </div>
                         </div>
-                        <button onclick="openArgoLogin()" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; color: white; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                            <i class="ph-fill ph-user-switch"></i> Cambia Profilo
-                        </button>
+                        <div>
+                            <div style="position: relative;">
+                                <i class="ph ph-magnifying-glass" style="position:absolute; left:12px; top:10px; color: var(--text-muted); font-size:18px;"></i>
+                                <input type="text" placeholder="Cerca..." onfocus="navigate('feed')" style="padding-left:38px; margin-bottom:0; height:38px;">
+                            </div>
+                        </div>
+                        <div>
+                            <button onclick="openArgoLogin()" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); width:40px; height:40px; border-radius: 12px; color:white; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                                <i class="ph-fill ph-user-switch" style="font-size:18px;"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
-                
+
                 ${!state.didup.connected ? `
                     <div class="card" style="background: rgba(255, 159, 10, 0.15); border: 1px solid var(--orange); margin-bottom: 20px; padding: 16px; display: flex; align-items: center; gap: 12px;">
                         <i class="ph ph-warning" style="color: var(--orange); font-size: 24px;"></i>
                         <div style="flex: 1;">
                             <div style="font-weight: 600; margin-bottom: 4px; color: white;">DidUP Non Connesso</div>
-                            <div style="font-size: 12px; color: rgba(255,255,255,0.7);">Collega il tuo account DidUP per vedere voti, compiti e promemoria</div>
+                            <div style="font-size: 12px; color: rgba(255,255,255,0.7);">Collega DidUP per vedere voti e compiti</div>
                         </div>
-                        <button onclick="openArgoLogin()" style="background: var(--orange); color: black; padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; font-size: 12px; cursor: pointer;">
+                        <button onclick="openArgoLogin()" style="background: var(--orange); color: black; padding: 8px 16px; border-radius: 8px; border: none; font-weight: 700; font-size: 12px; cursor: pointer;">
                             Connetti
                         </button>
                     </div>
                 ` : ''}
 
-                <!-- CIRCULARS -->
-                <div style="margin-bottom: 30px;">
-                    <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom: 16px;">
-                        <h2 style="margin:0; text-align: left;">Ultime Circolari</h2>
-                        <button onclick="window.open('https://www.liceogandhi.edu.it/categoria/storico-circolari/','_blank')" style="background:none; border:none; color:var(--blue); font-size:14px; font-weight:600; cursor:pointer;">Vedi tutte</button>
+                <!-- Ultime Circolari -->
+                <div style="margin-bottom: 24px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+                        <h2 style="margin:0; text-align:left;">Ultime Circolari</h2>
+                        <button onclick="window.open('https://www.liceogandhi.edu.it/categoria/storico-circolari/','_blank')" style="background:none; border:none; color:var(--blue); font-weight:700; cursor:pointer;">Vedi tutte</button>
                     </div>
-                    <div style="display: flex; gap: 16px; overflow-x: auto; padding-bottom: 10px; margin: 0 -24px; padding-left: 24px; scrollbar-width: none;">
-                        ${state.news.map(n => `
-                            <div onclick="window.open('${n.url}', '_blank')" style="min-width: 260px; height: 150px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; cursor:pointer;">
-                                <i class="ph-fill ph-file-pdf" style="position: absolute; right: -10px; bottom: -10px; font-size: 80px; color: rgba(255,255,255,0.05); transform: rotate(-15deg);"></i>
-                                <div>
-                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
-                                        <i class="ph-fill ph-file-pdf" style="color: var(--red); font-size: 16px;"></i>
-                                        <span style="color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase;">CIRCOLARE</span>
-                                    </div>
-                                    <h3 style="margin: 0; font-size: 17px; line-height: 1.3; font-weight: 600; color: white; text-align: left;">${n.title}</h3>
-                                </div>
-                                <span style="font-size: 12px; color: var(--blue); font-weight: 600;">Apri documento <i class="ph-bold ph-arrow-up-right" style="font-size:10px;"></i></span>
+                    <div style="display:flex; gap:12px; overflow-x:auto; padding: 8px 0; margin: 0 -24px; padding-left: 24px; scrollbar-width: none;">
+                        ${renderCirculars()}
+                    </div>
+                </div>
+
+                <!-- Panoramica: Media + Stress -->
+                <h2 style="margin-bottom: 12px; text-align:left;">Panoramica</h2>
+                <div style="display:flex; gap:12px; margin-bottom: 20px;">
+                    <div class="card glass-panel" onclick="showVotiView()" style="flex:1; padding: 12px; text-align:center; cursor:pointer; margin-bottom:0;">
+                        <div style="position:relative; width:64px; height:64px; margin:0 auto 6px auto;">
+                            <svg width="64" height="64" viewBox="0 0 70 70">
+                                <circle cx="35" cy="35" r="30" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6"/>
+                                <circle cx="35" cy="35" r="30" fill="none" stroke="${mediaColor}" stroke-width="6" stroke-dasharray="188" stroke-dashoffset="${188 - percent}" transform="rotate(-90 35 35)" stroke-linecap="round"/>
+                            </svg>
+                            <span style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:16px; font-weight:800; color:white;">${media || '--'}</span>
+                        </div>
+                        <span style="font-size:11px; color: rgba(255,255,255,0.7); font-weight:700; text-transform:uppercase;">Media</span>
+                    </div>
+
+                    <div class="card glass-panel" onclick="showStressModal()" style="flex:1; padding: 12px; text-align:center; cursor:pointer; margin-bottom:0;">
+                        <div style="position:relative; width:64px; height:64px; margin:0 auto 6px auto; display:flex; align-items:center; justify-content:center;">
+                             <div style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white;">
+                                <i class="ph-fill ph-activity" style="font-size:24px;"></i>
                             </div>
-                        `).join('')}
+                        </div>
+                        <span style="font-size:11px; color: rgba(255,255,255,0.7); font-weight:700; text-transform:uppercase;">Stress</span>
                     </div>
                 </div>
 
-                <!-- WIDGETS SECTION -->
-                <h2 style="margin-bottom: 16px; text-align: left;">Panoramica</h2>
-                <div style="display: flex; gap: 12px; margin-bottom: 24px;">
-                    
-                    <!-- GRADE AVERAGE WIDGET -->
-                    <div class="card glass-panel" onclick="showVotiView()" style="flex: 1; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0; cursor:pointer;">
-                        <div style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
-                            ${(() => {
-                    const media = calcolaMedia(state.voti);
-                    const m = media ? parseFloat(media) : 0;
-                    const percent = (m / 10) * 188;
-
-                    let color = 'var(--red)';
-                    if (m >= 6.00) color = 'var(--green)';
-                    else if (m >= 5.50) color = '#F5D90A';
-
-                    return `
-                                    <svg width="64" height="64" viewBox="0 0 70 70">
-                                        <circle cx="35" cy="35" r="30" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6" />
-                                        <circle cx="35" cy="35" r="30" fill="none" stroke="${color}" stroke-width="6" stroke-dasharray="188" stroke-dashoffset="${188 - percent}" transform="rotate(-90 35 35)" stroke-linecap="round" />
-                                    </svg>
-                                    <span style="position: absolute; font-size: 16px; font-weight: 700; color: white;">${media ? m.toFixed(2) : '--'}</span>
-                                `;
-                })()}
-                        </div>
-                        <span style="font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 700; text-transform: uppercase;">Media</span>
-                    </div>
-
-                    <!-- STRESS WIDGET -->
-                    <div class="card glass-panel" onclick="showStressModal()" style="flex: 1; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0; cursor:pointer;">
-                        <div style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
-                             ${(() => {
-                    const todayStr = new Date().toISOString().split('T')[0];
-                    const level = state.stressLevels[todayStr] || 0;
-                    const colors = ['rgba(255,255,255,0.1)', '#4ade80', '#fbbf24', '#f87171', '#ef4444', '#7f1d1d'];
-                    const color = colors[level] || colors[0];
-                    return `
-                                     <div style="width: 44px; height: 44px; background: ${color}20; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: ${color}; border: 1px solid ${color}40;">
-                                        <i class="ph-fill ph-activity" style="font-size: 22px;"></i>
-                                    </div>
-                                    ${level > 0 ? `<div style="position: absolute; bottom: 0; right: 0; background: ${color}; color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 8px;">${level}</div>` : ''}
-                                 `;
-                })()}
-                        </div>
-                        <span style="font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 700; text-transform: uppercase;">Stress</span>
-                    </div>
-                </div>
-
-                <!-- MINI PLANNER (INDISPENSABILI OGGI) -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <h2 style="margin:0; text-align: left;">Organizza Oggi</h2>
-                    <button onclick="showOrganizeStudyModal()" class="btn-secondary" style="position: relative; background: rgba(255,255,255,0.1); border: none; width: auto; height: auto; padding: 10px 20px; border-radius: 12px; color: white; display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <i class="ph-bold ph-calendar-check" style="font-size: 20px;"></i>
-                        <div style="font-size: 13px; font-weight: 600;">Organizza Oggi</div>
-                        ${(() => {
-                    const todayStr = new Date().toISOString().split('T')[0];
-                    const count = (state.plannedTasks[todayStr] || []).length;
-                    return count > 0 ? `
-                                <div id="planned-counter" style="position: absolute; top: -8px; right: -8px; background: var(--green); color: black; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; box-shadow: 0 2px 8px rgba(48, 209, 88, 0.4);">
-                                    ${count}
-                                </div>
-                            ` : '';
-                })()}
+                <!-- Organizza Oggi -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+                    <h2 style="margin:0; text-align:left;">Organizza Oggi</h2>
+                    <button onclick="showOrganizeStudyModal()" style="background: rgba(255,255,255,0.12); border:none; padding:10px 14px; border-radius:12px; color:white; font-weight:700; cursor:pointer; position:relative; display:flex; align-items:center; gap:8px;">
+                        <i class="ph-bold ph-calendar-check" style="font-size:18px;"></i>
+                        <span style="font-size:13px;">Organizza</span>
+                        ${plannedTodayCount > 0 ? `<div id="planned-counter" style="position:absolute; top:-8px; right:-8px; background: var(--green); color:black; width: 22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; box-shadow: 0 2px 8px rgba(0,0,0,0.4);">${plannedTodayCount}</div>` : ''}
                     </button>
                 </div>
-                <div class="card glass-panel" onclick="navigate('planner')" style="padding: 20px; cursor: pointer; background: rgba(255,255,255,0.15);">
-                    <div id="today-planner-widget" style="display: flex; flex-direction: column; gap: 12px;">
-                     ${(() => {
-                    const todayStr = new Date().toISOString().split('T')[0];
-                    const plannedIds = state.plannedTasks[todayStr] || [];
-                    const plannedTasks = state.tasks.filter(t => plannedIds.includes(t.id));
-
-                    if (plannedTasks.length > 0) {
-                        return plannedTasks.map(t => {
-                            const subjectColor = getSubjectColor(t.subject);
-                            return `
-                                <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 12px; border-left: 3px solid ${subjectColor};">
-                                    <div style="flex: 1; min-width: 0;">
-                                        <div style="font-weight: 600; font-size: 14px; color: white; margin-bottom: 2px;">${t.text}</div>
-                                        <div style="font-size: 11px; color: ${subjectColor}; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${t.subject}</div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('');
-                    } else {
-                        return '<div style="text-align: center; opacity: 0.5; font-size: 13px; padding: 10px;">Nessun compito pianificato.</div>';
-                    }
-                })()}
-                    </div>
+                <div class="card glass-panel" onclick="navigate('planner')" style="padding: 16px; cursor:pointer;">
+                    <div id="today-planner-widget">${renderTodayPlannerWidget()}</div>
                 </div>
-            </div>
-            `;
+            </div>`;
+        }
+
+        function renderCirculars() {
+            const news = [
+                { id: 128, title: "Circolare n. 128 - Assemblea d'Istituto 7 Febbraio", url: "https://www.liceogandhi.edu.it/categoria/storico-circolari/" },
+                { id: 127, title: "Circolare n. 127 - Variazione Calendario Scrutini", url: "https://www.liceogandhi.edu.it/categoria/storico-circolari/" },
+                { id: 126, title: "Circolare n. 126 - Saldo viaggio d'istruzione", url: "https://www.liceogandhi.edu.it/categoria/storico-circolari/" },
+            ];
+            return news.map(n => `
+                <div onclick="window.open('${n.url}','_blank')" class="card" style="min-width: 260px; height: 150px; padding: 18px; display:flex; flex-direction:column; justify-content:space-between; cursor:pointer; margin-bottom:0;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <i class="ph-fill ph-file-pdf" style="color: var(--red); font-size:18px;"></i>
+                        <span style="color: rgba(255,255,255,0.7); font-size: 11px; font-weight: 700; text-transform: uppercase;">CIRCOLARE</span>
+                    </div>
+                    <div style="font-size: 16px; font-weight: 700; line-height: 1.3; color:white; text-align:left;">${n.title}</div>
+                    <div style="font-size: 12px; color: var(--blue); font-weight: 700;">Apri documento <i class="ph-bold ph-arrow-up-right" style="font-size:10px;"></i></div>
+                </div>`).join('');
+        }
+
+        function renderTodayPlannerWidget() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const plannedIds = state.plannedTasks[todayStr] || [];
+            const plannedTasks = state.tasks.filter(t => plannedIds.includes(t.id));
+            if (!plannedTasks.length) return '<div style="text-align:center; opacity:0.6; font-size:13px; color:white; padding: 12px;">Nessun compito pianificato.</div>';
+            return plannedTasks.map(t => {
+                const subjectColor = getSubjectColor(t.subject);
+                return `
+                <div style="display:flex; align-items:center; gap:12px; padding:10px; background: rgba(255,255,255,0.05); border-radius: 12px; border-left: 3px solid ${subjectColor}; margin-bottom: 8px;">
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-weight:600; font-size:13px; color:white; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${t.text}</div>
+                        <div style="font-size:10px; color:${subjectColor}; font-weight:700; text-transform:uppercase; text-align:left;">${t.subject}</div>
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         function renderMarket() {
+            const items = [...state.marketItems];
+            const pinned = items.filter(i => i.pinned);
+            const normal = items.filter(i => !i.pinned);
+            const list = [...pinned, ...normal];
+
             return `
-                <div class="view">
-                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-                        <h1>Market Libri</h1>
-                        <button onclick="openNewItemModal()" style="background:var(--green); color:black; padding:8px 16px; border-radius:20px; border:none; font-weight:700; cursor:pointer;">+ Vendi</button>
-                    </div> 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                        ${state.marketItems.map(item => `
-                            <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin:0; height: 100%;">
-                                <div style="height:140px; background:#333; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                                    ${item.image ? `<img src="${item.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-book-open" style="font-size:40px; color:rgba(255,255,255,0.2);"></i>`}
-                                </div>
-                                <div style="padding:12px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
-                                    <div>
-                                        <div style="font-weight:600; font-size:15px; margin-bottom:4px; line-height:1.2;">${item.title}</div>
-                                        <div style="font-size:12px; color:var(--text-secondary);">Venduto da ${item.seller}</div>
-                                    </div>
-                                    <div style="margin-top:8px; font-weight:700; color:var(--green); font-size:16px;">${item.price}</div>
-                                </div>
-                            </div>
-                        `).join('')}
+            <div class="view">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h1>Market Libri</h1>
+                    <button onclick="openNewItemModal()" style="background:var(--green); color:black; padding:8px 16px; border-radius:20px; border:none; font-weight:700; cursor:pointer;">+ Vendi</button>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    ${list.map(renderMarketCard).join('')}
+                </div>
+            </div>`;
+        }
+
+        function renderMarketCard(item) {
+            const commentsHtml = (item.comments || []).map(c => `
+                <div style="display:flex; align-items:center; gap:8px; padding:8px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 4px;">
+                    ${renderAvatar(c.author || 'Utente', 28)}
+                    <div style="flex:1; text-align:left;">
+                        <div style="font-weight:700; font-size:12px; color:white;">${c.author || 'Utente'}</div>
+                        <div style="font-size:12px; color:rgba(255,255,255,0.8);">${c.text}</div>
                     </div>
                 </div>
-            `;
+            `).join('');
+
+            return `
+            <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin-bottom:0;">
+                <div style="height:140px; background:#333; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                    ${item.image ? `<img src="${item.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-book-open" style="font-size:40px; color:rgba(255,255,255,0.2);"></i>`}
+                </div>
+                <div style="padding:12px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                        <div style="font-weight:700; font-size:16px; color:white; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.title}</div>
+                        <button onclick="togglePinItem(${item.id})" title="Fissa" style="background:none; border:none; color:${item.pinned ? 'var(--yellow)' : 'var(--text-muted)'}; cursor:pointer;"><i class="ph ph-pushpin"></i></button>
+                    </div>
+                    <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px; text-align:left;">Venduto da ${item.seller || 'Utente'}</div>
+                    <div style="font-weight:800; color: var(--green); font-size:16px; margin-bottom:12px; text-align:left;">${item.price}</div>
+                    <div style="display:flex; gap:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:8px;">
+                        <button onclick="toggleItemCommentBox(${item.id})" style="background:none; border:none; color: var(--text-muted); cursor:pointer; display:flex; align-items:center; gap:4px; font-size:12px;"><i class="ph ph-chat-circle"></i> Commenta</button>
+                    </div>
+                    <div id="item-comments-${item.id}" style="margin-top:8px;">${commentsHtml}</div>
+                    <div id="item-comment-box-${item.id}" style="display:none; margin-top:8px;">
+                        <div style="display:flex; gap:8px;">
+                            <input id="item-comment-input-${item.id}" placeholder="..." style="margin-bottom:0; height:32px; font-size:13px; padding:0 8px;">
+                            <button onclick="addCommentToItem(${item.id})" style="background: var(--blue); color:white; border:none; border-radius: 8px; padding: 0 12px; font-weight:700; height:32px; font-size:12px;">Invia</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
         }
 
         function renderSearch() {
             return `
-                <div class="view" style="padding-top: 0;">
-                    <div class="search-container">
-                         <div style="display:flex; align-items:center; gap:10px; margin: 10px 0;">
-                             <button onclick="navigate('home')" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;"><i class="ph ph-arrow-left"></i></button>
-                             <h1 style="margin:0;">Community</h1>
-                         </div>
-                        <div style="position: relative;">
-                            <i class="ph ph-magnifying-glass" style="position: absolute; left: 14px; top: 12px; color: var(--text-secondary); font-size: 20px;"></i>
-                            <input id="search-input" type="text" placeholder="Cerca studente..." oninput="filterStudents(this.value)" style="padding-left: 44px; margin-bottom: 0;">
-                        </div>
-                    </div>
-                    
-                    <div id="student-list" style="padding-top: 10px;"></div>
+            <div class="view" style="padding-top: 0;">
+                <div style="display:flex; align-items:center; gap:10px; margin: 10px 0; padding: 0 12px;">
+                     <button onclick="navigate('home')" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;"><i class="ph ph-arrow-left"></i></button>
+                     <h1 style="margin:0; text-align:left;">Community</h1>
                 </div>
-            `;
+                <div style="position: relative; padding: 0 12px; margin-bottom: 16px;">
+                    <i class="ph ph-magnifying-glass" style="position: absolute; left: 26px; top: 12px; color: var(--text-muted); font-size: 20px;"></i>
+                    <input id="search-input" type="text" placeholder="Cerca studente..." oninput="filterStudents(this.value)" style="padding-left: 44px; margin-bottom: 0; background:rgba(255,255,255,0.1);">
+                </div>
+                <div id="student-list" style="padding: 0 12px;"></div>
+            </div>`;
         }
 
         function filterStudents(q) {
             const list = document.getElementById('student-list');
             if (!list) return;
-
-            const filtered = DIRECTORY.filter(u => u.name.toLowerCase().includes(q.toLowerCase()));
-
+            const filtered = (typeof DIRECTORY !== 'undefined' ? DIRECTORY : []).filter(u => u.name.toLowerCase().includes(q.toLowerCase()));
             if (filtered.length === 0) {
-                list.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--text-secondary);">Nessun utente trovato</div>`;
+                list.innerHTML = `<div style="text-align:center; padding: 40px; color: var(--text-muted);">Nessun utente trovato</div>`;
                 return;
             }
-
             list.innerHTML = `
-                ${q === '' ? `<h3 style="margin-bottom: 12px;">Suggeriti</h3>` : ''}
+                ${q === '' ? `<h3 style="margin-bottom: 12px; text-align:left; color:var(--text-muted); font-size:14px; text-transform:uppercase;">Suggeriti</h3>` : ''}
                 ${filtered.map(u => `
-                    <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor:pointer;">
-                        <div style="position: relative; margin-right: 16px;">
-                            <div style="width: 50px; height: 50px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;">${u.name[0]}</div>
+                    <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 18px; margin-bottom: 10px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05);">
+                        <div style="position: relative; margin-right: 12px;">
+                            ${renderAvatar(u.name, 48)}
                             ${u.status === 'online' ? `<div style="position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; background: var(--green); border: 2px solid black; border-radius: 50%;"></div>` : ''}
                         </div>
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 17px; margin-bottom: 2px;">${u.name}</div>
-                            <div style="color: var(--text-secondary); font-size: 13px;">Classe ${u.class}</div>
+                        <div style="flex: 1; text-align:left;">
+                            <div style="font-weight: 600; font-size: 16px; color:white;">${u.name}</div>
+                            <div style="color: var(--text-muted); font-size: 12px;">Classe ${u.class}</div>
                         </div>
-                        <button style="background: rgba(10, 132, 255, 0.15); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; color: var(--blue);">
-                            <i class="ph-fill ph-chat-circle-dots" style="font-size: 20px;"></i>
+                        <button style="background: rgba(37, 99, 235, 0.15); width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: none; color: var(--blue);">
+                            <i class="ph-fill ph-chat-circle" style="font-size: 20px;"></i>
                         </button>
                     </div>
                 `).join('')}
@@ -2188,255 +2285,325 @@
         }
 
         function renderFeed() {
-            // Filter Posts
-            let displayPosts = state.posts;
+            let displayPosts = [...state.posts];
 
-            // 1. Class Filter
-            if (state.feed.classFilter !== 'Tutte') {
-                displayPosts = displayPosts.filter(p => p.class === state.feed.classFilter);
-            }
+            // Pinned first
+            const pinned = displayPosts.filter(p => p.pinned);
+            const normal = displayPosts.filter(p => !p.pinned);
+            displayPosts = [...pinned, ...normal];
 
-            // 2. Search Filter (Search in Author or Text)
+            // Filters
+            if (state.feed.classFilter !== 'Tutte') displayPosts = displayPosts.filter(p => p.class === state.feed.classFilter);
             if (state.feed.search) {
                 const q = state.feed.search.toLowerCase();
-                displayPosts = displayPosts.filter(p =>
-                    (p.author || '').toLowerCase().includes(q) ||
-                    p.text.toLowerCase().includes(q)
-                );
+                displayPosts = displayPosts.filter(p => (p.author || '').toLowerCase().includes(q) || p.text.toLowerCase().includes(q));
             }
 
-            // Find Users (if searching)
-            let foundUsers = [];
-            if (state.feed.search) {
-                foundUsers = DIRECTORY.filter(u => u.name.toLowerCase().includes(state.feed.search.toLowerCase()));
-            }
-
-            // Get unique classes for filter
-            const allClasses = ['Tutte', ...new Set(DIRECTORY.map(u => u.class))];
+            const classes = ['Tutte', ...new Set(state.posts.map(p => p.class || '5B'))];
 
             return `
             <div class="view">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h1>Feed</h1>
-                    <button onclick="openNewPostModal()" style="background:var(--blue); padding:8px 16px; border-radius:20px; border:none; color:white; font-weight:600; cursor:pointer;">+ Post</button>
+                    <button onclick="openNewPostModal()" style="background:var(--blue); color:white; padding:8px 16px; border-radius: 20px; border:none; font-weight:700; cursor:pointer;">+ Post/Sondaggio</button>
                 </div>
 
-                <!-- POLL WIDGET (MOVED TO FEED) -->
-                ${renderPollWidget()}
-
-                <!-- Search Bar -->
-                <div style="position:relative; margin-bottom: 16px;">
-                     <i class="ph ph-magnifying-glass" style="position: absolute; left: 14px; top: 12px; color: var(--text-secondary); font-size: 20px;"></i>
-                     <input type="text" placeholder="Cerca persone o post..." value="${state.feed.search}" oninput="updateFeedSearch(this.value)" style="padding-left: 44px; margin-bottom: 0;">
+                <div style="position:relative; margin-bottom:12px;">
+                    <i class="ph ph-magnifying-glass" style="position:absolute; left:12px; top:10px; color: var(--text-muted); font-size:18px;"></i>
+                    <input type="text" placeholder="Cerca persone o post..." value="${state.feed.search}" oninput="updateFeedSearch(this.value)" style="padding-left:38px; margin-bottom:0; height:38px;">
                 </div>
 
-                <!-- Class Filters -->
-                <div style="display:flex; gap:10px; overflow-x:auto; padding-bottom:10px; margin: 0 -24px 16px -24px; padding-left: 24px; scrollbar-width: none;">
-                    ${allClasses.map(c => `
-                        <button onclick="setFeedClass('${c}')" style="
-                            padding: 6px 16px; 
-                            border-radius: 16px; 
-                            border: 1px solid ${state.feed.classFilter === c ? 'var(--blue)' : 'rgba(255,255,255,0.2)'}; 
-                            background: ${state.feed.classFilter === c ? 'var(--blue)' : 'transparent'}; 
-                            color: white; 
-                            font-weight: 600; 
-                            white-space: nowrap;
-                            font-size: 13px;
-                            transition: all 0.2s;
-                            cursor: pointer;
-                        ">${c}</button>
+                <div style="display:flex; gap:8px; overflow-x:auto; margin-bottom: 16px; padding-bottom:6px; scrollbar-width:none;">
+                    ${classes.map(c => `
+                        <button onclick="setFeedClass('${c}')" style="padding:6px 16px; border-radius:16px; border:1px solid ${state.feed.classFilter === c ? 'var(--blue)' : 'rgba(255,255,255,0.2)'}; background:${state.feed.classFilter === c ? 'var(--blue)' : 'transparent'}; color:white; font-weight:700; cursor:pointer; font-size: 13px; white-space:nowrap;">${c}</button>
                     `).join('')}
                 </div>
 
-                <!-- Found Users Section -->
-                ${foundUsers.length > 0 ? `
-                    <div style="margin-bottom: 24px;">
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom: 12px;">
-                            <i class="ph-fill ph-users" style="color:var(--blue);"></i>
-                            <h3 style="margin:0;">Persone Correlate</h3>
-                        </div>
-                        ${foundUsers.map(u => `
-                             <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 16px; margin-bottom: 8px; cursor:pointer; border: 1px solid rgba(255,255,255,0.05);">
-                                <div style="width: 36px; height: 36px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 12px; border: 1px solid rgba(255,255,255,0.1);">${u.name[0]}</div>
-                                <div style="flex:1;">
-                                    <div style="font-weight: 600; font-size: 15px;">${u.name}</div>
-                                    <div style="color: var(--text-secondary); font-size: 11px;">Classe ${u.class}</div>
-                                </div>
-                                <div style="background: rgba(10, 132, 255, 0.1); padding: 6px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; color: var(--blue);">MESSAGE</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
+                ${displayPosts.length ? displayPosts.map(renderPostCard).join('') : `<div style="text-align:center; opacity:0.5; padding:32px;">Nessun post</div>`}
+            </div>`;
+        }
 
-                <!-- Posts List -->
-                ${displayPosts.length > 0 ? displayPosts.map(post => `
-                    <div class="card">
-                        <div style="display:flex; gap:12px; margin-bottom:12px;">
-                            <div style="width:40px; height:40px; background:${post.anon ? '#333' : 'var(--blue)'}; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700;">${post.anon ? '?' : ((post.author && post.author.length) ? post.author[0] : '?')}</div>
-                            <div>
-                                <div style="font-weight:700;">${post.anon ? 'Anonimo' : post.author}</div>
-                                <div style="font-size:12px; opacity:0.6;">${post.anon ? 'Studente' : post.class}</div>
-                            </div>
-                        </div>
-                        <p>${post.text}</p>
-                        ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:12px; margin-bottom:12px;">` : ''}
-                        <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; gap:20px;">
-                            <button onclick="toggleLike(${post.id})" style="background:none; border:none; color:${post.liked ? 'var(--red)' : 'var(--text-secondary)'}; cursor:pointer;"><i class="${post.liked ? 'ph-fill' : 'ph'} ph-heart"></i> ${post.likes}</button>
-                            <button style="background:none; border:none; color:var(--text-secondary); cursor:pointer;"><i class="ph ph-chat-circle"></i> Commenta</button>
-                        </div>
+        function renderPostCard(post) {
+            const isPoll = post.type === 'poll';
+            const commentsHtml = (post.comments || []).map(c => `
+                <div style="display:flex; align-items:center; gap:8px; padding:8px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 4px;">
+                    ${renderAvatar(c.author || 'Utente', 28)}
+                    <div style="flex:1; text-align:left;">
+                        <div style="font-weight:700; font-size:12px; color:white;">${c.author || 'Utente'}</div>
+                        <div style="font-size:12px; color:rgba(255,255,255,0.8);">${c.text}</div>
                     </div>
-                `).join('') : `<div style="text-align:center; padding:40px; opacity:0.5;">Nessun post trovato</div>`}
+                </div>
+            `).join('');
+
+            return `
+            <div class="card">
+                <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+                    ${post.anon ? renderAvatar('Anonimo', 40) : renderAvatar(post.author || 'Utente', 40)}
+                    <div style="flex:1; text-align:left;">
+                        <div style="font-weight:700; color:white;">${post.anon ? 'Anonimo' : (post.author || 'Utente')}</div>
+                        <div style="font-size:12px; opacity:0.6; color:var(--text-muted);">${post.anon ? 'Studente' : (post.class || '')}</div>
+                    </div>
+                    <button onclick="togglePinPost(${post.id})" title="Fissa" style="background:none; border:none; color:${post.pinned ? 'var(--yellow)' : 'var(--text-muted)'}; cursor:pointer;"><i class="ph ph-pushpin"></i></button>
+                </div>
+
+                ${!isPoll ? `<p style="margin: 0 0 10px 0; text-align:left; color:white;">${post.text}</p>` : renderPoll(post)}
+
+                ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:12px; margin-bottom:12px;">` : ''}
+
+                <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; gap:16px;">
+                    <button onclick="toggleLike(${post.id})" style="background:none; border:none; color:${post.liked ? 'var(--red)' : 'var(--text-muted)'}; cursor:pointer; font-size:14px;"><i class="${post.liked ? 'ph-fill' : 'ph'} ph-heart"></i> ${post.likes || 0}</button>
+                    <button onclick="toggleCommentBox(${post.id})" style="background:none; border:none; color: var(--text-muted); cursor:pointer; font-size:14px;"><i class="ph ph-chat-circle"></i> Commenta</button>
+                </div>
+
+                <div id="comments-${post.id}" style="margin-top:10px;">${commentsHtml}</div>
+                <div id="comment-box-${post.id}" style="display:none; margin-top:8px;">
+                    <div style="display:flex; gap:8px;">
+                        <input id="comment-input-${post.id}" placeholder="Scrivi un commento..." style="margin-bottom:0; height:34px; font-size:14px;">
+                        <button onclick="addCommentToPost(${post.id})" style="background: var(--blue); color:white; border:none; border-radius: 10px; padding: 0 12px; font-weight:700; height:34px; font-size:13px;">Invia</button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderPoll(post) {
+            const options = post.pollOptions || [];
+            const votes = post.pollVotes || {};
+            const total = Object.values(votes).reduce((a, b) => a + b, 0);
+            return `
+            <div style="margin-bottom:12px; text-align:left;">
+                <h3 style="margin:0 0 10px 0; font-size:16px; text-align:left; color:white;">${post.text}</h3>
+                ${options.map(opt => {
+                const v = votes[opt] || 0;
+                const pct = total ? Math.round((v / total) * 100) : 0;
+                return `
+                   <div onclick="votePoll(${post.id}, '${opt}')" style="padding:10px; border:1px solid rgba(255,255,255,0.2); border-radius:12px; margin-bottom:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.05);">
+                       <span style="color:white; font-size:14px;">${opt}</span><span style="color:var(--text-muted); font-size:13px;">${pct}%</span>
+                   </div>`;
+            }).join('')}
             </div>`;
         }
 
         function renderChat() {
             const msgs = state.messages[state.currentChatUser] || [];
             return `
-            <div class="view" style="display:flex; flex-direction:column; height:100vh; padding:0;">
-                <div style="padding:20px; padding-top:60px; background:rgba(28,28,30,0.9); display:flex; align-items:center; gap:16px; border-bottom:1px solid rgba(255,255,255,0.1);">
+            <div class="view" style="display:flex; flex-direction:column; height:100dvh; padding:0;">
+                <div style="padding:20px; padding-top:calc(var(--safe-top) + 20px); background:rgba(0,0,0,0.6); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); display:flex; align-items:center; gap:16px; border-bottom:1px solid rgba(255,255,255,0.1);">
                     <button onclick="navigate('search')" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;"><i class="ph ph-arrow-left"></i></button>
-                    <h2>${state.currentChatUser}</h2>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        ${renderAvatar(state.currentChatUser, 40)}
+                        <h2 style="margin:0; font-size:18px;">${state.currentChatUser}</h2>
+                    </div>
                 </div>
-                <div id="chat-history" style="flex:1; overflow-y:auto; padding:20px;">
-                    ${msgs.map(m => `<div class="message-bubble ${m.me ? 'msg-me' : 'msg-other'}">${m.text}</div>`).join('')}
+                <div id="chat-history" style="flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:12px;">
+                    ${msgs.map(m => `
+                        <div class="message-bubble ${m.me ? 'msg-me' : 'msg-other'}" style="
+                            max-width: 80%; 
+                            padding: 10px 16px; 
+                            border-radius: 18px; 
+                            font-size: 15px; 
+                            align-self: ${m.me ? 'flex-end' : 'flex-start'};
+                            background: ${m.me ? 'var(--blue)' : 'rgba(255,255,255,0.1)'};
+                            color: white;
+                            border-bottom-${m.me ? 'right' : 'left'}-radius: 4px;
+                        ">${m.text}</div>
+                    `).join('')}
                 </div>
-                <div style="padding:20px; padding-bottom: 40px; background:black; display:flex; gap:10px; border-top:1px solid rgba(255,255,255,0.1);">
-                    <input id="msg-input" placeholder="Messaggio..." style="margin-bottom:0;">
-                    <button onclick="sendMessage()" style="background:var(--blue); width:50px; border-radius:50%; border:none; color:white; cursor:pointer;">
-                        <i class="ph-fill ph-paper-plane-right"></i>
+                <div style="padding:20px; padding-bottom: calc(var(--safe-bottom) + 20px); background:rgba(0,0,0,0.8); display:flex; gap:10px; border-top:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);">
+                    <input id="msg-input" placeholder="Messaggio..." style="margin-bottom:0; height:44px; border-radius:22px; background:rgba(255,255,255,0.05);">
+                    <button onclick="sendMessage()" style="background:var(--blue); width:44px; height:44px; border-radius:50%; border:none; color:white; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                        <i class="ph-fill ph-paper-plane-right" style="font-size:20px;"></i>
                     </button>
                 </div>
             </div>`;
         }
 
         function renderPlanner() {
-            setTimeout(() => {
-                initPlannerCalendar();
-            }, 0);
-
+            setTimeout(() => { initPlannerCalendar(); }, 0);
             return `
-            <div class="view" style="padding: 20px; padding-bottom: 100px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <h1 style="margin: 0;">Planner</h1>
-                        <button onclick="addManualReminder()" style="background: rgba(255,255,255,0.1); border: none; width: 28px; height: 28px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                            <i class="ph-bold ph-plus" style="font-size: 14px;"></i>
-                        </button>
-                    </div>
-                    <button onclick="performSync()" style="background: var(--blue); color: white; border: none; padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <div class="view" style="padding-bottom: 40px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h1 style="margin: 0;">Planner</h1>
+                    <button onclick="performArgoSync()" style="background: var(--blue); color: white; border: none; padding: 10px 16px; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                         <i class="ph ph-arrow-clockwise" style="font-size: 16px; ${state.syncing ? 'animation: spin 1s linear infinite;' : ''}"></i>
                         ${state.syncing ? 'Sincronizzazione...' : 'Sincronizza'}
                     </button>
                 </div>
 
-                <h3 style="text-align: center; margin-bottom: 8px; font-size: 11px;">IL TUO CALENDARIO</h3>
-                <div style="background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 20px; padding: 10px; border: 1px solid rgba(255, 255, 255, 0.15);">
-                    <div id="calendar"></div>
+                <div class="card" style="padding: 12px; margin-bottom: 24px;">
+                    <div id="calendar" style="min-height:300px;"></div>
                 </div>
 
-                <!-- WEEKLY PLAN SECTION (REORDERED) -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 12px;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <h3 style="margin:0; text-align: left; color: white;">Agenda della settimana</h3>
-                        <button onclick="showTasksBySubjectModal()" style="background: var(--blue); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                            <i class="ph-bold ph-circles-four"></i>
-                            Per Materia
-                        </button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <h2 style="margin:0; text-align: left; color: white;">Agenda Settimana</h2>
                     </div>
-                    <button onclick="showPlanWeekModal()" style="background: rgba(255,255,255,0.1); border: none; width: 28px; height: 28px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                        <i class="ph-bold ph-plus" style="font-size: 14px;"></i>
+                    <button onclick="showPlanWeekModal()" style="background: rgba(255,255,255,0.12); border: none; width: 36px; height: 36px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                        <i class="ph-bold ph-plus" style="font-size: 18px;"></i>
                     </button>
                 </div>
-                <div id="weekly-agenda-widget" class="card glass-panel" style="padding: 16px; background: rgba(255,255,255,0.05); margin-bottom: 24px;">
-                    ${(() => {
-                    const plannedWithDates = [];
-                    Object.entries(state.plannedTasks).forEach(([dateStr, taskIds]) => {
-                        taskIds.forEach(id => {
-                            const task = state.tasks.find(t => t.id === id);
-                            if (task) plannedWithDates.push({ ...task, plannedDate: dateStr });
-                        });
-                    });
-                    plannedWithDates.sort((a, b) => new Date(a.plannedDate) - new Date(b.plannedDate));
-                    if (plannedWithDates.length > 0) {
-                        const dayNamesShort = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
-                        return plannedWithDates.map(t => {
-                            const d = new Date(t.plannedDate);
-                            const dayLabel = `${dayNamesShort[d.getDay()]} ${d.getDate()}`;
-                            const subjectColor = getSubjectColor(t.subject);
-                            return `
-                                <div class="glass-list-item" style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                                    <div style="min-width: 50px; font-size: 11px; font-weight: 800; color: var(--orange); text-transform: uppercase;">${dayLabel}</div>
-                                    <div 
-                                        class="task-checkbox ${t.done ? 'checked' : ''}"
-                                        data-task-toggle="${t.id}"
-                                        onclick="toggleTask('${t.id}')" 
-                                        style="width: 20px; height: 20px; border: 2px solid ${t.done ? 'var(--green)' : subjectColor}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;">
-                                        ${t.done ? '<i class="ph-bold ph-check" style="font-size: 12px; color: black;"></i>' : ''}
-                                    </div>
-                                    <div style="flex: 1; min-width: 0;">
-                                        <div data-task-text="${t.id}" style="font-size: 14px; color: white; font-weight: 500; ${t.done ? 'text-decoration: line-through; opacity: 0.5;' : ''}">${t.text}</div>
-                                        <div style="font-size: 10px; color: ${getSubjectColor(t.subject)}; font-weight: 700; text-transform: uppercase;">${t.subject}</div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('');
-                    } else {
-                        return `<div style="text-align: center; opacity: 0.5; font-size: 13px; padding: 10px;">Nessun compito pianificato.</div>`;
-                    }
-                })()}
+
+                <div id="weekly-agenda-list" class="card glass-panel" style="padding: 16px;">
+                    ${renderWeeklyAgenda()}
                 </div>
             </div>`;
         }
 
-        function showPlanWeekModal() {
+        function renderWeeklyAgenda() {
+            const plannedWithDates = [];
+            Object.entries(state.plannedTasks).forEach(([dateStr, taskIds]) => {
+                taskIds.forEach(id => {
+                    const task = state.tasks.find(t => t.id === id);
+                    if (task) plannedWithDates.push({ ...task, plannedDate: dateStr });
+                });
+            });
+            plannedWithDates.sort((a, b) => new Date(a.plannedDate) - new Date(b.plannedDate));
+
+            if (!plannedWithDates.length) return `<div style="text-align: center; opacity: 0.5; font-size: 14px; padding: 20px; color:white;">Nessun compito pianificato.</div>`;
+
+            const dayNames = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+            return plannedWithDates.map(t => {
+                const d = new Date(t.plannedDate);
+                const label = `${dayNames[d.getDay()]} ${d.getDate()}`;
+                const subjectColor = getSubjectColor(t.subject);
+                return `
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px;">
+                    <div style="min-width: 54px; font-size: 11px; font-weight: 800; color: var(--orange); text-transform: uppercase;">${label}</div>
+                    <div onclick="toggleTask('${t.id}')" style="width: 22px; height: 22px; border: 2px solid ${t.done ? 'var(--green)' : subjectColor}; background: ${t.done ? 'var(--green)' : 'transparent'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;">
+                        ${t.done ? '<i class="ph-bold ph-check" style="font-size: 14px; color: black;"></i>' : ''}
+                    </div>
+                    <div style="flex: 1; text-align:left;">
+                        <div style="font-size: 15px; color: white; font-weight: 500; ${t.done ? 'text-decoration: line-through; opacity: 0.4;' : ''}">${t.text}</div>
+                        <div style="font-size: 11px; color: ${subjectColor}; font-weight: 800; text-transform: uppercase;">${t.subject}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        /* Stress modal with simple chart */
+        function showStressModal() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const currentLevel = state.stressLevels[todayStr] || 0;
             const modalContainer = getModalContainer();
             if (!modalContainer) return;
             modalContainer.innerHTML = `
-                <div class="modal-overlay" onclick="closeModal(event)">
-                    <div class="modal-content glass-panel" style="max-width: 450px; padding: 24px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2 style="margin:0;">Pianifica Settimana</h2>
-                            <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
-                        </div>
-                        <p style="font-size: 14px; opacity: 0.7; margin-bottom: 20px;">Assegna i compiti ai giorni della settimana per organizzare il tuo studio.</p>
-                        
-                        <div style="display: flex; flex-direction: column; gap: 20px; max-height: 500px; overflow-y: auto;">
-                            ${state.tasks.filter(t => !t.done).map(t => {
-                return `
-                                    <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1);">
-                                        <div style="font-weight: 700; color: white; margin-bottom: 4px;">${t.text}</div>
-                                        <div style="font-size: 11px; color: var(--blue); margin-bottom: 12px;">${t.subject}</div>
-                                        
-                                        <div style="display: flex; justify-content: space-between; gap: 4px;">
-                                            ${['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((dayLabel, i) => {
-                    const dayIndex = (i + 1) % 7; // Monday is 1, Sunday is 0
-                    // Calculate the date for this day of the current week
-                    const today = new Date();
-                    const d = today.getDay();
-                    const diff = today.getDate() - (d === 0 ? 6 : d - 1) + i;
-                    const date = new Date(new Date(today).setDate(diff));
-                    const dateStr = date.toISOString().split('T')[0];
-                    const isPlanned = state.plannedTasks[dateStr] && state.plannedTasks[dateStr].includes(t.id);
-
-                    return `
-                                                     <div 
-                                                        data-task-id="${t.id}" 
-                                                        data-date="${dateStr}"
-                                                        onclick="togglePlanDay('${t.id}', '${dateStr}')" 
-                                                        style="flex:1; height: 32px; border-radius: 8px; background: ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; cursor: pointer; color: ${isPlanned ? 'white' : 'rgba(255,255,255,0.5)'}; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
-                                                        ${dayLabel}
-                                                    </div>
-                                                `;
-                }).join('')}
-                                        </div>
-                                    </div>
-                                `;
-            }).join('')}
-                        </div>
-                        <button onclick="closeModal()" class="btn-primary" style="margin-top: 20px;">Fatto</button>
-                    </div>
+            <div class="modal-overlay" onclick="closeModal(event)">
+              <div class="modal-content glass-panel" style="max-width: 420px; text-align:center;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+                    <h2 style="margin:0;">Stress Giornaliero</h2>
+                    <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px; color:white;"></i>
                 </div>
-            `;
+                <p style="opacity:0.8; font-size:14px; margin-bottom:20px; color:white; text-align:left;">Come ti senti oggi? Registra il tuo livello di stress e guarda l'andamento degli ultimi 14 giorni.</p>
+                <div style="display:flex; gap:10px; margin-bottom:24px;">
+                    ${[1, 2, 3, 4, 5].map(lv => `
+                      <button onclick="setStressLevel(${lv})" style="flex:1; height:44px; border-radius:12px; border:1px solid rgba(255,255,255,0.2); background:${currentLevel === lv ? 'var(--blue)' : 'rgba(255,255,255,0.05)'}; color:white; font-weight:700; cursor:pointer;">${lv}</button>
+                    `).join('')}
+                </div>
+                <div class="card" style="padding:16px; background:rgba(0,0,0,0.3); border-radius:20px;">
+                    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:12px; text-align:left;">Andamento Storico</div>
+                    <canvas id="stressChart" width="320" height="120" style="width:100%; height:120px;"></canvas>
+                </div>
+                <button onclick="closeModal()" class="btn-primary" style="margin-top:20px; width:100%;">Chiudi</button>
+              </div>
+            </div>`;
+            setTimeout(drawStressChart, 100);
+        }
+
+        function setStressLevel(lv) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            state.stressLevels[todayStr] = lv;
+            localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels));
+            savePlannerRemote(); // Sync to server
+            showStressModal();
+        }
+
+        function drawStressChart() {
+            const canvas = document.getElementById('stressChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            const points = [];
+            const days = 13;
+            for (let i = days; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const key = d.toISOString().split('T')[0];
+                const val = state.stressLevels[key] || 0;
+                points.push({
+                    x: 20 + (days - i) * ((w - 40) / days),
+                    y: h - 20 - (val * (h - 40) / 5)
+                });
+            }
+
+            // Axes
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(20, 10); ctx.lineTo(20, h - 20);
+            ctx.lineTo(w - 10, h - 20);
+            ctx.stroke();
+
+            // Line
+            ctx.strokeStyle = 'var(--blue)';
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            points.forEach((p, i) => {
+                if (i === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            });
+            ctx.stroke();
+
+            // Dots
+            ctx.fillStyle = 'var(--blue)';
+            points.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        function showPlanWeekModal() {
+            const modalContainer = getModalContainer();
+            if (!modalContainer) return;
+            const today = new Date();
+            const dayNames = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
+
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" onclick="closeModal(event)">
+                <div class="modal-content glass-panel" style="max-width: 450px; padding: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin:0;">Pianifica Settimana</h2>
+                        <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px;"></i>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 16px; max-height: 500px; overflow-y: auto;">
+                        ${state.tasks.filter(t => !t.done).map(t => {
+                const subjectColor = getSubjectColor(t.subject);
+                return `
+                                <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1);">
+                                    <div style="font-weight: 700; color: white; margin-bottom: 4px; text-align:left;">${t.text}</div>
+                                    <div style="font-size: 11px; color: ${subjectColor}; font-weight:700; text-transform:uppercase; margin-bottom: 12px; text-align:left;">${t.subject}</div>
+                                    <div style="display: flex; justify-content: space-between; gap: 4px;">
+                                        ${dayNames.map((label, i) => {
+                    const dayIndex = (i + 1) % 7;
+                    const diff = today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1) + i;
+                    const d = new Date(new Date(today).setDate(diff));
+                    const dateStr = d.toISOString().split('T')[0];
+                    const isPlanned = state.plannedTasks[dateStr] && state.plannedTasks[dateStr].includes(t.id);
+                    return `
+                                                <div data-task-id="${t.id}" data-date="${dateStr}" onclick="togglePlanDay('${t.id}', '${dateStr}')" 
+                                                    style="flex:1; height: 32px; border-radius: 8px; background: ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; cursor: pointer; color: ${isPlanned ? 'white' : 'rgba(255,255,255,0.4)'}; transition: all .2s;">
+                                                    ${label}
+                                                </div>`;
+                }).join('')}
+                                    </div>
+                                </div>`;
+            }).join('')}
+                    </div>
+                    <button onclick="closeModal()" class="btn-primary" style="margin-top: 20px;">Fatto</button>
+                </div>
+            </div>`;
         }
 
         function togglePlanDay(taskId, dateStr) {
@@ -2459,10 +2626,7 @@
         function updateWeekDayButton(taskId, dateStr) {
             const isPlanned = state.plannedTasks[dateStr] && state.plannedTasks[dateStr].includes(taskId);
             const buttons = document.querySelectorAll(`[data-task-id="${taskId}"][data-date="${dateStr}"]`);
-
             buttons.forEach(btn => {
-                btn.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
-
                 if (isPlanned) {
                     btn.style.background = 'var(--blue)';
                     btn.style.borderColor = 'var(--blue)';
@@ -2470,16 +2634,62 @@
                 } else {
                     btn.style.background = 'rgba(255,255,255,0.05)';
                     btn.style.borderColor = 'rgba(255,255,255,0.1)';
-                    btn.style.color = 'rgba(255,255,255,0.5)';
+                    btn.style.color = 'rgba(255,255,255,0.4)';
                 }
-
-                btn.style.transform = 'scale(0.85) translateZ(0)';
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        btn.style.transform = 'scale(1) translateZ(0)';
-                    }, 50);
-                });
             });
+        }
+
+        /* Feed & Market Interactions */
+        function togglePinPost(id) {
+            const post = state.posts.find(p => p.id === id);
+            if (post) post.pinned = !post.pinned;
+            render();
+        }
+
+        function togglePinItem(id) {
+            const item = state.marketItems.find(i => i.id === id);
+            if (item) item.pinned = !item.pinned;
+            render();
+        }
+
+        function toggleCommentBox(id) {
+            const el = document.getElementById(`comment-box-${id}`);
+            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function addCommentToPost(id) {
+            const input = document.getElementById(`comment-input-${id}`);
+            if (!input || !input.value.trim()) return;
+            const post = state.posts.find(p => p.id === id);
+            if (post) {
+                if (!post.comments) post.comments = [];
+                post.comments.push({ author: state.user.name, text: input.value });
+                render();
+            }
+        }
+
+        function toggleItemCommentBox(id) {
+            const el = document.getElementById(`item-comment-box-${id}`);
+            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function addCommentToItem(id) {
+            const input = document.getElementById(`item-comment-input-${id}`);
+            if (!input || !input.value.trim()) return;
+            const item = state.marketItems.find(i => i.id === id);
+            if (item) {
+                if (!item.comments) item.comments = [];
+                item.comments.push({ author: state.user.name, text: input.value });
+                render();
+            }
+        }
+
+        function votePoll(postId, option) {
+            const post = state.posts.find(p => p.id === postId);
+            if (!post) return;
+            if (!post.pollVotes) post.pollVotes = {};
+            post.pollVotes[option] = (post.pollVotes[option] || 0) + 1;
+            render();
         }
 
         function selectDay(day) {
@@ -2491,9 +2701,9 @@
             modalContainer.innerHTML = `
             <div class="modal-overlay" onclick="closeModal(event)">
                 <div class="modal-content" style="max-height:85vh; overflow-y:auto; padding: 0;">
-                    <div style="position: sticky; top: 0; background:rgba(28,28,30,0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); padding: 20px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; z-index: 10;">
+                    <div style="position: sticky; top: 0; background:rgba(0,0,0,0.8); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); padding: 20px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; z-index: 10;">
                         <h2 style="margin:0;">Voti DidUP</h2>
-                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue); font-weight:700; font-size:16px;">Chiudi</button>
+                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue); font-weight:700; font-size:16px; cursor:pointer;">Chiudi</button>
                     </div>
                     <div style="padding: 20px;">
                         ${renderVoti()}
@@ -2503,74 +2713,42 @@
         }
 
         function renderVoti() {
-            // ⭐ DEBUG: Log completo per capire cosa c'è
-            console.log("🎓 renderVoti chiamato - state.voti:", state.voti);
-            console.log("🎓 renderVoti chiamato - state.grades:", state.grades);
-            console.log("🎓 renderVoti chiamato - localStorage argo_voti:", localStorage.getItem(lsKey('voti')));
-
-            // ⭐ Prova prima voti, poi grades
             const votiData = (state.voti && state.voti.length > 0) ? state.voti :
                 ((state.grades && state.grades.length > 0) ? state.grades : []);
 
-            console.log("🎓 votiData finale:", votiData);
-
             if (votiData.length === 0) {
                 return `
-                    <div style="text-align:center; padding: 40px; color: var(--text-secondary);">
-                        <i class="ph ph-graduation-cap" style="font-size: 48px; opacity: 0.3; margin-bottom: 12px; display: block;"></i>
-                        Nessun voto caricato<br>
-                        <span style="font-size: 12px; margin-top: 8px; display: block;">I voti verranno caricati dopo la sincronizzazione con DidUP</span>
-                        <button onclick="performSync(); closeModal();" style="background:var(--blue); color:white; padding:10px 20px; border-radius:10px; border:none; margin-top:16px; cursor:pointer; font-weight:600;">
-                            <i class="ph ph-arrow-clockwise"></i> Sincronizza Ora
-                        </button>
-                        <div style="margin-top: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 11px; text-align: left;">
-                            <strong>Debug Info:</strong><br>
-                            state.voti.length: ${state.voti?.length || 0}<br>
-                            state.grades.length: ${state.grades?.length || 0}<br>
-                            localStorage: ${localStorage.getItem(lsKey('voti')) ? 'Presente' : 'Vuoto'}
-                        </div>
-                    </div>`;
+                <div style="text-align:center; padding: 48px 24px; color: var(--text-muted);">
+                    <i class="ph ph-graduation-cap" style="font-size: 56px; opacity: 0.2; margin-bottom: 16px; display: block;"></i>
+                    <p style="margin-bottom:20px; font-size:16px;">Nessun voto registrato.</p>
+                    <button onclick="performArgoSync()" class="btn-primary" style="padding: 10px 20px; font-size: 14px; width: auto;">Sincronizza DidUP</button>
+                </div>`;
             }
 
             const media = calcolaMedia(votiData);
-            const mediaNum = media ? parseFloat(media) : null;
-
             return `
-                <div style="margin-bottom: 20px;">
-                    <div class="card glass-panel" style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.4), rgba(79, 70, 229, 0.4)); border: 1px solid var(--blue); padding: 20px; text-align: center; margin-bottom: 16px; box-shadow: 0 10px 40px rgba(37, 99, 235, 0.3);">
-                        <div style="font-size: 12px; color: rgba(255,255,255,0.8); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Media Generale</div>
-                        <div style="font-size: 56px; font-weight: 800; color: white; margin-bottom: 4px; text-shadow: 0 4px 12px rgba(0,0,0,0.3);">${media || '--'}</div>
-                        <div style="font-size: 14px; color: rgba(255,255,255,0.7);">Su ${votiData.length} voti registrati</div>
-                    </div>
+            <div class="view">
+                <div class="card" style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.4), rgba(79, 70, 229, 0.4)); border: 1px solid var(--blue); padding: 24px; text-align: center; margin-bottom: 20px;">
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.8); font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">Media Generale</div>
+                    <div style="font-size: 56px; font-weight: 800; color: white;">${media || '--'}</div>
+                    <div style="font-size: 12px; opacity:0.7;">Su ${votiData.length} voti</div>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     ${votiData.map(v => {
                 const val = (v.valore || v.value || '').toString();
-                const mat = v.materia || v.subject || 'Materia non specificata';
-                const data = v.data || v.date || 'Data non disponibile';
-                const tipo = v.tipo || v.type || '';
-                const valNum = parseFloat(val.replace(',', '.'));
-                const isSufficient = !isNaN(valNum) && valNum >= 6;
-                const color = isSufficient ? 'var(--green)' : '#FF453A';
-
+                const mat = v.materia || v.subject || 'Materia';
+                const color = parseFloat(val.replace(',', '.')) >= 6 ? 'var(--green)' : 'var(--red)';
                 return `
-                            <div class="glass-list-item" style="padding: 16px; display: flex; align-items: center; gap: 16px; border-left: 4px solid ${color};">
-                                <div style="width: 60px; height: 60px; border-radius: 16px; background: ${color}20; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; color: ${color}; border: 1px solid ${color}40; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
-                                    ${val}
-                                </div>
-                                <div style="flex: 1; min-width: 0;">
-                                    <div style="font-weight: 700; font-size: 17px; color: white; margin-bottom: 4px;">${mat}</div>
-                                    ${tipo ? `<div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; letter-spacing:0.5px; margin-bottom: 2px;">${tipo}</div>` : ''}
-                                    <div style="font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
-                                        <i class="ph ph-calendar" style="font-size: 12px;"></i>
-                                        ${data}
-                                    </div>
-                                </div>
+                        <div class="card" style="padding:16px; display:flex; align-items:center; gap:16px; margin-bottom:0;">
+                            <div style="width:54px; height:54px; border-radius:12px; background:${color}15; border:1px solid ${color}30; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:800; color:${color};">${val}</div>
+                            <div style="flex:1; text-align:left;">
+                                <div style="font-weight:700; font-size:16px; color:white;">${mat}</div>
+                                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">${v.data || v.date || ''} • ${v.tipo || v.type || ''}</div>
                             </div>
-                        `;
+                        </div>`;
             }).join('')}
                 </div>
-            `;
+            </div>`;
         }
 
         function showBachecaModal() {
@@ -2632,94 +2810,58 @@
         function renderProfile() {
             return `
             <div class="view">
-                <h1>Profilo</h1>
-                <div style="margin-top:20px;">
-                    <div class="card">
-                        <div style="font-size: 14px; color:var(--text-secondary); margin-bottom:8px;">Utente Collegato</div>
-                        <div style="font-size:18px; font-weight:700; margin-bottom:16px;">${state.user.name || 'Non specificato'}</div>
-                        <div style="font-size:14px; color: var(--text-secondary); margin-bottom:12px;">Classe: ${state.user.class || 'Non specificata'}</div>
-                        ${state.lastSync ? `<div style="font-size:12px; color: var(--text-secondary); display:flex; align-items:center; gap:6px;">
-                            <i class="ph ph-clock" style="font-size:14px;"></i>
-                            Ultima sincronizzazione: ${state.lastSync}
-                        </div>` : ''}
+                <h1>Il Mio Profilo</h1>
+                <div class="card" style="padding:20px; display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+                    ${renderAvatar(state.user.name, 64)}
+                    <div style="flex:1; text-align:left;">
+                        <div style="font-size:20px; font-weight:800; color:white;">${state.user.name || 'Utente'}</div>
+                        <div style="font-size:14px; color:var(--text-muted);">Classe ${state.user.class || '-'}</div>
                     </div>
-                    <div class="card" style="margin-top:16px;">
-                        <div style="font-size: 14px; color:var(--text-secondary); margin-bottom:12px; font-weight:600;">Stato Connessione</div>
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                            <div style="width:12px; height:12px; border-radius:50%; background:${state.didup.connected ? 'var(--green)' : 'var(--red)'};"></div>
-                            <span>DidUP: ${state.didup.connected ? 'Connesso' : 'Non connesso'}</span>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <div style="width:12px; height:12px; border-radius:50%; background:${state.isOffline ? 'var(--red)' : 'var(--green)'};"></div>
-                            <span>Server: ${state.isOffline ? 'Offline' : 'Online'}</span>
-                        </div>
-                    </div>
-                    <button class="btn-primary" onclick="logout()" style="background:var(--red); margin-top:20px; cursor:pointer;">Esci e Disconnetti</button>
-                    <button onclick="openArgoLogin()" style="background:var(--blue); width:100%; padding:16px; border-radius:14px; font-weight:600; font-size:16px; cursor:pointer; border:none; color:white; margin-top:12px;">
-                        <i class="ph ph-arrow-clockwise"></i> Riconnetti DidUP
-                    </button>
                 </div>
+
+                <div class="card" style="padding:16px; margin-bottom:16px;">
+                    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:12px;">Connessione DidUP</div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                        <span style="font-size:14px; color:white;">Stato:</span>
+                        <span style="font-size:14px; font-weight:700; color:${state.didup.connected ? 'var(--green)' : 'var(--red)'};">${state.didup.connected ? 'COLLEGATO' : 'DISCONNESSO'}</span>
+                    </div>
+                    ${state.lastSync ? `<div style="font-size:12px; color:var(--text-muted);">Ultima sincronizzazione: ${state.lastSync}</div>` : ''}
+                </div>
+
+                <button onclick="logout()" class="btn-primary" style="background:#333; margin-bottom:12px; color:var(--red);">Esci e Disconnetti</button>
+                <button onclick="openArgoLogin()" class="btn-secondary" style="width:100%; height:50px; border-radius:12px; font-weight:700; background:var(--blue); color:white; border:none; cursor:pointer;">Cambia Account DidUP</button>
             </div>`;
         }
 
-        // --- CORE UI MODALS & ACTIONS ---
-
-        function openNewPostModal() {
-            modalContainer.innerHTML = `
-            <div class="modal-overlay" onclick="closeModal(event)">
-                <div class="modal-content">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
-                        <button onclick="closeModal()" style="background:none; border:none; color:var(--blue); cursor:pointer;">Annulla</button>
-                        <b>Nuovo Post</b>
-                        <button onclick="publishPost()" style="background:none; border:none; color:var(--blue); font-weight:700; cursor:pointer;">Pubblica</button>
-                    </div>
-                    <textarea id="new-post-text" rows="5" placeholder="Scrivi qualcosa..."></textarea>
-                    
-                    <div style="margin-bottom: 20px;">
-                         <label style="display:flex; align-items:center; gap:10px; margin-bottom: 10px; cursor:pointer;">
-                            <input type="checkbox" id="post-anon-toggle" style="width:20px; height:20px;">
-                            <span>Pubblica in Anonimo</span>
-                        </label>
-                         <label style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.1); padding:10px; border-radius:12px; cursor:pointer;">
-                            <i class="ph ph-camera" style="font-size:20px;"></i>
-                            <span>Aggiungi Foto</span>
-                            <input type="file" id="post-image-input" accept="image/*" style="display:none;" onchange="handleImagePreview(this)">
-                        </label>
-                        <div id="image-preview" style="margin-top:10px;"></div>
-                    </div>
-                </div>
-            </div>`;
-        }
+        /* --- Modals --- */
 
         function openArgoLogin() {
+            const modalContainer = getModalContainer();
+            if (!modalContainer) return;
             modalContainer.innerHTML = `
             <div class="modal-overlay" onclick="closeModal(event)">
-                <div class="modal-content" style="text-align:center;">
-                    <div style="width:60px; height:60px; background:#106690; border-radius:16px; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;">
-                         <i class="ph-fill ph-book-bookmark" style="font-size:30px;"></i>
+                <div class="modal-content" style="max-width:380px;">
+                    <div style="text-align:center; margin-bottom:20px;">
+                        <div style="width:60px; height:60px; background:#106690; border-radius:16px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px auto;">
+                           <i class="ph-fill ph-book-bookmark" style="font-size:30px; color:white;"></i>
+                        </div>
+                        <h2 style="margin:0; color:white;">Collega DidUP</h2>
                     </div>
-                    <h2 style="margin-bottom:8px;">Collega DidUP</h2>
-                    
-                    <!-- SERVER STATUS WIDGET -->
+
                     <div id="server-status" style="margin-bottom: 20px; font-size: 12px; color: var(--orange); display: flex; align-items: center; justify-content: center; gap: 6px;">
                         <span style="width: 8px; height: 8px; background: var(--orange); border-radius: 50%;"></span>
-                        Sto cercando il server...
+                        In attesa del server...
                     </div>
 
-                    <input id="argo-school" placeholder="Codice Scuola (es. SG12345)">
+                    <input id="argo-school" placeholder="Codice Scuola" value="${localStorage.getItem('argo_school') || ''}">
                     <input id="argo-user" placeholder="Nome Utente">
                     <input type="password" id="argo-pass" placeholder="Password">
-                    
-                    <button id="login-btn" onclick="performArgoSync()" style="background:var(--blue); width:100%; padding: 14px; border-radius:12px; font-weight:700; margin-top:10px; border:none; color:white; cursor:pointer;">Accedi e Sincronizza</button>
-                    <button onclick="closeModal()" style="background:none; width:100%; padding: 10px; margin-top:5px; border:none; color:var(--text-secondary); cursor:pointer;">Annulla</button>
-                    <button onclick="testBackendConnection()" style="background:rgba(255,255,255,0.1); width:100%; padding: 10px; margin-top:5px; border:1px solid rgba(255,255,255,0.2); border-radius:12px; color:var(--text-secondary); cursor:pointer; font-size:12px;">🔍 Test Connessione Backend</button>
+                    <button onclick="performArgoSync()" class="btn-primary" style="width:100%; margin-top:10px;">Accedi e Sincronizza</button>
+                    <button onclick="closeModal()" style="width:100%; background:none; border:none; color:var(--text-muted); margin-top:12px; cursor:pointer;">Annulla</button>
                 </div>
             </div>`;
-
-            // AUTO-CHECK SERVER HEALTH
             checkServerHealth();
         }
-
         async function checkServerHealth(attempt = 1) {
             const statusEl = document.getElementById('server-status');
             if (!statusEl) return;
@@ -3604,33 +3746,14 @@
         }
 
         // Init - render will be called by DOMContentLoaded
-        function renderPollWidget() {
-            return `
-            <div class="card glass-panel" style="padding-bottom: 20px; margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
-                    <span style="color: var(--purple); font-size: 12px; font-weight: 700; text-transform: uppercase;">Sondaggio Community</span>
-                    <span style="font-size: 12px; color: var(--text-secondary);">Scade tra 5h</span>
-                </div>
-                <h3 style="margin-bottom: 20px; font-size: 18px; line-height: 1.4; color: white; text-align: left;">Data prossima Assemblea? 🗓️</h3>
-                
-                <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer; color: white;">
-                    <span>Venerdì 7 Feb</span>
-                    <span>60%</span>
-                </div>
-                    <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; margin-bottom: 10px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer; color: white;">
-                    <span>Lunedì 10 Feb</span>
-                    <span>15%</span>
-                </div>
-                    <div onclick="this.style.background='var(--blue)'; this.style.borderColor='var(--blue)'" style="padding: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; font-weight: 600; display: flex; justify-content: space-between; cursor:pointer; color: white;">
-                    <span>Sabato 15 Feb</span>
-                    <span>25%</span>
-                </div>
-            </div>`;
-        }
-
-        // ⭐ Esposizione globale per garantire accessibilità da HTML
+        // ⭐ Global exposures
         window.showPlanWeekModal = showPlanWeekModal;
         window.closeModal = closeModal;
+        window.setStressLevel = setStressLevel;
+        window.togglePollCreatorUI = togglePollCreatorUI;
+        window.addPollOption = addPollOption;
+        window.publishPost = publishPost;
+        window.navigate = navigate;
     </script>
 </body>
 
