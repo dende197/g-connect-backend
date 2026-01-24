@@ -1,6 +1,3 @@
-from planner_routes import register_planner_routes
-app = Flask(__name__)
-register_planner_routes(app)
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import argofamiglia
@@ -13,6 +10,13 @@ import re
 import base64
 from hashlib import sha256
 from datetime import datetime
+
+from planner_routes import register_planner_routes
+
+app = Flask(__name__)
+CORS(app)
+
+register_planner_routes(app)
 
 # ✅ NEW: Supabase
 from supabase import create_client, Client
