@@ -46,7 +46,46 @@
             --radius-xl: 36px;
             --radius-lg: 28px;
             --radius-md: 18px;
+            --radius-md: 18px;
             --radius-sm: 14px;
+
+            /* Z-index */
+            --z-loader: 10000;
+        }
+
+        /* 🔄 App Loader Overlay */
+        #app-loader {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: var(--z-loader);
+            color: #fff;
+            transition: opacity 0.3s ease;
+        }
+
+        #app-loader .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid var(--blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 10px var(--blue));
+        }
+
+        #app-loader .msg {
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: 0.5px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         * {
@@ -794,6 +833,10 @@
 
 <body>
     <div id="app"></div>
+    <div id="app-loader">
+        <div class="spinner"></div>
+        <div class="msg">Caricamento...</div>
+    </div>
     <div id="modals"></div>
     <div id="offline-badge" class="offline-badge">📡 Offline Mode</div>
 
@@ -1046,9 +1089,11 @@
         const modalContainer = document.getElementById('modals');
         const offlineBadge = document.getElementById('offline-badge');
 
-        // ⭐ INITIALIZE APP ON LOAD - Versione che funzionava
+        // ⭐ INITIALIZE APP ON LOAD
         document.addEventListener('DOMContentLoaded', async () => {
             console.log("🚀 App Loading...");
+            showLoader("Avvio G-Connect...");
+
             const isLoggedIn = sessionManager.isLoggedIn();
             const savedSession = sessionManager.load();
 
@@ -1143,31 +1188,24 @@
                 // 2) Sincronizza da server (source of truth)
                 await fetchPlannerRemote();
 
-                // 3) Flush outbox (ora includerà anche planner)
+                // 3) Flush outbox
                 await flushOutbox();
 
-                state.view = 'home';
-                render();
+                // ⭐ RIPRISTINA LA VIEW SALVATA
+                state.view = loadView();
+                state.isLoggedIn = true;
 
-                // ⭐ Sync in background passando la sessione salvata
-                console.log("🔄 Sincronizzazione in background...");
-                await performSync(savedSession);
+                render();
+                hideLoader();
+
+                // ⭐ Sync silente in background
+                performSync(savedSession);
             } else {
                 console.log("❌ No session - showing login");
                 state.isLoggedIn = false;
                 state.view = 'login';
-
-                // ⭐ Carica comunque i dati locali (feed/market potrebbero essere cached)
-                const cachedPosts = localStorage.getItem(globalKey('posts'));
-                if (cachedPosts) {
-                    try { state.posts = JSON.parse(cachedPosts); } catch (e) { state.posts = []; }
-                }
-                const cachedMarket = localStorage.getItem(globalKey('market'));
-                if (cachedMarket) {
-                    try { state.marketItems = JSON.parse(cachedMarket); } catch (e) { state.marketItems = []; }
-                }
-
                 render();
+                hideLoader();
             }
 
             // ⭐ LOG di debug per verificare persistenza
@@ -1475,23 +1513,27 @@
                 }
             } catch (e) {
                 console.error("⚠️ Errore Sync:", e);
-                if (e.message.includes("Sessione non valida")) {
+
+                if (String(e?.message || "").includes("Sessione non valida")) {
                     if (sessionData && sessionData.storedUser && sessionData.storedPass) {
                         await performSilentLogin(sessionData.schoolCode, sessionData.storedUser, sessionData.storedPass);
                     } else {
-                        sessionManager.clear();
-                        state.isLoggedIn = false;
-                        state.view = 'login';
-                        alert("❌ Sessione scaduta. Effettua di nuovo il login.");
-                        render();
+                        // NON reindirizzare alla login: resta sulla pagina corrente
+                        state.isOffline = true;
+                        state.didup.connected = false;
+                        updateOfflineBadge && updateOfflineBadge();
+                        // niente state.view = 'login'
+                        // niente alert bloccante
                     }
                 } else {
+                    // Altri errori: resta sulla pagina e passa in offline
                     state.isOffline = true;
-                    updateOfflineBadge();
-                    render();
+                    updateOfflineBadge && updateOfflineBadge();
                 }
             } finally {
                 state.syncing = false;
+                hideLoader && hideLoader();
+                render && render();
             }
         }
 
@@ -1680,53 +1722,76 @@
             saveTasks();
             if (shouldRender) render();
         }
-        function render() {
-            const previousView = state.previousView || '';
-            const currentView = state.view;
+        const VIEW_KEY = 'gconnect_current_view';
 
-            document.querySelectorAll('.nav-item').forEach((el, idx) => {
-                const views = ['home', 'market', 'feed', 'planner', 'profile'];
-                if (views[idx] === currentView) el.classList.add('active');
+        function saveView(view) {
+            if (!view || view === 'login') return;
+            localStorage.setItem(VIEW_KEY, view);
+        }
+
+        function loadView() {
+            return localStorage.getItem(VIEW_KEY) || 'home';
+        }
+
+        function showLoader(message = "Caricamento...") {
+            const loader = document.getElementById('app-loader');
+            if (loader) {
+                loader.querySelector('.msg').innerText = message;
+                loader.style.display = 'flex';
+                loader.style.opacity = '1';
+            }
+        }
+
+        function hideLoader() {
+            const loader = document.getElementById('app-loader');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => { loader.style.display = 'none'; }, 300);
+            }
+        }
+
+        function navigate(view, params = {}) {
+            console.log("🚀 Navigating to:", view, params);
+            state.view = view;
+            if (params.user) state.currentChatUser = params.user;
+            saveView(view); // Persist view
+            render();
+            window.scrollTo(0, 0);
+        }
+
+        function render() {
+            const root = document.getElementById('app');
+            if (!root) return;
+
+            if (!state.isLoggedIn) {
+                root.innerHTML = renderLogin();
+                return;
+            }
+
+            saveView(state.view); // Salva la view ad ogni render
+
+            // Update Navigation Active state
+            document.querySelectorAll('.nav-item').forEach(el => {
+                const viewAttr = el.getAttribute('onclick');
+                if (viewAttr && viewAttr.includes(`'${state.view}'`)) el.classList.add('active');
                 else el.classList.remove('active');
             });
 
-            if (!state.isLoggedIn) {
-                document.getElementById('bottom-nav').style.display = 'none';
-                app.innerHTML = renderLogin();
-            } else {
-                document.getElementById('bottom-nav').style.display = 'flex';
-
-                if (previousView !== currentView) {
-                    app.style.opacity = '0';
-                    app.style.transition = 'opacity 0.15s ease-out';
-
-                    requestAnimationFrame(() => {
-                        setTimeout(() => {
-                            if (currentView === 'home') app.innerHTML = renderHome();
-                            else if (currentView === 'search') app.innerHTML = renderSearch();
-                            else if (currentView === 'market') app.innerHTML = renderMarket();
-                            else if (currentView === 'feed') app.innerHTML = renderFeed();
-                            else if (currentView === 'planner') app.innerHTML = renderPlanner();
-                            else if (currentView === 'profile') app.innerHTML = renderProfile();
-                            else if (currentView === 'chat') app.innerHTML = renderChat();
-
-                            requestAnimationFrame(() => {
-                                app.style.opacity = '1';
-                            });
-                        }, 150);
-                    });
-                }
+            // View Switcher logic
+            let html = '';
+            switch (state.view) {
+                case 'home': html = renderHome(); break;
+                case 'feed': html = renderFeed(); break;
+                case 'planner': html = renderPlanner(); break;
+                case 'market': html = renderMarket(); break;
+                case 'profile': html = renderProfile(); break;
+                case 'chat': html = renderChat(); break;
+                case 'search': html = renderSearch(); break;
+                default: html = renderHome(); break;
             }
 
-            state.previousView = currentView;
-        }
-
-        function navigate(v) {
-            if (state.view !== v) {
-                state.view = v;
-                render();
-                window.scrollTo(0, 0); // Reset scroll position on the body
-            }
+            root.innerHTML = html;
+            updateOfflineBadge();
         }
 
         function updatePlanTaskUI(taskId, isPlanned) {
@@ -3787,6 +3852,14 @@
         window.addPollOption = addPollOption;
         window.publishPost = publishPost;
         window.navigate = navigate;
+        window.showLoader = showLoader;
+        window.hideLoader = hideLoader;
+
+        // Mostra loader anche al ritorno da refresh / bfcache
+        window.addEventListener('pageshow', () => {
+            showLoader && showLoader("Ripristino pagina...");
+            setTimeout(() => hideLoader && hideLoader(), 400);
+        });
     </script>
 </body>
 
