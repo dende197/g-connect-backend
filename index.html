@@ -439,6 +439,7 @@
             gap: 14px;
             margin-bottom: 20px;
             width: 100%;
+            flex: 1;
         }
 
         .metrics-grid>* {
@@ -2192,6 +2193,18 @@
             }
 
             root.innerHTML = html;
+
+            // Dopo ogni render, se siamo in Home, ridisegna i widget (imposta dimensioni corrette ai canvas)
+            if (state.view === 'home') {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const level = (state.stressLevels && state.stressLevels[todayStr] != null) ? Number(state.stressLevels[todayStr]) : 5;
+                const mediaVal = parseFloat(calcolaMedia(state.voti)) || 0;
+                setTimeout(() => {
+                    if (typeof initHomeWidgets === 'function') {
+                        initHomeWidgets({ mediaValue: mediaVal, stressLevel: level });
+                    }
+                }, 0);
+            }
             updateOfflineBadge();
         }
 
@@ -2546,26 +2559,8 @@
                     </div>` : ''}
                 </div>
 
-                <!-- Media + Stress row -->
-                <div style="display:flex; gap:12px; margin: 12px 0;">
-                    <!-- Media gauge with dynamic background -->
-                    <div class="card glass-panel gauge-card ${gaugeClass}" style="flex:1; margin-bottom:0;" onclick="showVotiView()">
-                        <div class="gauge-label">Media</div>
-                        <svg class="gauge-svg" viewBox="0 0 120 120">
-                            <path d="M14,60 A46,46 0 0,1 106,60" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="12" stroke-linecap="round"/>
-                            <defs>
-                                <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stop-color="#22c55e"/><stop offset="50%" stop-color="#84cc16"/><stop offset="100%" stop-color="#14b8a6"/>
-                                </linearGradient>
-                            </defs>
-                            <path d="M14,60 A46,46 0 0,1 106,60" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round"
-                                style="stroke-dasharray:${circumference.toFixed(2)}; stroke-dashoffset:${(circumference - dash).toFixed(2)}; transition: stroke-dashoffset 0.5s ease-out;"/>
-                        </svg>
-                        <div class="gauge-value">${media ? m.toFixed(2) : '--'}</div>
-                    </div>
-
                 <!-- Media + Stress (Advanced Canvas Widgets) -->
-                <div class="metrics-grid">
+                <div class="metrics-grid" style="margin:12px 0;">
                     <!-- STRESS -->
                     <div class="metric-card stress" onclick="showPlanWeekModal()">
                         <div class="title">Stress</div>
