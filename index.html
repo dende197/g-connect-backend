@@ -464,11 +464,17 @@
             /* Stabilizza aspect ratio */
         }
 
-        /* Card Stress (viola ad alta fedeltà) */
+        /* Card Stress: solo sfondo, nessun padding interno */
         .metric-card.stress {
             background: radial-gradient(circle at 50% 45%, var(--stress-bg-lighter) 0%, var(--stress-bg-main) 60%, var(--stress-bg-darker) 100%);
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
             border: none;
+            padding: 0;
+            /* nessun padding, canvas a piena area */
+            position: relative;
+            overflow: hidden;
+            min-height: 155px;
+            /* stabilizza laltezza su mobile */
         }
 
         .metric-card.stress::before {
@@ -479,14 +485,12 @@
             pointer-events: none;
         }
 
-        .metric-card.stress .title {
-            color: rgba(255, 255, 255, 0.9);
-            font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 6px;
-            position: relative;
-            /* ensure above before */
-            z-index: 1;
+        /* Canvas dell’onda a piena larghezza/altezza della card */
+        #stressWaveCanvas {
+            display: block;
+            width: 100%;
+            height: 140px;
+            /* regola a piacere */
         }
 
         .stress-wave {
@@ -2225,12 +2229,11 @@
 
             // Dopo ogni render, se siamo in Home, ridisegna i widget (imposta dimensioni corrette ai canvas)
             if (state.view === 'home') {
-                const todayStr = new Date().toISOString().slice(0, 10);
-                const level = (state.stressLevels && state.stressLevels[todayStr] != null) ? Number(state.stressLevels[todayStr]) : 5;
                 const mediaVal = parseFloat(calcolaMedia(state.voti)) || 0;
                 setTimeout(() => {
-                    if (typeof initHomeWidgets === 'function') {
-                        initHomeWidgets({ mediaValue: mediaVal, stressLevel: level });
+                    initStressWaveFromState();
+                    if (typeof renderMediaGauge === 'function') {
+                        renderMediaGauge(mediaVal);
                     }
                 }, 0);
             }
@@ -2590,11 +2593,9 @@
 
                 <!-- Media + Stress (Advanced Canvas Widgets) -->
                 <div class="metrics-grid" style="margin:12px 0;">
-                    <!-- STRESS -->
+                    <!-- STRESS (Solo sfondo + onda) -->
                     <div class="metric-card stress" onclick="showStressCaptureModal()">
-                        <div class="title">Stress</div>
-                        <canvas id="stressWaveCanvas" class="stress-wave"></canvas>
-                        <div id="stressLevelBadge" class="stress-level-badge">Livello: ${level}</div>
+                        <canvas id="stressWaveCanvas"></canvas>
                     </div>
 
                     <!-- MEDIA -->
@@ -4326,11 +4327,8 @@
                     cancelAnimationFrame(__stressWaveRAF);
                     return;
                 }
+                // Pulisci, ma NON disegnare alcun rettangolo di sfondo
                 ctx.clearRect(0, 0, W, H);
-
-                // delicato bagliore di fondo
-                ctx.fillStyle = 'rgba(255,255,255,0.06)';
-                ctx.fillRect(0, 0, W, H);
 
                 // linea onda
                 ctx.lineWidth = 3;
@@ -4351,10 +4349,14 @@
                 __stressWaveRAF = requestAnimationFrame(draw);
             }
             draw();
+        }
 
-            // Badge livello
-            const badge = document.getElementById('stressLevelBadge');
-            if (badge) badge.textContent = `Livello: ${level}`;
+        /* Dopo ogni render della Home, ridisegna l’onda con il livello odierno */
+        function initStressWaveFromState() {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const level = (state.stressLevels && state.stressLevels[todayStr] != null)
+                ? Number(state.stressLevels[todayStr]) : 5;
+            renderStressWave(level);
         }
 
         /* 3B) MEDIA: gauge semicircolare animato (valore 0-10) */
@@ -4437,13 +4439,11 @@
             renderMediaGauge(mediaValue);
         }
 
-        /* 3E) Rerender su resize (mantiene la qualità del canvas) */
+        /* Se ridimensioni, ridisegna mantenendo la qualità */
         window.addEventListener('resize', () => {
             if (state.view !== 'home') return;
-            const badgeText = document.getElementById('stressLevelBadge')?.textContent || 'Livello: 5';
-            const level = Number((badgeText.split(':')[1] || '5').trim()) || 5;
+            initStressWaveFromState();
             const currentMedia = Number(document.getElementById('mediaValue')?.dataset.current || '0') || 0;
-            renderStressWave(level);
             renderMediaGauge(currentMedia);
         });
 
