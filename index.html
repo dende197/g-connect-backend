@@ -350,14 +350,13 @@
                     rgba(10, 17, 40, 0.00) 100%);
         }
 
-        /* 5) Header Home: pulsante Cerca centrale */
+        /* Header Home con Cerca centrale */
         .home-hero {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            margin-bottom: 20px;
-            padding: 0 4px;
+            margin-bottom: 12px;
         }
 
         .home-search-center {
@@ -367,20 +366,18 @@
         }
 
         .search-big {
-            width: auto;
-            min-width: 160px;
-            padding: 10px 20px;
+            min-width: 180px;
+            padding: 12px 18px;
             border-radius: 999px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.15);
             color: white;
-            font-weight: 700;
+            font-weight: 800;
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
+            gap: 10px;
             cursor: pointer;
-            box-shadow: 0 10px 32px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
             transition: all 0.2s ease;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
@@ -391,7 +388,7 @@
             background: rgba(255, 255, 255, 0.15);
         }
 
-        /* 6) Card profilo CinqueAnna */
+        /* Card profilo */
         .profile-card {
             display: flex;
             align-items: center;
@@ -400,8 +397,8 @@
         }
 
         .profile-avatar {
-            width: 52px;
-            height: 52px;
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
             background: linear-gradient(135deg, #1e40af, #3b82f6);
             display: flex;
@@ -410,151 +407,155 @@
             font-weight: 800;
             color: #fff;
             font-size: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.25);
             flex-shrink: 0;
         }
 
         .profile-meta {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
         }
 
         .tag-cinqueanna {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
+            gap: 8px;
+            padding: 6px 10px;
             border-radius: 999px;
-            background: rgba(59, 130, 246, 0.15);
+            background: rgba(59, 130, 246, 0.18);
             color: #93c5fd;
-            font-weight: 700;
+            font-weight: 800;
             font-size: 11px;
-            letter-spacing: .2px;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            width: fit-content;
+            letter-spacing: .3px;
+            border: 1px solid rgba(59, 130, 246, 0.35);
         }
 
-        /* 7) Widget Media (gauge semicircolare) */
+        /* Media gauge: semicirconferenza + sfondo dinamico */
         .gauge-card {
             position: relative;
-            padding: 18px 16px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
             align-items: center;
-            justify-content: center;
         }
 
         .gauge-svg {
-            width: 110px;
-            height: 70px;
+            width: 120px;
+            height: 120px;
         }
 
         .gauge-label {
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.6);
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 700;
         }
 
         .gauge-value {
             position: absolute;
-            bottom: 18px;
-            font-size: 22px;
+            top: 56%;
+            transform: translateY(-50%);
+            font-size: 24px;
             font-weight: 800;
             color: white;
-            text-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+            text-shadow: 0 2px 8px rgba(0, 0, 0, .25);
         }
 
-        /* 8) Widget Stress (card viola + wave) */
+        /* Sfondi dinamici */
+        .gauge-good {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.22), rgba(22, 163, 74, 0.18));
+            border-color: rgba(34, 197, 94, 0.35);
+        }
+
+        .gauge-warn {
+            background: linear-gradient(135deg, rgba(245, 159, 11, 0.22), rgba(250, 204, 21, 0.18));
+            border-color: rgba(245, 159, 11, 0.35);
+        }
+
+        .gauge-bad {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(220, 38, 38, 0.18));
+            border-color: rgba(239, 68, 68, 0.35);
+        }
+
+        /* Stress card viola + wave */
         .stress-card {
             position: relative;
-            padding: 18px 16px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
             align-items: center;
-            justify-content: center;
             background: linear-gradient(135deg, #4c1d95, #6d28d9);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.22);
             cursor: pointer;
-            transition: transform 0.2s ease;
-        }
-
-        .stress-card:active {
-            transform: scale(0.98);
         }
 
         .stress-label {
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.8);
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.95);
+            font-weight: 700;
         }
 
         .stress-wave {
-            width: 100px;
-            height: 40px;
+            width: 120px;
+            height: 60px;
         }
 
         .stress-wave path {
-            stroke: rgba(255, 255, 255, 0.8);
+            stroke: rgba(255, 255, 255, 0.92);
             stroke-width: 3.5;
             fill: none;
             stroke-linecap: round;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .2));
+            filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .25));
             animation: wavePulse 2.4s ease-in-out infinite;
         }
 
         @keyframes wavePulse {
             0% {
                 stroke-dashoffset: 0;
-                opacity: .8;
+                opacity: .9
             }
 
             50% {
                 stroke-dashoffset: 24;
-                opacity: 1;
+                opacity: 1
             }
 
             100% {
                 stroke-dashoffset: 0;
-                opacity: .8;
+                opacity: .9
             }
         }
 
-        /* 9) Animazione fluida selezione stress */
+        /* Stress selector fluido */
         .stress-level-grid {
             display: flex;
             justify-content: space-between;
-            gap: 8px;
+            gap: 10px;
         }
 
         .stress-pill {
             flex: 1;
             aspect-ratio: 1;
-            border-radius: 12px;
-            border: 1.5px solid rgba(255, 255, 255, 0.1);
-            background: rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.06);
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-            color: rgba(255, 255, 255, 0.5);
+            transition: transform .15s ease, background .15s ease, border-color .15s ease, color .15s ease;
+            color: rgba(255, 255, 255, 0.6);
             font-weight: 800;
             font-size: 18px;
             cursor: pointer;
         }
 
         .stress-pill.active {
-            transform: scale(1.1);
-            background: var(--blue);
+            transform: scale(1.06);
             color: #fff;
-            border-color: #fff;
-            box-shadow: 0 0 15px rgba(10, 132, 255, 0.5);
+            border-color: rgba(255, 255, 255, 0.35);
+            background: var(--blue);
         }
 
         /* 11) Sezione Circolari spostata in basso */
@@ -573,17 +574,17 @@
         }
 
         .circolare-card {
-            min-width: 240px;
-            background: rgba(255, 255, 255, 0.08);
+            min-width: 260px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 20px;
-            padding: 16px;
+            padding: 18px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            justify-content: space-between;
             position: relative;
-            overflow: hidden;
         }
 
         /* Avatar circolare (fallback iniziale) */
@@ -1188,6 +1189,13 @@
             return (somma / validi.length).toFixed(2);
         }
 
+        // Helper: calcola classi sfondo media (good/warn/bad)
+        function gaugeClassForMedia(m) {
+            if (m >= 6.5) return 'gauge-good';
+            if (m >= 6.0) return 'gauge-warn';
+            return 'gauge-bad';
+        }
+
         const DIRECTORY = [
             { name: 'Alessandro Russo', id: 'demo:alessandro:0', class: '5B', status: 'online' },
             { name: 'Sofia Bianchi', id: 'demo:sofia:0', class: '3A', status: 'offline' },
@@ -1532,7 +1540,7 @@
             }
         }
 
-        // Carica planner dal server per il profilo attivo
+        // Carica planner dal server: non sovrascrivere locale se il remoto è vuoto e il locale ha dati
         async function fetchPlannerRemote() {
             const userId = getUserId();
             if (!sessionManager.isLoggedIn() || !userId || userId === 'guest') return;
@@ -1541,43 +1549,36 @@
                 const res = await fetch(`${API_BASE_URL}/api/planner/${encodeURIComponent(userId)}`);
                 const data = await res.json();
                 if (data.success && data.data) {
-                    state.plannedTasks = data.data.plannedTasks || {};
-                    state.stressLevels = data.data.stressLevels || {};
-                    const details = data.data.plannedDetails || {};
+                    const remotePT = data.data.plannedTasks || {};
+                    const remoteSL = data.data.stressLevels || {};
+                    const remoteUpdatedAt = data.data.updatedAt || null;
 
-                    // Cache locale per accesso offline
-                    localStorage.setItem(lsKey('planned_tasks'), JSON.stringify(state.plannedTasks));
-                    localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels));
+                    const localPT = JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}');
+                    const localSL = JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}');
+                    const localUpdatedAt = localStorage.getItem(lsKey('planner_updated_at')) || null;
 
-                    // Se i compiti non sono ancora caricati (o mancano alcuni ID), idrata con snapshot
-                    const plannedIds = [...new Set(Object.values(state.plannedTasks).flat())];
-                    const missing = plannedIds.filter(id => !state.tasks.find(t => t.id === id));
-                    if (missing.length && details && Object.keys(details).length) {
-                        missing.forEach(id => {
-                            const d = details[id];
-                            if (!d) return;
-                            const dateObj = parseArgoDate(d.due_date);
-                            state.tasks.push({
-                                id,
-                                text: d.text,
-                                subject: d.subject,
-                                due_date: d.due_date,
-                                display_date: d.due_date,
-                                dateObj,
-                                hasValidDate: !isNaN(dateObj.getTime()),
-                                done: false
-                            });
-                        });
-                        // ordina e salva
-                        state.tasks.sort((a, b) => (a.dateObj || 0) - (b.dateObj || 0));
-                        saveTasks();
+                    // Regola: se remoto è vuoto e locale ha dati, non sovrascrivere
+                    const remoteEmpty = Object.keys(remotePT).length === 0 && Object.keys(remoteSL).length === 0;
+                    const localHasData = Object.keys(localPT).length > 0 || Object.keys(localSL).length > 0;
+
+                    if (remoteEmpty && localHasData) {
+                        // mantieni locale, ma aggiorna cache timestamp
+                        console.log("ℹ️ Planner remoto vuoto, mantengo locale.");
+                        state.plannedTasks = localPT;
+                        state.stressLevels = localSL;
+                    } else {
+                        state.plannedTasks = remotePT;
+                        state.stressLevels = remoteSL;
+                        localStorage.setItem(lsKey('planned_tasks'), JSON.stringify(state.plannedTasks));
+                        localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels));
+                        if (remoteUpdatedAt) localStorage.setItem(lsKey('planner_updated_at'), remoteUpdatedAt);
                     }
 
-                    console.log("✅ Planner remoto caricato → cache locale aggiornata (idratazione:", missing?.length || 0, "items)");
-                    notifyPlannerChanged(); // aggiorna UI
+                    console.log("✅ Planner remoto caricato → cache locale aggiornata");
+                    notifyPlannerChanged();
                 }
             } catch (e) {
-                console.error("fetchPlannerRemote failed:", e);
+                console.warn("Planner remote fetch failed:", e.message);
             }
         }
 
@@ -1674,65 +1675,21 @@
         }
 
         // Salva planner sul server quando cambia
-        // --- PLANNER PERSISTENCE & CONSTRAINTS ---
-        let _plannerSaveT = null;
-        function debouncedSavePlannerRemote(delay = 250) {
-            if (_plannerSaveT) clearTimeout(_plannerSaveT);
-            _plannerSaveT = setTimeout(() => {
-                savePlannerRemote().catch(() => { });
-            }, delay);
-        }
-
-        async function hardSavePlanner() {
-            try {
-                saveTasks();
-                await savePlannerRemote();
-                if (typeof saveTasksSnapshotRemote === 'function') {
-                    await saveTasksSnapshotRemote();
-                }
-            } catch (e) {
-                console.error("hardSavePlanner error:", e);
-            }
-        }
-
-        function isFutureOrToday(dateStr) {
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
-            return d.getTime() >= today.getTime();
-        }
-
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') {
-                hardSavePlanner();
-            }
-        });
-
-        window.addEventListener('beforeunload', () => {
-            hardSavePlanner();
-        });
-
+        // Save remoto + timestamp locale
         async function savePlannerRemote() {
             const userId = getUserId();
             if (!sessionManager.isLoggedIn() || !userId || userId === 'guest') return;
 
-            // Costruisci uno snapshot minimale dei compiti pianificati (per render su altri device)
+            // Snapshot compiti pianificati per portabilità
             const plannedDetails = {};
             try {
                 for (const [dateStr, ids] of Object.entries(state.plannedTasks || {})) {
                     ids.forEach(id => {
                         const t = state.tasks.find(x => x.id === id);
-                        if (t) {
-                            plannedDetails[id] = {
-                                text: t.text,
-                                subject: t.subject,
-                                due_date: t.due_date
-                            };
-                        }
+                        if (t) plannedDetails[id] = { text: t.text, subject: t.subject, due_date: t.due_date };
                     });
                 }
-            } catch (e) {
-                console.warn("build plannedDetails failed:", e.message);
-            }
+            } catch { }
 
             const payload = {
                 plannedTasks: state.plannedTasks || {},
@@ -1742,17 +1699,56 @@
 
             try {
                 const res = await fetch(`${API_BASE_URL}/api/planner/${encodeURIComponent(userId)}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const nowIso = new Date().toISOString();
+                localStorage.setItem(lsKey('planner_updated_at'), nowIso);
                 console.log("✅ Planner salvato sul server");
             } catch (e) {
-                console.warn("Planner remote save failed, aggiungo a outbox:", e.message);
+                console.warn("Planner remote save failed, outbox:", e.message);
                 enqueueOutbox('planner', { userId, payload });
             }
         }
+
+        // Debounce e hard-save
+        let _plannerSaveT = null;
+        function debouncedSavePlannerRemote(delay = 250) {
+            if (_plannerSaveT) clearTimeout(_plannerSaveT);
+            _plannerSaveT = setTimeout(() => { savePlannerRemote().catch(() => { }); }, delay);
+        }
+        async function hardSavePlanner() {
+            try {
+                saveTasks(); await savePlannerRemote();
+                if (typeof saveTasksSnapshotRemote === 'function') await saveTasksSnapshotRemote();
+            } catch { }
+        }
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') hardSavePlanner(); });
+        window.addEventListener('beforeunload', () => { hardSavePlanner(); });
+
+        // Watchdog: se planner si svuota, ripristina dalla cache
+        function verifyAndRepairPlanner() {
+            try {
+                const localPT = JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}');
+                const localSL = JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}');
+                if ((Object.keys(state.plannedTasks || {}).length === 0) && Object.keys(localPT).length > 0) {
+                    state.plannedTasks = localPT; notifyPlannerChanged();
+                    console.log("🔁 Ripristino plannedTasks da cache");
+                }
+                if ((Object.keys(state.stressLevels || {}).length === 0) && Object.keys(localSL).length > 0) {
+                    state.stressLevels = localSL; console.log("🔁 Ripristino stressLevels da cache");
+                }
+            } catch { }
+        }
+        // Autosave/verify periodico
+        setInterval(() => { debouncedSavePlannerRemote(0); if (typeof saveTasksSnapshotRemote === 'function') saveTasksSnapshotRemote(); verifyAndRepairPlanner(); }, 45000);
+
+        function isFutureOrToday(dateStr) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
+            return d.getTime() >= today.getTime();
+        }
+
 
         async function submitPost(postData) {
             // optimistic: aggiorna subito UI/cache
@@ -2490,15 +2486,12 @@
             const plannedTasks = state.tasks.filter(t => plannedIds.includes(t.id));
             const media = calcolaMedia(state.voti);
             const m = media ? parseFloat(media) : 0;
-            const pct = Math.max(0, Math.min(1, m / 10)); // 0..1
-
-            // Gauge semicircolare path calc
-            const C = { cx: 60, cy: 60, r: 46 }; // semicircle
-            const circumference = Math.PI * C.r; // half circle length
+            const pct = Math.max(0, Math.min(1, m / 10));
+            const C = { r: 46 };
+            const circumference = Math.PI * C.r;
             const dash = circumference * pct;
-
-            // Stress current level
             const level = state.stressLevels[todayStr] || 0;
+            const gaugeClass = gaugeClassForMedia(m);
 
             return `
             <div class="view page-bg">
@@ -2508,21 +2501,20 @@
                         <h1 style="margin:0; font-size:28px; font-weight:800; letter-spacing:-0.02em;">Dashboard</h1>
                     </div>
                     <div class="home-search-center">
-                        <button class="search-big" onclick="navigate('search')" title="Cerca">
-                            <i class="ph-bold ph-magnifying-glass" style="font-size: 20px;"></i>
-                            Cerca
+                        <button class="search-big" onclick="showSearchModal()" title="Cerca">
+                            <i class="ph-bold ph-magnifying-glass" style="font-size:20px;"></i> Cerca
                         </button>
                     </div>
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <button onclick="openArgoLogin()" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 12px; color: white; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                        <button onclick="openArgoLogin()" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 12px; color: white; font-weight: 700; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
                             <i class="ph-fill ph-user-switch"></i> Profilo
                         </button>
                     </div>
                 </div>
 
-                <!-- Card profilo CinqueAnna -->
+                <!-- Profilo -->
                 <div class="card profile-card">
-                    <div class="profile-avatar">${(state.user?.name || 'C')[0]}</div>
+                    <div class="profile-avatar">${(state.user?.name || 'U')[0]}</div>
                     <div class="profile-meta" style="flex:1; min-width:0;">
                         <div style="font-size:16px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                             ${state.user?.name || 'Utente'}
@@ -2536,16 +2528,40 @@
                     </div>` : ''}
                 </div>
 
-                <!-- Sezione Organizza Oggi (prioritaria) -->
+                <!-- ROW: Media + Stress (SOTTO profilo, SOPRA Organizza Oggi) -->
+                <div style="display:flex; gap:12px; margin: 12px 0;">
+                    <!-- Media gauge con sfondo dinamico -->
+                    <div class="card glass-panel gauge-card ${gaugeClass}" style="flex:1; margin-bottom:0;" onclick="showVotiView()">
+                        <div class="gauge-label">Media</div>
+                        <svg class="gauge-svg" viewBox="0 0 120 120">
+                            <path d="M14,60 A46,46 0 0,1 106,60" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="12" stroke-linecap="round"/>
+                            <defs>
+                                <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#22c55e"/><stop offset="50%" stop-color="#84cc16"/><stop offset="100%" stop-color="#14b8a6"/>
+                                </linearGradient>
+                            </defs>
+                            <path d="M14,60 A46,46 0 0,1 106,60" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round"
+                                style="stroke-dasharray:${circumference.toFixed(2)}; stroke-dashoffset:${(circumference - dash).toFixed(2)}; transition: stroke-dashoffset 0.5s ease-out;"/>
+                        </svg>
+                        <div class="gauge-value">${media ? m.toFixed(2) : '--'}</div>
+                    </div>
+
+                    <!-- Stress card con wave e click per dettagli -->
+                    <div class="card stress-card" style="flex:1; margin-bottom:0;" onclick="showStressDetailsModal()" title="Stress">
+                        <div class="stress-label">Stress</div>
+                        <svg class="stress-wave" viewBox="0 0 120 60" preserveAspectRatio="none">
+                            <path d="M5 30 Q 20 10, 35 30 T 65 30 T 95 25 T 115 30" stroke-dasharray="60 24"/>
+                        </svg>
+                        ${level > 0 ? `<div style="position:absolute; bottom:10px; right:12px; background: rgba(255,255,255,0.18); color:#fff; font-size:11px; font-weight:800; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.28);" data-stress-badge>${level}</div>` : ''}
+                    </div>
+                </div>
+
+                <!-- Organizza Oggi -->
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px;">
                     <h2 style="margin:0; text-align:left;">Organizza Oggi</h2>
-                    <button onclick="showPlanWeekModal()" class="btn-secondary" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); padding:10px 14px; border-radius: 12px; color: white; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <i class="ph-bold ph-calendar-check" style="font-size: 18px;"></i> Pianifica
-                        ${plannedIds.length > 0 ? `
-                            <div id="planned-counter" style="margin-left:8px; background: var(--green); color: black; min-width: 24px; height: 24px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; padding: 0 8px; font-size: 12px; font-weight: 800;">
-                                ${plannedIds.length}
-                            </div>` : ''
-                }
+                    <button onclick="showPlanWeekModal()" class="btn-secondary" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); padding:10px 14px; border-radius: 12px; color: white; font-weight:700; display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+                        <i class="ph-bold ph-calendar-check" style="font-size:18px;"></i> Pianifica
+                        ${plannedIds.length > 0 ? `<div id="planned-counter" style="margin-left:8px; background: var(--green); color:black; min-width:24px; height:24px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; padding:0 8px; font-size:12px; font-weight:800;">${plannedIds.length}</div>` : ''}
                     </button>
                 </div>
 
@@ -2558,50 +2574,16 @@
                                 <div style="display:flex; align-items:center; gap:12px; padding:12px; background: rgba(255,255,255,0.06); border-radius: 12px; border-left: 3px solid ${subjectColor};">
                                     <div style="flex:1; min-width:0;">
                                         <div style="font-weight:700; font-size:14px; color:white; margin-bottom:2px;">${t.text}</div>
-                                        <div style="font-size:11px; color:${subjectColor}; font-weight:800; text-transform:uppercase; letter-spacing: .4px;">${t.subject}</div>
+                                        <div style="font-size:11px; color:${subjectColor}; font-weight:800; text-transform:uppercase; letter-spacing:.4px;">${t.subject}</div>
                                     </div>
                                 </div>`;
                     }).join('')
-                    : '<div style="text-align:center; opacity: .6; font-size: 13px; padding: 10px;">Nessun compito pianificato per oggi.</div>'
+                    : '<div style="text-align:center; opacity:.6; font-size:13px; padding:10px;">Nessun compito pianificato per oggi.</div>'
                 }
                     </div>
                 </div>
 
-                <!-- Widget row: Media + Stress -->
-                <div style="display:flex; gap:12px; margin: 16px 0;">
-                    <!-- Media Gauge -->
-                    <div class="card glass-panel gauge-card" style="flex:1; margin-bottom:0;" onclick="showVotiView()">
-                        <div class="gauge-label">Media</div>
-                        <svg class="gauge-svg" viewBox="0 0 120 120">
-                            <!-- semicircle background -->
-                            <path d="M14,60 A46,46 0 0,1 106,60" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="12" stroke-linecap="round"/>
-                            <!-- progress arc -->
-                            <defs>
-                                <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stop-color="#22c55e"/>
-                                    <stop offset="50%" stop-color="#84cc16"/>
-                                    <stop offset="100%" stop-color="#14b8a6"/>
-                                </linearGradient>
-                            </defs>
-                            <path d="M14,60 A46,46 0 0,1 106,60"
-                                    fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round"
-                                    style="stroke-dasharray:${circumference.toFixed(2)}; stroke-dashoffset:${(circumference - dash).toFixed(2)}; transition: stroke-dashoffset 0.5s ease-out;"/>
-                        </svg>
-                        <div class="gauge-value">${media ? m.toFixed(2) : '--'}</div>
-                    </div>
-
-                    <!-- Stress Wave -->
-                    <div class="card stress-card" style="flex:1; margin-bottom:0;" onclick="showStressModal()" title="Stress">
-                        <div class="stress-label">Stress</div>
-                        <svg class="stress-wave" viewBox="0 0 120 60" preserveAspectRatio="none">
-                            <path d="M5 30 Q 20 10, 35 30 T 65 30 T 95 25 T 115 30"
-                                    stroke-dasharray="60 24"/>
-                        </svg>
-                        ${level > 0 ? `<div style="position:absolute; bottom:10px; right:12px; background: rgba(255,255,255,0.18); color:#fff; font-size:11px; font-weight:800; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.28);" data-stress-badge>${level}</div>` : ''}
-                    </div>
-                </div>
-
-                <!-- Circolari spostate in fondo -->
+                <!-- Circolari in fondo -->
                 <div style="margin-top: 18px;">
                     <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom: 12px;">
                         <h2 class="circolari-title">Ultime Circolari</h2>
@@ -2610,10 +2592,10 @@
                     <div class="circolari-row">
                         ${state.news.map(n => `
                             <div class="circolare-card" onclick="window.open('${n.url}', '_blank')" style="cursor:pointer;">
-                                <i class="ph-fill ph-file-pdf" style="position: absolute; right: -10px; bottom: -10px; font-size: 80px; color: rgba(255,255,255,0.05); transform: rotate(-15deg);"></i>
+                                <i class="ph-fill ph-file-pdf" style="position:absolute; right:-10px; bottom:-10px; font-size:80px; color: rgba(255,255,255,0.05); transform: rotate(-15deg);"></i>
                                 <div>
                                     <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
-                                        <i class="ph-fill ph-file-pdf" style="color: #ef4444; font-size: 16px;"></i>
+                                        <i class="ph-fill ph-file-pdf" style="color:#ef4444; font-size:16px;"></i>
                                         <span style="color: rgba(255,255,255,0.7); font-size: 11px; font-weight: 800; text-transform: uppercase;">CIRCOLARE</span>
                                     </div>
                                     <h3 style="margin: 0; font-size: 16px; line-height: 1.3; font-weight: 700; color: white; text-align: left;">${n.title}</h3>
@@ -2996,12 +2978,12 @@
             }).join('');
         }
 
+        // Stress Modal fluida (mantieni selezione senza ri-render)
         function showStressModal() {
             const todayStr = new Date().toISOString().split('T')[0];
             const currentLevel = state.stressLevels[todayStr] || 0;
             const modalContainer = getModalContainer();
             if (!modalContainer) return;
-
             modalContainer.innerHTML = `
             <div class="modal-overlay" onclick="closeModal(event)">
                 <div class="modal-content glass-panel" style="max-width: 420px; padding: 24px;">
@@ -3011,18 +2993,61 @@
                     </div>
                     <p style="opacity:.7; margin-bottom: 16px; font-size: 14px;">Seleziona il tuo livello di stress. L’animazione è fluida e non ricarica la vista.</p>
                     <div class="stress-level-grid">
-                        ${[1, 2, 3, 4, 5].map(lv => `
-                            <div class="stress-pill ${currentLevel === lv ? 'active' : ''}" data-stress="${lv}" onclick="setStressLevel(${lv}, true)">${lv}</div>
-                        `).join('')}
+                        ${[1, 2, 3, 4, 5].map(lv => `<div class="stress-pill ${currentLevel === lv ? 'active' : ''}" data-stress="${lv}" onclick="setStressLevel(${lv}, true)">${lv}</div>`).join('')}
                     </div>
                     <div style="display:flex; justify-content:center; margin-top: 24px;">
-                        <button onclick="closeModal()" class="btn-primary" style="max-width: 200px;">Conferma</button>
+                        <button onclick="closeModal()" class="btn-primary" style="max-width: 220px;">Conferma</button>
                     </div>
                 </div>
             </div>
             `;
         }
 
+        // Dettagli Stress: grafico storico ultimi 14 giorni (linea)
+        function showStressDetailsModal() {
+            const days = 14;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const points = [];
+            const modalContainer = getModalContainer();
+            if (!modalContainer) return;
+
+            for (let i = days - 1; i >= 0; i--) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                const iso = d.toISOString().split('T')[0];
+                const lv = state.stressLevels[iso] || 0;
+                points.push({ date: iso, lv, x: ((days - 1 - i) / (days - 1)) * 280, y: 100 - (lv / 5) * 80 });
+            }
+            const path = points.map((p, idx) => (idx === 0 ? `M ${p.x.toFixed(1)} ${p.y.toFixed(1)}` : `L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)).join(' ');
+
+            modalContainer.innerHTML = `
+            <div class="modal-overlay" onclick="closeModal(event)">
+                <div class="modal-content glass-panel" style="max-width: 520px; padding: 20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <h2 style="margin:0;">Stress • Ultimi ${days} giorni</h2>
+                        <button onclick="closeModal()" style="background:none; border:none; color:#60a5fa; font-weight:700;">Chiudi</button>
+                    </div>
+                    <div style="width:100%; height:160px; background: rgba(76,29,149,0.18); border:1px solid rgba(255,255,255,0.18); border-radius:12px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                        <svg viewBox="0 0 300 120" width="100%" height="100%" preserveAspectRatio="none">
+                            <defs>
+                                <linearGradient id="stressGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.65"/><stop offset="100%" stop-color="#7c3aed" stop-opacity="0.0"/>
+                                </linearGradient>
+                            </defs>
+                            <path d="${path}" stroke="#a78bfa" stroke-width="3" fill="none" stroke-linecap="round"/>
+                            <path d="${path} L 280 120 L 0 120 Z" fill="url(#stressGrad)"/>
+                        </svg>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:12px;">
+                        ${[1, 2, 3, 4, 5].map(lv => `<button onclick="setStressLevel(${lv}, true)" class="btn-primary" style="flex:1; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); color:white; font-weight:800;">${lv}</button>`).join('')}
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+
+        // setStressLevel(lv, inModal): aggiorna fluido
         function setStressLevel(lv, inModal = false) {
             const todayStr = new Date().toISOString().split('T')[0];
             state.stressLevels[todayStr] = lv;
@@ -3031,101 +3056,22 @@
             debouncedSavePlannerRemote();
 
             if (inModal) {
-                // Aggiornamento fluido: attiva pill selezionata
                 document.querySelectorAll('.stress-pill').forEach(p => {
-                    const val = Number(p.getAttribute('data-stress'));
-                    p.classList.toggle('active', val === lv);
+                    p.classList.toggle('active', Number(p.getAttribute('data-stress')) === lv);
                 });
             }
 
-            // Aggiorna widget stress in Home (solo contenuto, niente re-render completo)
-            const stressCard = document.querySelector('.stress-card');
-            if (stressCard) {
-                const existingBadge = stressCard.querySelector('[data-stress-badge]');
+            // Aggiorna badge in Home
+            const stressBadge = document.querySelector('.stress-card');
+            if (stressBadge) {
+                const existingBadge = stressBadge.querySelector('[data-stress-badge]');
                 if (existingBadge) existingBadge.remove();
-
                 const badge = document.createElement('div');
                 badge.setAttribute('data-stress-badge', '');
-                badge.style = "position:absolute; bottom:10px; right:12px; background: rgba(255,255,255,0.18); color:#fff; font-size:11px; font-weight:800; padding: 4px 8px; border-radius: 999px; border:1px solid rgba(255,255,255,0.28);";
+                badge.style = "position:absolute; bottom:10px; right:12px; background: rgba(255,255,255,0.18); color:#fff; font-size:11px; font-weight:800; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.28);";
                 badge.textContent = String(lv);
-                stressCard.appendChild(badge);
+                stressBadge.appendChild(badge);
             }
-        }
-
-        function drawStressChart() {
-            const canvas = document.getElementById('stressChart');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            const w = canvas.width;
-            const h = canvas.height;
-            ctx.clearRect(0, 0, w, h);
-
-            const days = 7;
-            const points = [];
-            for (let i = days - 1; i >= 0; i--) {
-                const d = new Date();
-                d.setDate(d.getDate() - i);
-                const key = d.toISOString().split('T')[0];
-                const val = state.stressLevels[key] || 0;
-                points.push({
-                    x: 30 + ((days - 1 - i) * (w - 60) / (days - 1)),
-                    y: h - 30 - (val * (h - 60) / 5),
-                    val: val
-                });
-            }
-
-            // Grid lines (y-axis)
-            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-            ctx.lineWidth = 1;
-            for (let i = 1; i <= 5; i++) {
-                const y = h - 30 - (i * (h - 60) / 5);
-                ctx.beginPath();
-                ctx.moveTo(30, y); ctx.lineTo(w - 30, y);
-                ctx.stroke();
-            }
-
-            // Area gradient
-            const grad = ctx.createLinearGradient(0, 0, 0, h);
-            grad.addColorStop(0, 'rgba(37, 99, 235, 0.2)');
-            grad.addColorStop(1, 'rgba(37, 99, 235, 0)');
-
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, h - 30);
-            points.forEach(p => ctx.lineTo(p.x, p.y));
-            ctx.lineTo(points[points.length - 1].x, h - 30);
-            ctx.closePath();
-            ctx.fill();
-
-            // Line
-            ctx.strokeStyle = 'var(--blue)';
-            ctx.lineWidth = 4;
-            ctx.lineJoin = 'round';
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            points.forEach((p, i) => {
-                if (i === 0) ctx.moveTo(p.x, p.y);
-                else ctx.lineTo(p.x, p.y);
-            });
-            ctx.stroke();
-
-            // Glow
-            ctx.shadowBlur = 15; ctx.shadowColor = 'var(--blue)';
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-
-            // Dots
-            points.forEach(p => {
-                if (p.val > 0) {
-                    ctx.fillStyle = 'white';
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = 'var(--blue)';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                }
-            });
         }
         function showPlanWeekModal() {
             const modalContainer = getModalContainer();
