@@ -432,101 +432,87 @@
             border: 1px solid rgba(59, 130, 246, 0.35);
         }
 
-        /* Media gauge: semicirconferenza + sfondo dinamico */
-        .gauge-card {
+        /* Nuova Griglia Metriche (Canvas Based) */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
             position: relative;
-            padding: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            align-items: center;
+            border-radius: 18px;
+            padding: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.12);
         }
 
-        .gauge-svg {
-            width: 110px;
-            height: 110px;
+        /* Card Stress (viola + onda animata) */
+        .metric-card.stress {
+            background: linear-gradient(180deg, #5a49c9 0%, #6b52d1 60%, #7a59d7 100%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 24px rgba(106, 84, 208, 0.35);
         }
 
-        .gauge-label {
-            font-size: 12px;
+        .metric-card.stress .title {
             color: rgba(255, 255, 255, 0.9);
-            font-weight: 700;
-        }
-
-        .gauge-value {
-            position: absolute;
-            top: 55%;
-            transform: translateY(-50%);
-            font-size: 22px;
-            font-weight: 800;
-            color: white;
-            text-shadow: 0 2px 8px rgba(0, 0, 0, .25);
-        }
-
-        /* Sfondi dinamici */
-        .gauge-good {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.22), rgba(22, 163, 74, 0.18));
-            border-color: rgba(34, 197, 94, 0.35);
-        }
-
-        .gauge-warn {
-            background: linear-gradient(135deg, rgba(245, 159, 11, 0.22), rgba(250, 204, 21, 0.18));
-            border-color: rgba(245, 159, 11, 0.35);
-        }
-
-        .gauge-bad {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(220, 38, 38, 0.18));
-            border-color: rgba(239, 68, 68, 0.35);
-        }
-
-        /* Stress card viola + wave */
-        .stress-card {
-            position: relative;
-            padding: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            align-items: center;
-            background: linear-gradient(135deg, #4c1d95, #6d28d9);
-            border: 1px solid rgba(255, 255, 255, 0.22);
-            cursor: pointer;
-        }
-
-        .stress-label {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.95);
-            font-weight: 700;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 8px;
         }
 
         .stress-wave {
-            width: 110px;
-            height: 55px;
+            width: 100%;
+            height: 96px;
+            display: block;
+            border-radius: 12px;
+            background: radial-gradient(80% 80% at 20% 20%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
         }
 
-        .stress-wave path {
-            stroke: rgba(255, 255, 255, 0.92);
-            stroke-width: 3.5;
-            fill: none;
-            stroke-linecap: round;
-            filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .25));
-            animation: wavePulse 2.4s ease-in-out infinite;
+        .stress-level-badge {
+            position: absolute;
+            right: 14px;
+            bottom: 12px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.85);
+            background: rgba(0, 0, 0, 0.2);
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
         }
 
-        @keyframes wavePulse {
-            0% {
-                stroke-dashoffset: 0;
-                opacity: .9
-            }
+        /* Card Media (gauge semicircolare animato) */
+        .metric-card.media {
+            background: linear-gradient(180deg, rgba(28, 30, 40, 0.65) 0%, rgba(28, 30, 40, 0.55) 100%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 24px rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
 
-            50% {
-                stroke-dashoffset: 24;
-                opacity: 1
-            }
+        .metric-card.media .title {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
 
-            100% {
-                stroke-dashoffset: 0;
-                opacity: .9
-            }
+        .media-gauge {
+            width: 100%;
+            height: 118px;
+            display: block;
+        }
+
+        .media-value {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 700;
+            color: #ffffff;
+            transform: translateY(6px);
+            pointer-events: none;
         }
 
         /* Stress selector fluido */
@@ -2569,13 +2555,20 @@
                         <div class="gauge-value">${media ? m.toFixed(2) : '--'}</div>
                     </div>
 
-                    <!-- Stress card opening selection modal -->
-                    <div class="card stress-card" style="flex:1; margin-bottom:0;" onclick="showStressModal()" title="Stress">
-                        <div class="stress-label">Stress</div>
-                        <svg class="stress-wave" viewBox="0 0 120 60" preserveAspectRatio="none">
-                            <path d="M5 30 Q 20 10, 35 30 T 65 30 T 95 25 T 115 30" stroke-dasharray="60 24"/>
-                        </svg>
-                        ${level > 0 ? `<div style="position:absolute; bottom:10px; right:12px; background: rgba(255,255,255,0.18); color:#fff; font-size:11px; font-weight:800; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.28);" data-stress-badge>${level}</div>` : ''}
+                <!-- Media + Stress (Advanced Canvas Widgets) -->
+                <div class="metrics-grid">
+                    <!-- STRESS -->
+                    <div class="metric-card stress" onclick="showPlanWeekModal()">
+                        <div class="title">Stress</div>
+                        <canvas id="stressWaveCanvas" class="stress-wave"></canvas>
+                        <div id="stressLevelBadge" class="stress-level-badge">Livello: ${level}</div>
+                    </div>
+
+                    <!-- MEDIA -->
+                    <div class="metric-card media" onclick="showVotiView()">
+                        <div class="title">Media</div>
+                        <canvas id="mediaGaugeCanvas" class="media-gauge"></canvas>
+                        <div id="mediaValue" class="media-value">${media ? m.toFixed(2) : '0.00'}</div>
                     </div>
                 </div>
 
@@ -4257,6 +4250,170 @@
         }
 
         // Init - render will be called by DOMContentLoaded
+        let __stressWaveRAF = null;
+        let __mediaGaugeRAF = null;
+
+        /* Utilità canvas DPR-safe */
+        function setupCanvas(canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = Math.floor(rect.width * dpr);
+            canvas.height = Math.floor(rect.height * dpr);
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            return { ctx, rect, dpr };
+        }
+
+        /* 3A) STRESS: onda animata (livello 0-10) */
+        function renderStressWave(level = 5) {
+            const canvas = document.getElementById('stressWaveCanvas');
+            if (!canvas) return;
+            const { ctx, rect } = setupCanvas(canvas);
+            const W = rect.width, H = rect.height;
+
+            // Parametri onda in base al livello
+            const ampBase = 16;
+            const amp = ampBase * (0.35 + (level / 10) * 0.65); // più livello → più ampiezza
+            const freq = 0.018;
+            const speed = 0.05;
+
+            if (__stressWaveRAF) cancelAnimationFrame(__stressWaveRAF);
+            let t = 0;
+
+            function strokeGradient() {
+                const g = ctx.createLinearGradient(0, 0, W, 0);
+                g.addColorStop(0.00, '#c7b8ff');
+                g.addColorStop(0.50, '#ffffff');
+                g.addColorStop(1.00, '#c7b8ff');
+                return g;
+            }
+
+            function draw() {
+                if (!document.getElementById('stressWaveCanvas')) {
+                    cancelAnimationFrame(__stressWaveRAF);
+                    return;
+                }
+                ctx.clearRect(0, 0, W, H);
+
+                // delicato bagliore di fondo
+                ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                ctx.fillRect(0, 0, W, H);
+
+                // linea onda
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = strokeGradient();
+                ctx.shadowColor = 'rgba(255,255,255,0.35)';
+                ctx.shadowBlur = 6;
+
+                ctx.beginPath();
+                const midY = H / 2;
+                for (let x = 0; x <= W; x += 2) {
+                    const y = midY + Math.sin(x * freq + t) * amp;
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+
+                t += speed;
+                __stressWaveRAF = requestAnimationFrame(draw);
+            }
+            draw();
+
+            // Badge livello
+            const badge = document.getElementById('stressLevelBadge');
+            if (badge) badge.textContent = `Livello: ${level}`;
+        }
+
+        /* 3B) MEDIA: gauge semicircolare animato (valore 0-10) */
+        function renderMediaGauge(target = 0) {
+            const canvas = document.getElementById('mediaGaugeCanvas');
+            const valueEl = document.getElementById('mediaValue');
+            if (!canvas || !valueEl) return;
+
+            const { ctx, rect } = setupCanvas(canvas);
+            const W = rect.width, H = rect.height;
+
+            // Semicerchio inferiore
+            const cx = W / 2, cy = H * 0.95;
+            const radius = Math.min(W, H * 2) / 2.2;
+            const start = Math.PI;      // 180°
+            const endMax = 2 * Math.PI;   // 360°
+            const lineW = 10;
+
+            let current = Math.max(0, Math.min(10, Number(valueEl.dataset.current) || 0));
+
+            function arcGradient() {
+                const g = ctx.createLinearGradient(cx - radius, cy, cx + radius, cy);
+                g.addColorStop(0.00, '#44d2ff');
+                g.addColorStop(0.50, '#61e26c');
+                g.addColorStop(1.00, '#9be15a');
+                return g;
+            }
+
+            if (__mediaGaugeRAF) cancelAnimationFrame(__mediaGaugeRAF);
+
+            function draw() {
+                if (!document.getElementById('mediaGaugeCanvas')) {
+                    cancelAnimationFrame(__mediaGaugeRAF);
+                    return;
+                }
+                ctx.clearRect(0, 0, W, H);
+
+                // fondo ghost
+                ctx.lineWidth = lineW;
+                ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+                ctx.beginPath(); ctx.arc(cx, cy, radius, start, endMax, false); ctx.stroke();
+
+                // progress
+                const progress = (current / 10);
+                const end = start + progress * Math.PI; // semicircolare (180° → 360°)
+                ctx.lineWidth = lineW;
+                ctx.strokeStyle = arcGradient();
+                ctx.shadowColor = 'rgba(255,255,255,0.25)';
+                ctx.shadowBlur = 8;
+                ctx.beginPath(); ctx.arc(cx, cy, radius, start, end, false); ctx.stroke();
+
+                // knob
+                const knobX = cx + radius * Math.cos(end);
+                const knobY = cy + radius * Math.sin(end);
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath(); ctx.arc(knobX, knobY, 6, 0, Math.PI * 2); ctx.fill();
+
+                // valore numerico
+                valueEl.textContent = (Math.round(current * 100) / 100).toFixed(2);
+
+                // easing verso target
+                const diff = target - current;
+                const step = Math.sign(diff) * Math.min(Math.abs(diff), 0.08);
+                current = current + step;
+
+                __mediaGaugeRAF = requestAnimationFrame(draw);
+            }
+            draw();
+
+            valueEl.dataset.current = String(target);
+        }
+
+        /* 3C) API semplici per aggiornare i widget in runtime */
+        function updateStressWidget(level) { renderStressWave(level); }
+        function updateMediaWidget(value) { renderMediaGauge(value); }
+
+        /* 3D) Init: richiama con i tuoi valori (es. media voti e stress odierno) */
+        function initHomeWidgets({ mediaValue = 7.64, stressLevel = 5 } = {}) {
+            renderStressWave(stressLevel);
+            renderMediaGauge(mediaValue);
+        }
+
+        /* 3E) Rerender su resize (mantiene la qualità del canvas) */
+        window.addEventListener('resize', () => {
+            if (state.view !== 'home') return;
+            const badgeText = document.getElementById('stressLevelBadge')?.textContent || 'Livello: 5';
+            const level = Number((badgeText.split(':')[1] || '5').trim()) || 5;
+            const currentMedia = Number(document.getElementById('mediaValue')?.dataset.current || '0') || 0;
+            renderStressWave(level);
+            renderMediaGauge(currentMedia);
+        });
+
         // ⭐ Global exposures
         window.showPlanWeekModal = showPlanWeekModal;
         window.closeModal = closeModal;
@@ -4269,6 +4426,7 @@
         window.hideBoot = hideBoot;
         window.submitPollVote = submitPollVote;
         window.fetchPolls = fetchPolls;
+        window.initHomeWidgets = initHomeWidgets;
 
         // Mostra loader anche al ritorno da refresh / bfcache
         window.addEventListener('pageshow', () => {
