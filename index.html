@@ -477,6 +477,17 @@
             /* stabilizza laltezza su mobile */
         }
 
+        .metric-card.stress .title {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+            font-size: 14px;
+            z-index: 2;
+            pointer-events: none;
+        }
+
         .metric-card.stress::before {
             content: '';
             position: absolute;
@@ -2595,6 +2606,7 @@
                 <div class="metrics-grid" style="margin:12px 0;">
                     <!-- STRESS (Solo sfondo + onda) -->
                     <div class="metric-card stress" onclick="showStressCaptureModal()">
+                        <div class="title">Stress</div>
                         <canvas id="stressWaveCanvas"></canvas>
                     </div>
 
@@ -3126,6 +3138,10 @@
                 badge.style = "position:absolute; bottom:10px; right:12px; background: rgba(255,255,255,0.18); color:#fff; font-size:11px; font-weight:800; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.28);";
                 badge.textContent = String(lv);
                 stressBadge.appendChild(badge);
+            }
+            // Trigger animazione onda live
+            if (typeof initStressWaveFromState === 'function') {
+                initStressWaveFromState();
             }
         }
         function showPlanWeekModal() {
@@ -4487,7 +4503,8 @@
           ${Array.from({ length: 11 }, (_, lv) => lv).map(lv => `
             <button 
               onclick="setStressLevel(${lv}, true); drawWeeklyStressChart('weeklyStressChart');" 
-              class="btn-primary" 
+              class="stress-pill btn-primary" 
+              data-stress="${lv}" 
               style="
                 flex:1 0 48px; 
                 min-width:48px; 
