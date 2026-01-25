@@ -2591,7 +2591,7 @@
                 <!-- Media + Stress (Advanced Canvas Widgets) -->
                 <div class="metrics-grid" style="margin:12px 0;">
                     <!-- STRESS -->
-                    <div class="metric-card stress" onclick="showPlanWeekModal()">
+                    <div class="metric-card stress" onclick="showStressCaptureModal()">
                         <div class="title">Stress</div>
                         <canvas id="stressWaveCanvas" class="stress-wave"></canvas>
                         <div id="stressLevelBadge" class="stress-level-badge">Livello: ${level}</div>
@@ -4466,6 +4466,129 @@
             showBoot("Ripristino pagina...");
             setTimeout(hideBoot, 400);
         });
+
+        function showStressCaptureModal() {
+            const modalContainer = getModalContainer();
+            if (!modalContainer) return;
+
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const currentLevel = state.stressLevels?.[todayStr] ?? null;
+
+            modalContainer.innerHTML = `
+    <div class="modal-overlay" onclick="closeModal(event)">
+      <div class="modal-content glass-panel" onclick="event.stopPropagation()" style="max-width: 480px; padding: 20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+          <h2 style="margin:0;">Stress di oggi</h2>
+          <button onclick="closeModal()" style="background:none; border:none; color:#60a5fa; font-weight:700; cursor:pointer;">Chiudi</button>
+        </div>
+
+        <!-- Selettore livello 0-10 -->
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+          ${Array.from({ length: 11 }, (_, lv) => lv).map(lv => `
+            <button 
+              onclick="setStressLevel(${lv}, true); drawWeeklyStressChart('weeklyStressChart');" 
+              class="btn-primary" 
+              style="
+                flex:1 0 48px; 
+                min-width:48px; 
+                height:36px; 
+                border-radius:12px; 
+                font-weight:800; 
+                background:${currentLevel === lv ? 'var(--blue)' : 'rgba(255,255,255,0.12)'}; 
+                border:1px solid ${currentLevel === lv ? 'var(--blue)' : 'rgba(255,255,255,0.22)'};">
+              ${lv}
+            </button>
+          `).join('')}
+        </div>
+
+        <!-- Grafico settimanale -->
+        <div style="margin-top:8px;">
+          <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Andamento ultimi 7 giorni</div>
+          <canvas id="weeklyStressChart" width="600" height="180" style="width:100%; height:180px; border:1px solid rgba(255,255,255,0.12); border-radius:12px;"></canvas>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+          <button onclick="closeModal()" class="btn-primary" style="max-width:200px;">Salva</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+            // Disegna subito il grafico
+            drawWeeklyStressChart('weeklyStressChart');
+        }
+
+        function drawWeeklyStressChart(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            // DPR-safe
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = Math.floor(rect.width * dpr);
+            canvas.height = Math.floor(rect.height * dpr);
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            const W = rect.width, H = rect.height;
+
+            // Calcola ultimi 7 giorni
+            const days = 7;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const series = [];
+            for (let i = days - 1; i >= 0; i--) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                const iso = d.toISOString().slice(0, 10);
+                const lv = Number(state.stressLevels?.[iso] ?? 0);
+                series.push({ date: iso, level: lv });
+            }
+
+            // Sfondo
+            ctx.clearRect(0, 0, W, H);
+            ctx.fillStyle = 'rgba(255,255,255,0.05)';
+            ctx.fillRect(0, 0, W, H);
+
+            // Assi
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(40, 16);
+            ctx.lineTo(40, H - 28);
+            ctx.lineTo(W - 12, H - 28);
+            ctx.stroke();
+
+            // Linea valori (0-10)
+            const minX = 52, maxX = W - 24;
+            const minY = 20, maxY = H - 40;
+            const stepX = (maxX - minX) / Math.max(1, series.length - 1);
+
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            series.forEach((pt, i) => {
+                const x = minX + i * stepX;
+                const y = maxY - (pt.level / 10) * (maxY - minY);
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                // punti
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+            });
+            ctx.stroke();
+
+            // Etichette giorno
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            ctx.font = '11px system-ui';
+            series.forEach((pt, i) => {
+                const x = minX + i * stepX;
+                const label = pt.date.slice(5); // MM-DD
+                ctx.fillText(label, x - 12, H - 10);
+            });
+        }
+
+        window.showStressCaptureModal = showStressCaptureModal;
+        window.drawWeeklyStressChart = drawWeeklyStressChart;
     </script>
 </body>
 
