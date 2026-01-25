@@ -8,6 +8,9 @@
     <title>G-Connect</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- Forza coerenza della system bar su Android/Samsung per entrambe le modalità -->
+    <meta name="theme-color" content="#0a1128" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#0a1128" media="(prefers-color-scheme: light)">
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
@@ -257,25 +260,22 @@
         }
 
 
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
+        /* 1) Comunica al browser che la pagina è già dark: evita auto-darkening */
+        html {
+            color-scheme: dark;
             background: #000;
-            color: var(--text-main);
-            font-family: 'Outfit', -apple-system, sans-serif;
         }
 
-        /* Sfondo sempre fullscreen, elimina bande anche se iOS stretch-a */
+        /* 2) Gradiente globale più ricco di blu, sempre attivo */
         body::before {
             content: "";
             position: fixed;
             inset: 0;
             z-index: -1;
-            background: linear-gradient(to bottom, #000000 0%, #0a1128 100%);
+            background: linear-gradient(135deg, #020617 0%, #0a1128 55%, #1e3a8a 100%);
+            background-attachment: fixed;
             transform: translateZ(0);
+            -webkit-transform: translateZ(0);
         }
 
         body {
@@ -300,26 +300,52 @@
             min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 96px);
         }
 
-        /* Cards */
-        .card {
-            background: var(--glass-base);
-            backdrop-filter: blur(30px) saturate(120%);
-            -webkit-backdrop-filter: blur(30px) saturate(120%);
-            border: 1px solid var(--glass-border);
+        /* 3) Pannelli glass: blocca qualsiasi “auto-darkening” involontario */
+        .card,
+        .glass-panel {
+            mix-blend-mode: normal;
+            filter: none;
+            background: rgba(255, 255, 255, 0.24);
+            backdrop-filter: blur(40px) saturate(120%);
+            -webkit-backdrop-filter: blur(40px) saturate(120%);
+            border: 1px solid rgba(255, 255, 255, 0.28);
             border-radius: var(--radius-lg);
             padding: 24px;
             margin-bottom: 24px;
-            box-shadow: none;
             position: relative;
             overflow: hidden;
         }
 
         .glass-panel {
-            background: var(--glass-panel);
-            backdrop-filter: blur(50px) saturate(100%);
-            -webkit-backdrop-filter: blur(50px) saturate(100%);
-            border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: var(--radius-xl);
+        }
+
+        /* 4) Rafforza un po’ i border/contrast quando il sistema è in dark */
+        @media (prefers-color-scheme: dark) {
+
+            .card,
+            .glass-panel {
+                background: rgba(255, 255, 255, 0.26);
+                border-color: rgba(255, 255, 255, 0.30);
+            }
+        }
+
+        /* 5) Overlay blu leggero per le viste con meno percezione di blu (Home, Market) */
+        .page-bg {
+            position: relative;
+        }
+
+        .page-bg::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background: radial-gradient(120% 120% at 50% 0%,
+                    rgba(30, 64, 175, 0.25) 0%,
+                    /* #1e40af soft */
+                    rgba(10, 17, 40, 0.00) 60%,
+                    rgba(10, 17, 40, 0.00) 100%);
         }
 
         /* Avatar circolare (fallback iniziale) */
@@ -2195,7 +2221,7 @@
             else if (m >= 5.0 && m < 6.0) mediaColor = 'var(--yellow)';
 
             return `
-            <div class="view">
+            <div class="view page-bg">
                 <!-- Header: Avatar + Nome + Search centrale -->
                 <div class="card" style="padding:16px; margin-bottom:16px;">
                     <div style="display:grid; grid-template-columns: auto 1fr auto; align-items:center; gap:14px;">
@@ -2324,7 +2350,7 @@
             const list = [...pinned, ...normal];
 
             return `
-            <div class="view">
+            <div class="view page-bg">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                     <h1>Market Libri</h1>
                     <button onclick="openNewItemModal()" style="background:var(--green); color:black; padding:8px 16px; border-radius:20px; border:none; font-weight:700; cursor:pointer;">+ Vendi</button>
