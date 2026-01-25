@@ -12,7 +12,7 @@
     <meta name="theme-color" content="#0a1128" media="(prefers-color-scheme: dark)">
     <meta name="theme-color" content="#0a1128" media="(prefers-color-scheme: light)">
     <link
-        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Urbanist:wght@500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/main.min.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -283,6 +283,8 @@
             overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
             min-height: 100dvh;
+            color: var(--text-main);
+            font-family: 'Rubik', 'Urbanist', -apple-system, system-ui, sans-serif;
         }
 
         #app {
@@ -346,6 +348,242 @@
                     /* #1e40af soft */
                     rgba(10, 17, 40, 0.00) 60%,
                     rgba(10, 17, 40, 0.00) 100%);
+        }
+
+        /* 5) Header Home: pulsante Cerca centrale */
+        .home-hero {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 0 4px;
+        }
+
+        .home-search-center {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+        }
+
+        .search-big {
+            width: auto;
+            min-width: 160px;
+            padding: 10px 20px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            box-shadow: 0 10px 32px rgba(0, 0, 0, 0.25);
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .search-big:active {
+            transform: scale(0.96);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* 6) Card profilo CinqueAnna */
+        .profile-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px;
+        }
+
+        .profile-avatar {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            color: #fff;
+            font-size: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            flex-shrink: 0;
+        }
+
+        .profile-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .tag-cinqueanna {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.15);
+            color: #93c5fd;
+            font-weight: 700;
+            font-size: 11px;
+            letter-spacing: .2px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            width: fit-content;
+        }
+
+        /* 7) Widget Media (gauge semicircolare) */
+        .gauge-card {
+            position: relative;
+            padding: 18px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .gauge-svg {
+            width: 110px;
+            height: 70px;
+        }
+
+        .gauge-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .gauge-value {
+            position: absolute;
+            bottom: 18px;
+            font-size: 22px;
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+        }
+
+        /* 8) Widget Stress (card viola + wave) */
+        .stress-card {
+            position: relative;
+            padding: 18px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #4c1d95, #6d28d9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .stress-card:active {
+            transform: scale(0.98);
+        }
+
+        .stress-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stress-wave {
+            width: 100px;
+            height: 40px;
+        }
+
+        .stress-wave path {
+            stroke: rgba(255, 255, 255, 0.8);
+            stroke-width: 3.5;
+            fill: none;
+            stroke-linecap: round;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .2));
+            animation: wavePulse 2.4s ease-in-out infinite;
+        }
+
+        @keyframes wavePulse {
+            0% {
+                stroke-dashoffset: 0;
+                opacity: .8;
+            }
+
+            50% {
+                stroke-dashoffset: 24;
+                opacity: 1;
+            }
+
+            100% {
+                stroke-dashoffset: 0;
+                opacity: .8;
+            }
+        }
+
+        /* 9) Animazione fluida selezione stress */
+        .stress-level-grid {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .stress-pill {
+            flex: 1;
+            aspect-ratio: 1;
+            border-radius: 12px;
+            border: 1.5px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: 800;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .stress-pill.active {
+            transform: scale(1.1);
+            background: var(--blue);
+            color: #fff;
+            border-color: #fff;
+            box-shadow: 0 0 15px rgba(10, 132, 255, 0.5);
+        }
+
+        /* 11) Sezione Circolari spostata in basso */
+        .circolari-row {
+            display: flex;
+            gap: 16px;
+            overflow-x: auto;
+            padding: 4px 0 16px 0;
+            margin: 0 -24px;
+            padding-left: 24px;
+            scrollbar-width: none;
+        }
+
+        .circolari-row::-webkit-scrollbar {
+            display: none;
+        }
+
+        .circolare-card {
+            min-width: 240px;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            position: relative;
+            overflow: hidden;
         }
 
         /* Avatar circolare (fallback iniziale) */
@@ -2248,100 +2486,142 @@
 
         function renderHome() {
             const todayStr = new Date().toISOString().split('T')[0];
-            const plannedTodayCount = (state.plannedTasks[todayStr] || []).length;
+            const plannedIds = state.plannedTasks[todayStr] || [];
+            const plannedTasks = state.tasks.filter(t => plannedIds.includes(t.id));
             const media = calcolaMedia(state.voti);
             const m = media ? parseFloat(media) : 0;
-            const percent = (m / 10) * 188;
+            const pct = Math.max(0, Math.min(1, m / 10)); // 0..1
 
-            let mediaColor = 'var(--red)';
-            if (m >= 6.0) mediaColor = 'var(--green)';
-            else if (m >= 5.0 && m < 6.0) mediaColor = 'var(--yellow)';
+            // Gauge semicircolare path calc
+            const C = { cx: 60, cy: 60, r: 46 }; // semicircle
+            const circumference = Math.PI * C.r; // half circle length
+            const dash = circumference * pct;
+
+            // Stress current level
+            const level = state.stressLevels[todayStr] || 0;
 
             return `
             <div class="view page-bg">
-                <!-- Header: Avatar + Nome + Search centrale -->
-                <div class="card" style="padding:16px; margin-bottom:16px;">
-                    <div style="display:grid; grid-template-columns: auto 1fr auto; align-items:center; gap:14px;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            ${renderAvatar(state.user.name, 44)}
-                            <div>
-                               <div style="font-size:16px; font-weight:700; color:white;">${state.user.name || 'Utente'}</div>
-                               <div style="font-size:12px; color:var(--text-muted);">Classe ${state.user.class || '-'}</div>
-                            </div>
-                        </div>
-                        <div>
-                            <div style="position: relative;">
-                                <i class="ph ph-magnifying-glass" style="position:absolute; left:12px; top:10px; color: var(--text-muted); font-size:18px;"></i>
-                                <input type="text" placeholder="Cerca persone o materie..." onfocus="navigate('search')" style="padding-left:38px; margin-bottom:0; height:38px;">
-                            </div>
-                        </div>
-                        <div>
-                            <button onclick="openArgoLogin()" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); width:40px; height:40px; border-radius: 12px; color:white; display:flex; align-items:center; justify-content:center; cursor:pointer;">
-                                <i class="ph-fill ph-user-switch" style="font-size:18px;"></i>
-                            </button>
-                        </div>
+                <!-- Header con Cerca centrale -->
+                <div class="home-hero">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <h1 style="margin:0; font-size:28px; font-weight:800; letter-spacing:-0.02em;">Dashboard</h1>
                     </div>
-                </div>
-
-                ${!state.didup.connected ? `
-                    <div class="card" style="background: rgba(255, 159, 10, 0.15); border: 1px solid var(--orange); margin-bottom: 20px; padding: 16px; display: flex; align-items: center; gap: 12px;">
-                        <i class="ph ph-warning" style="color: var(--orange); font-size: 24px;"></i>
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; margin-bottom: 4px; color: white;">DidUP Non Connesso</div>
-                            <div style="font-size: 12px; color: rgba(255,255,255,0.7);">Collega DidUP per vedere voti e compiti</div>
-                        </div>
-                        <button onclick="openArgoLogin()" style="background: var(--orange); color: black; padding: 8px 16px; border-radius: 8px; border: none; font-weight: 700; font-size: 12px; cursor: pointer;">
-                            Connetti
+                    <div class="home-search-center">
+                        <button class="search-big" onclick="navigate('search')" title="Cerca">
+                            <i class="ph-bold ph-magnifying-glass" style="font-size: 20px;"></i>
+                            Cerca
                         </button>
                     </div>
-                ` : ''}
-
-                <!-- Ultime Circolari -->
-                <div style="margin-bottom: 24px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
-                        <h2 style="margin:0; text-align:left;">Ultime Circolari</h2>
-                        <button onclick="window.open('https://www.liceogandhi.edu.it/categoria/storico-circolari/','_blank')" style="background:none; border:none; color:var(--blue); font-weight:700; cursor:pointer;">Vedi tutte</button>
-                    </div>
-                    <div style="display:flex; gap:12px; overflow-x:auto; padding: 8px 0; margin: 0 -24px; padding-left: 24px; scrollbar-width: none;">
-                        ${renderCirculars()}
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <button onclick="openArgoLogin()" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 12px; color: white; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                            <i class="ph-fill ph-user-switch"></i> Profilo
+                        </button>
                     </div>
                 </div>
 
-                <!-- Panoramica: Media + Stress -->
-                <h2 style="margin-bottom: 12px; text-align:left;">Panoramica</h2>
-                <div style="display:flex; gap:12px; margin-bottom: 20px;">
-                    <div class="card glass-panel" onclick="showVotiView()" style="flex:1; padding: 12px; text-align:center; cursor:pointer; margin-bottom:0;">
-                        <div style="position:relative; width:64px; height:64px; margin:0 auto 6px auto;">
-                            <svg width="64" height="64" viewBox="0 0 70 70">
-                                <circle cx="35" cy="35" r="30" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6"/>
-                                <circle cx="35" cy="35" r="30" fill="none" stroke="${mediaColor}" stroke-width="6" stroke-dasharray="188" stroke-dashoffset="${188 - percent}" transform="rotate(-90 35 35)" stroke-linecap="round"/>
-                            </svg>
-                            <span style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:16px; font-weight:800; color:white;">${media || '--'}</span>
+                <!-- Card profilo CinqueAnna -->
+                <div class="card profile-card">
+                    <div class="profile-avatar">${(state.user?.name || 'C')[0]}</div>
+                    <div class="profile-meta" style="flex:1; min-width:0;">
+                        <div style="font-size:16px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            ${state.user?.name || 'Utente'}
                         </div>
-                        <span style="font-size:11px; color: rgba(255,255,255,0.7); font-weight:700; text-transform:uppercase;">Media</span>
-                    </div>
-
-                    <div class="card glass-panel" onclick="showStressModal()" style="flex:1; padding: 12px; text-align:center; cursor:pointer; margin-bottom:0;">
-                        <div style="position:relative; width:64px; height:64px; margin:0 auto 6px auto; display:flex; align-items:center; justify-content:center;">
-                             <div style="width: 44px; height: 44px; background: rgba(255,255,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white;">
-                                <i class="ph-fill ph-activity" style="font-size:24px;"></i>
-                            </div>
+                        <div class="tag-cinqueanna">
+                            <i class="ph-bold ph-graduation-cap"></i> CinqueAnna • ${state.user?.class || '5B'}
                         </div>
-                        <span style="font-size:11px; color: rgba(255,255,255,0.7); font-weight:700; text-transform:uppercase;">Stress</span>
                     </div>
+                    ${state.lastSync ? `<div style="font-size:11px; color: rgba(255,255,255,0.6); display:flex; align-items:center; gap:6px;">
+                        <i class="ph ph-clock" style="font-size:14px;"></i>${state.lastSync}
+                    </div>` : ''}
                 </div>
 
-                <!-- Organizza Oggi -->
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+                <!-- Sezione Organizza Oggi (prioritaria) -->
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px;">
                     <h2 style="margin:0; text-align:left;">Organizza Oggi</h2>
-                    <button onclick="showOrganizeStudyModal()" style="background: rgba(255,255,255,0.12); border:none; padding:10px 14px; border-radius:12px; color:white; font-weight:700; cursor:pointer; position:relative; display:flex; align-items:center; gap:8px;">
-                        <i class="ph-bold ph-calendar-check" style="font-size:18px;"></i>
-                        <span style="font-size:13px;">Organizza</span>
-                        ${plannedTodayCount > 0 ? `<div id="planned-counter" style="position:absolute; top:-8px; right:-8px; background: var(--green); color:black; width: 22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; box-shadow: 0 2px 8px rgba(0,0,0,0.4);">${plannedTodayCount}</div>` : ''}
+                    <button onclick="showPlanWeekModal()" class="btn-secondary" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); padding:10px 14px; border-radius: 12px; color: white; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <i class="ph-bold ph-calendar-check" style="font-size: 18px;"></i> Pianifica
+                        ${plannedIds.length > 0 ? `
+                            <div id="planned-counter" style="margin-left:8px; background: var(--green); color: black; min-width: 24px; height: 24px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; padding: 0 8px; font-size: 12px; font-weight: 800;">
+                                ${plannedIds.length}
+                            </div>` : ''
+                }
                     </button>
                 </div>
-                <div class="card glass-panel" onclick="navigate('planner')" style="padding: 16px; cursor:pointer;">
-                    <div id="today-planner-widget">${renderTodayPlannerWidget()}</div>
+
+                <div class="card glass-panel organize-card" onclick="navigate('planner')" style="cursor:pointer;">
+                    <div id="today-planner-widget" style="display:flex; flex-direction:column; gap:12px;">
+                        ${plannedTasks.length > 0
+                    ? plannedTasks.map(t => {
+                        const subjectColor = getSubjectColor(t.subject);
+                        return `
+                                <div style="display:flex; align-items:center; gap:12px; padding:12px; background: rgba(255,255,255,0.06); border-radius: 12px; border-left: 3px solid ${subjectColor};">
+                                    <div style="flex:1; min-width:0;">
+                                        <div style="font-weight:700; font-size:14px; color:white; margin-bottom:2px;">${t.text}</div>
+                                        <div style="font-size:11px; color:${subjectColor}; font-weight:800; text-transform:uppercase; letter-spacing: .4px;">${t.subject}</div>
+                                    </div>
+                                </div>`;
+                    }).join('')
+                    : '<div style="text-align:center; opacity: .6; font-size: 13px; padding: 10px;">Nessun compito pianificato per oggi.</div>'
+                }
+                    </div>
+                </div>
+
+                <!-- Widget row: Media + Stress -->
+                <div style="display:flex; gap:12px; margin: 16px 0;">
+                    <!-- Media Gauge -->
+                    <div class="card glass-panel gauge-card" style="flex:1; margin-bottom:0;" onclick="showVotiView()">
+                        <div class="gauge-label">Media</div>
+                        <svg class="gauge-svg" viewBox="0 0 120 120">
+                            <!-- semicircle background -->
+                            <path d="M14,60 A46,46 0 0,1 106,60" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="12" stroke-linecap="round"/>
+                            <!-- progress arc -->
+                            <defs>
+                                <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#22c55e"/>
+                                    <stop offset="50%" stop-color="#84cc16"/>
+                                    <stop offset="100%" stop-color="#14b8a6"/>
+                                </linearGradient>
+                            </defs>
+                            <path d="M14,60 A46,46 0 0,1 106,60"
+                                    fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round"
+                                    style="stroke-dasharray:${circumference.toFixed(2)}; stroke-dashoffset:${(circumference - dash).toFixed(2)}; transition: stroke-dashoffset 0.5s ease-out;"/>
+                        </svg>
+                        <div class="gauge-value">${media ? m.toFixed(2) : '--'}</div>
+                    </div>
+
+                    <!-- Stress Wave -->
+                    <div class="card stress-card" style="flex:1; margin-bottom:0;" onclick="showStressModal()" title="Stress">
+                        <div class="stress-label">Stress</div>
+                        <svg class="stress-wave" viewBox="0 0 120 60" preserveAspectRatio="none">
+                            <path d="M5 30 Q 20 10, 35 30 T 65 30 T 95 25 T 115 30"
+                                    stroke-dasharray="60 24"/>
+                        </svg>
+                        ${level > 0 ? `<div style="position:absolute; bottom:10px; right:12px; background: rgba(255,255,255,0.18); color:#fff; font-size:11px; font-weight:800; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.28);" data-stress-badge>${level}</div>` : ''}
+                    </div>
+                </div>
+
+                <!-- Circolari spostate in fondo -->
+                <div style="margin-top: 18px;">
+                    <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom: 12px;">
+                        <h2 class="circolari-title">Ultime Circolari</h2>
+                        <button onclick="window.open('https://www.liceogandhi.edu.it/categoria/storico-circolari/','_blank')" style="background:none; border:none; color:#60a5fa; font-size:14px; font-weight:700; cursor:pointer;">Vedi tutte</button>
+                    </div>
+                    <div class="circolari-row">
+                        ${state.news.map(n => `
+                            <div class="circolare-card" onclick="window.open('${n.url}', '_blank')" style="cursor:pointer;">
+                                <i class="ph-fill ph-file-pdf" style="position: absolute; right: -10px; bottom: -10px; font-size: 80px; color: rgba(255,255,255,0.05); transform: rotate(-15deg);"></i>
+                                <div>
+                                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+                                        <i class="ph-fill ph-file-pdf" style="color: #ef4444; font-size: 16px;"></i>
+                                        <span style="color: rgba(255,255,255,0.7); font-size: 11px; font-weight: 800; text-transform: uppercase;">CIRCOLARE</span>
+                                    </div>
+                                    <h3 style="margin: 0; font-size: 16px; line-height: 1.3; font-weight: 700; color: white; text-align: left;">${n.title}</h3>
+                                </div>
+                                <span style="font-size: 12px; color: #60a5fa; font-weight: 700;">Apri documento <i class="ph-bold ph-arrow-up-right" style="font-size:10px;"></i></span>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
             </div>`;
         }
@@ -2722,64 +3002,54 @@
             const modalContainer = getModalContainer();
             if (!modalContainer) return;
 
-            // Sorting history entries
-            const history = Object.entries(state.stressLevels)
-                .sort((a, b) => new Date(b[0]) - new Date(a[0]))
-                .slice(0, 7);
-
             modalContainer.innerHTML = `
             <div class="modal-overlay" onclick="closeModal(event)">
-                <div class="modal-content glass-panel" style="max-width: 440px; padding: 24px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
-                        <h2 style="margin:0; color:white;">Stress Monitor</h2>
-                        <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 24px; color:white;"></i>
+                <div class="modal-content glass-panel" style="max-width: 420px; padding: 24px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+                        <h2 style="margin:0;">Stress Giornaliero</h2>
+                        <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 22px;"></i>
                     </div>
-                    
-                    <div style="text-align:center; margin-bottom: 24px;">
-                        <p style="opacity:0.8; font-size:14px; color:white; margin-bottom:16px;">Come ti senti oggi? Registra il tuo livello per vedere il trend settimanale.</p>
-                        <div style="display:flex; gap:10px;">
-                            ${[1, 2, 3, 4, 5].map(lv => `
-                                <button onclick="setStressLevel(${lv})" style="flex:1; height:48px; border-radius:14px; border:1.5px solid ${currentLevel === lv ? 'var(--blue)' : 'rgba(255,255,255,0.1)'}; background:${currentLevel === lv ? 'rgba(37, 99, 235, 0.2)' : 'rgba(255,255,255,0.03)'}; color:${currentLevel === lv ? 'var(--blue)' : 'white'}; font-weight:800; font-size:18px; cursor:pointer; transition:all 0.2s;">${lv}</button>
-                            `).join('')}
-                        </div>
+                    <p style="opacity:.7; margin-bottom: 16px; font-size: 14px;">Seleziona il tuo livello di stress. L’animazione è fluida e non ricarica la vista.</p>
+                    <div class="stress-level-grid">
+                        ${[1, 2, 3, 4, 5].map(lv => `
+                            <div class="stress-pill ${currentLevel === lv ? 'active' : ''}" data-stress="${lv}" onclick="setStressLevel(${lv}, true)">${lv}</div>
+                        `).join('')}
                     </div>
-
-                    <div class="card" style="padding:16px; background:rgba(0,0,0,0.2); border-radius:18px; margin-bottom:24px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                            <span style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Trend Settimanale</span>
-                            <span style="font-size:11px; color:var(--blue); font-weight:700;">LIVE</span>
-                        </div>
-                        <canvas id="stressChart" width="360" height="150" style="width:100%; height:150px;"></canvas>
+                    <div style="display:flex; justify-content:center; margin-top: 24px;">
+                        <button onclick="closeModal()" class="btn-primary" style="max-width: 200px;">Conferma</button>
                     </div>
-
-                    <div style="text-align:left;">
-                        <h3 style="font-size:12px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Cronologia Recente</h3>
-                        ${history.map(([date, lv]) => {
-                const d = new Date(date);
-                const label = d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
-                return `
-                            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
-                                <span style="font-size:14px; color:rgba(255,255,255,0.8);">${label}</span>
-                                <div style="display:flex; gap:4px;">
-                                    ${Array.from({ length: 5 }).map((_, i) => `<div style="width:8px; height:8px; border-radius:50%; background:${i < lv ? 'var(--blue)' : 'rgba(255,255,255,0.1)'};"></div>`).join('')}
-                                </div>
-                            </div>`;
-            }).join('')}
-                    </div>
-
-                    <button onclick="closeModal()" class="btn-secondary" style="margin-top:24px; width:100%; height:44px; border-radius:12px; background:rgba(255,255,255,0.05); color:white; border:none; font-weight:700; cursor:pointer;">Fatto</button>
                 </div>
-            </div>`;
-            setTimeout(drawStressChart, 100);
+            </div>
+            `;
         }
 
-        function setStressLevel(lv) {
+        function setStressLevel(lv, inModal = false) {
             const todayStr = new Date().toISOString().split('T')[0];
             state.stressLevels[todayStr] = lv;
-            localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels));
-            savePlannerRemote(); // Sync to server
+            saveTasks();
+            savePlannerRemote();
             debouncedSavePlannerRemote();
-            showStressModal();
+
+            if (inModal) {
+                // Aggiornamento fluido: attiva pill selezionata
+                document.querySelectorAll('.stress-pill').forEach(p => {
+                    const val = Number(p.getAttribute('data-stress'));
+                    p.classList.toggle('active', val === lv);
+                });
+            }
+
+            // Aggiorna widget stress in Home (solo contenuto, niente re-render completo)
+            const stressCard = document.querySelector('.stress-card');
+            if (stressCard) {
+                const existingBadge = stressCard.querySelector('[data-stress-badge]');
+                if (existingBadge) existingBadge.remove();
+
+                const badge = document.createElement('div');
+                badge.setAttribute('data-stress-badge', '');
+                badge.style = "position:absolute; bottom:10px; right:12px; background: rgba(255,255,255,0.18); color:#fff; font-size:11px; font-weight:800; padding: 4px 8px; border-radius: 999px; border:1px solid rgba(255,255,255,0.28);";
+                badge.textContent = String(lv);
+                stressCard.appendChild(badge);
+            }
         }
 
         function drawStressChart() {
