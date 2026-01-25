@@ -28,6 +28,8 @@ def register_planner_routes(app: Flask):
             params = {
                 "select": "user_id,planned_tasks,stress_levels,planned_details,updated_at",
                 "user_id": f"eq.{user_id}",
+                "order": "updated_at.desc",
+                "limit": "1"
             }
             r = requests.get(url, headers=sb_headers(), params=params, timeout=15)
             if not r.ok:

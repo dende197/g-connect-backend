@@ -1436,6 +1436,43 @@
         }
 
         // Salva planner sul server quando cambia
+        // --- PLANNER PERSISTENCE & CONSTRAINTS ---
+        let _plannerSaveT = null;
+        function debouncedSavePlannerRemote(delay = 250) {
+            if (_plannerSaveT) clearTimeout(_plannerSaveT);
+            _plannerSaveT = setTimeout(() => {
+                savePlannerRemote().catch(() => { });
+            }, delay);
+        }
+
+        async function hardSavePlanner() {
+            try {
+                saveTasks();
+                await savePlannerRemote();
+                if (typeof saveTasksSnapshotRemote === 'function') {
+                    await saveTasksSnapshotRemote();
+                }
+            } catch (e) {
+                console.error("hardSavePlanner error:", e);
+            }
+        }
+
+        function isFutureOrToday(dateStr) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
+            return d.getTime() >= today.getTime();
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                hardSavePlanner();
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            hardSavePlanner();
+        });
+
         async function savePlannerRemote() {
             const userId = getUserId();
             if (!sessionManager.isLoggedIn() || !userId || userId === 'guest') return;
@@ -2741,6 +2778,7 @@
             state.stressLevels[todayStr] = lv;
             localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels));
             savePlannerRemote(); // Sync to server
+            debouncedSavePlannerRemote();
             showStressModal();
         }
 
@@ -2840,15 +2878,16 @@
                                     <div style="font-weight: 700; color: white; margin-bottom: 4px; text-align:left;">${t.text}</div>
                                     <div style="font-size: 11px; color: ${subjectColor}; font-weight:700; text-transform:uppercase; margin-bottom: 12px; text-align:left;">${t.subject}</div>
                                     <div style="display: flex; justify-content: space-between; gap: 4px;">
-                                        ${dayNames.map((label, i) => {
-                    const dayIndex = (i + 1) % 7;
+                                         ${dayNames.map((label, i) => {
                     const diff = today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1) + i;
                     const d = new Date(new Date(today).setDate(diff));
                     const dateStr = d.toISOString().split('T')[0];
-                    const isPlanned = state.plannedTasks[dateStr] && state.plannedTasks[dateStr].includes(t.id);
+                    const isFuture = isFutureOrToday(dateStr);
+                    const isPlanned = isFuture && state.plannedTasks[dateStr] && state.plannedTasks[dateStr].includes(t.id);
                     return `
-                                                <div data-task-id="${t.id}" data-date="${dateStr}" onclick="togglePlanDay('${t.id}', '${dateStr}')" 
-                                                    style="flex:1; height: 32px; border-radius: 8px; background: ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; cursor: pointer; color: ${isPlanned ? 'white' : 'rgba(255,255,255,0.4)'}; transition: all .2s;">
+                                                <div data-task-id="${t.id}" data-date="${dateStr}" 
+                                                    ${isFuture ? `onclick="togglePlanDay('${t.id}', '${dateStr}')"` : ''}
+                                                    style="flex:1; height: 32px; border-radius: 8px; background: ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isPlanned ? 'var(--blue)' : 'rgba(255,255,255,0.1)'}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; cursor: ${isFuture ? 'pointer' : 'not-allowed'}; color: ${isPlanned ? 'white' : 'rgba(255,255,255,0.4)'}; opacity: ${isFuture ? '1' : '0.45'}; pointer-events: ${isFuture ? 'auto' : 'none'}; transition: all .3s cubic-bezier(0.16, 1, 0.3, 1);">
                                                     ${label}
                                                 </div>`;
                 }).join('')}
@@ -2863,6 +2902,7 @@
 
         function togglePlanDay(taskId, dateStr) {
             if (event) event.stopPropagation();
+            if (!isFutureOrToday(dateStr)) return;
 
             if (!state.plannedTasks[dateStr]) state.plannedTasks[dateStr] = [];
             const index = state.plannedTasks[dateStr].indexOf(taskId);
@@ -2874,6 +2914,7 @@
 
             saveTasks();
             savePlannerRemote();
+            debouncedSavePlannerRemote();
             updateWeekDayButton(taskId, dateStr);
             notifyPlannerChanged(); // ✅ aggiorna Planner e Home SUBITO
         }
@@ -3711,6 +3752,7 @@
                     localStorage.setItem(lsKey('reminders'), JSON.stringify(state.reminders));
                 }
                 savePlannerRemote();
+                debouncedSavePlannerRemote();
                 updatePlanTaskUI(id, t.done); // Use t.done for the isPlanned argument
                 notifyPlannerChanged(); // ✅ aggiorna colore evento calendario + liste
 
@@ -3873,6 +3915,7 @@
 
             saveTasks();
             savePlannerRemote();
+            debouncedSavePlannerRemote();
             updatePlanTaskUI(id, state.plannedTasks[todayStr].includes(id));
             updatePlannerCounter();
             notifyPlannerChanged(); // ✅ aggiorna Planner e Home SUBITO
