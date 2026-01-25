@@ -78,7 +78,7 @@ def register_planner_routes(app: Flask):
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
 
-            url = sb_table_url("planners")
+            url = f"{sb_table_url('planners')}?on_conflict=user_id"
             headers = sb_headers()
             headers["Prefer"] = "resolution=merge-duplicates,return=representation"
 

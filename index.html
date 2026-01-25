@@ -1265,6 +1265,7 @@
             localStorage.setItem(key, JSON.stringify(list));
         }
 
+        // --- OUTBOX: anti-replay (non inviare payload più vecchi dell’ultimo timestamp locale) ---
         async function flushOutbox() {
             for (const kind of ['posts', 'market', 'planner']) {
                 const key = lsKey(`outbox_${kind}`);
@@ -1276,17 +1277,27 @@
                     try {
                         if (kind === 'planner') {
                             const userId = it.userId;
+                            const payload = it.payload || {};
+                            const payloadUpdatedAt = payload.updatedAt || null;
+                            const localUpdatedAt = localStorage.getItem(lsKey('planner_updated_at')) || null;
+
+                            if (payloadUpdatedAt && localUpdatedAt &&
+                                new Date(payloadUpdatedAt).getTime() < new Date(localUpdatedAt).getTime()) {
+                                console.log("⏭️ Outbox planner saltato (payload più vecchio del locale)");
+                                continue;
+                            }
+
                             const res = await fetch(`${API_BASE_URL}/api/planner/${encodeURIComponent(userId)}`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(it.payload)
+                                body: JSON.stringify(payload)
                             });
                             const data = await res.json().catch(() => ({ success: false }));
                             if (data.success) {
-                                state.plannedTasks = it.payload.plannedTasks || state.plannedTasks;
-                                state.stressLevels = it.payload.stressLevels || state.stressLevels;
-                                localStorage.setItem(lsKey('planned_tasks'), JSON.stringify(state.plannedTasks));
-                                localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels));
+                                if (data.data?.updatedAt) {
+                                    localStorage.setItem(lsKey('planner_updated_at'), data.data.updatedAt);
+                                }
+                                console.log("📤 Outbox planner sincronizzato");
                             } else {
                                 kept.push(it);
                             }
@@ -1543,6 +1554,7 @@
         }
 
         // Carica planner dal server: non sovrascrivere locale se il remoto è vuoto e il locale ha dati
+        // --- FETCH: blindato anti-wipe + last-write-wins ---
         async function fetchPlannerRemote() {
             const userId = getUserId();
             if (!sessionManager.isLoggedIn() || !userId || userId === 'guest') return;
@@ -1550,6 +1562,7 @@
             try {
                 const res = await fetch(`${API_BASE_URL}/api/planner/${encodeURIComponent(userId)}`);
                 const data = await res.json();
+
                 if (data.success && data.data) {
                     const remotePT = data.data.plannedTasks || {};
                     const remoteSL = data.data.stressLevels || {};
@@ -1559,24 +1572,32 @@
                     const localSL = JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}');
                     const localUpdatedAt = localStorage.getItem(lsKey('planner_updated_at')) || null;
 
-                    // Regola: se remoto è vuoto e locale ha dati, non sovrascrivere
-                    const remoteEmpty = Object.keys(remotePT).length === 0 && Object.keys(remoteSL).length === 0;
+                    const remoteHasData = Object.keys(remotePT).length > 0 || Object.keys(remoteSL).length > 0;
                     const localHasData = Object.keys(localPT).length > 0 || Object.keys(localSL).length > 0;
+                    const localIsNewer = localUpdatedAt && (!remoteUpdatedAt || (new Date(localUpdatedAt).getTime() > new Date(remoteUpdatedAt).getTime()));
 
-                    if (remoteEmpty && localHasData) {
-                        // mantieni locale, ma aggiorna cache timestamp
-                        console.log("ℹ️ Planner remoto vuoto, mantengo locale.");
+                    if (!remoteHasData && localHasData) {
+                        console.log("🛡️ Remoto vuoto → mantengo locale e ripopolo il server");
+                        debouncedSavePlannerRemote(0);
+                        notifyPlannerChanged();
+                        return;
+                    }
+
+                    if (localIsNewer) {
+                        console.log("ℹ️ Locale più nuovo → mantengo locale e sincronizzo remoto");
                         state.plannedTasks = localPT;
                         state.stressLevels = localSL;
-                    } else {
-                        state.plannedTasks = remotePT;
-                        state.stressLevels = remoteSL;
+                        debouncedSavePlannerRemote(0);
+                    } else if (remoteHasData) {
+                        // Merge prudente: remoto prevale solo dove locale è assente
+                        state.plannedTasks = { ...localPT, ...remotePT };
+                        state.stressLevels = { ...localSL, ...remoteSL };
                         localStorage.setItem(lsKey('planned_tasks'), JSON.stringify(state.plannedTasks));
                         localStorage.setItem(lsKey('stress_levels'), JSON.stringify(state.stressLevels));
                         if (remoteUpdatedAt) localStorage.setItem(lsKey('planner_updated_at'), remoteUpdatedAt);
+                        console.log("✅ Remoto applicato (merge) → cache locale aggiornata");
                     }
 
-                    console.log("✅ Planner remoto caricato → cache locale aggiornata");
                     notifyPlannerChanged();
                 }
             } catch (e) {
@@ -1678,11 +1699,11 @@
 
         // Salva planner sul server quando cambia
         // Save remoto + timestamp locale
+        // --- SALVATAGGIO: aggiorna subito timestamp locale e invia updatedAt ---
         async function savePlannerRemote() {
             const userId = getUserId();
             if (!sessionManager.isLoggedIn() || !userId || userId === 'guest') return;
 
-            // Snapshot compiti pianificati per portabilità
             const plannedDetails = {};
             try {
                 for (const [dateStr, ids] of Object.entries(state.plannedTasks || {})) {
@@ -1693,19 +1714,27 @@
                 }
             } catch { }
 
+            const nowIso = new Date().toISOString();
+            localStorage.setItem(lsKey('planner_updated_at'), nowIso);
+
             const payload = {
                 plannedTasks: state.plannedTasks || {},
                 stressLevels: state.stressLevels || {},
-                plannedDetails
+                plannedDetails,
+                updatedAt: nowIso
             };
 
             try {
                 const res = await fetch(`${API_BASE_URL}/api/planner/${encodeURIComponent(userId)}`, {
-                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const nowIso = new Date().toISOString();
-                localStorage.setItem(lsKey('planner_updated_at'), nowIso);
+                const data = await res.json();
+                if (data?.success && data?.data?.updatedAt) {
+                    localStorage.setItem(lsKey('planner_updated_at'), data.data.updatedAt);
+                }
                 console.log("✅ Planner salvato sul server");
             } catch (e) {
                 console.warn("Planner remote save failed, outbox:", e.message);
