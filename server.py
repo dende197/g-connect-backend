@@ -709,6 +709,124 @@ def handle_market():
         debug_log("⚠️ /api/market fallback error", str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
+# ============= POLLS ENDPOINTS =============
+POLLS_FILE = "polls.json"
+
+def load_polls_file():
+    try:
+        if os.path.exists(POLLS_FILE):
+            with open(POLLS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        debug_log("⚠️ load_polls_file error", str(e))
+    return []
+
+def save_polls_file(polls):
+    try:
+        with open(POLLS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(polls, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        debug_log("⚠️ save_polls_file error", str(e))
+
+def getUserIdFromBody(body):
+    """Estrae l'id utente da vari possibili campi nel payload"""
+    return body.get("voterId") or body.get("authorId") or body.get("userId") or body.get("voter")
+
+@app.route('/api/polls', methods=['GET', 'POST'])
+def handle_polls():
+    # GET: list polls
+    if request.method == 'GET':
+        if supabase:
+            try:
+                resp = supabase.table("polls").select("*").order("created_at", desc=True).execute()
+                return jsonify({"success": True, "data": resp.data or []}), 200
+            except Exception as e:
+                debug_log("⚠️ /api/polls GET supabase error", str(e))
+        polls = load_polls_file()
+        return jsonify({"success": True, "data": polls}), 200
+
+    # POST: create poll
+    payload = request.json or {}
+    question = payload.get("question")
+    choices = payload.get("choices", [])  # [{id,text}]
+    author = payload.get("authorId") or payload.get("author")
+    expires_at = payload.get("expiresAt")
+    if not question or not choices:
+        return jsonify({"success": False, "error": "Missing question or choices"}), 400
+
+    new_poll = {
+        "id": str(uuid.uuid4()),
+        "question": question,
+        "choices": [{"id": c.get("id") or str(uuid.uuid4()), "text": c.get("text"), "votes": 0} for c in choices],
+        "voters": {},  # voterId -> choiceId
+        "author": author,
+        "created_at": datetime.now().isoformat(),
+        "expires_at": expires_at
+    }
+
+    if supabase:
+        try:
+            supabase.table("polls").insert(new_poll).execute()
+            resp = supabase.table("polls").select("*").order("created_at", desc=True).limit(10).execute()
+            return jsonify({"success": True, "data": resp.data or []}), 200
+        except Exception as e:
+            debug_log("⚠️ /api/polls POST supabase error", str(e))
+
+    polls = load_polls_file()
+    polls.insert(0, new_poll)
+    save_polls_file(polls)
+    return jsonify({"success": True, "data": polls}), 200
+
+@app.route('/api/polls/<poll_id>/vote', methods=['POST'])
+def vote_poll(poll_id):
+    body = request.json or {}
+    voter = getUserIdFromBody(body)
+    choice_id = body.get("choiceId")
+    if not voter or not choice_id:
+        return jsonify({"success": False, "error": "Missing voterId or choiceId"}), 400
+
+    if supabase:
+        try:
+            resp = supabase.table("polls").select("*").eq("id", poll_id).limit(1).execute()
+            rows = resp.data or []
+            if not rows:
+                return jsonify({"success": False, "error": "Poll not found"}), 404
+            poll = rows[0]
+            voters = poll.get("voters") or {}
+            prev_choice = voters.get(voter)
+            if prev_choice == choice_id:
+                return jsonify({"success": True, "data": poll}), 200
+            choices = poll.get("choices", [])
+            for ch in choices:
+                if ch["id"] == choice_id:
+                    ch["votes"] = (ch.get("votes") or 0) + 1
+                if prev_choice and ch["id"] == prev_choice:
+                    ch["votes"] = max(0, (ch.get("votes") or 0) - 1)
+            voters[voter] = choice_id
+            supabase.table("polls").update({"choices": choices, "voters": voters}).eq("id", poll_id).execute()
+            resp = supabase.table("polls").select("*").eq("id", poll_id).limit(1).execute()
+            return jsonify({"success": True, "data": (resp.data or [])[0]}), 200
+        except Exception as e:
+            debug_log("⚠️ /api/polls vote supabase error", str(e))
+
+    polls = load_polls_file()
+    poll = next((p for p in polls if p["id"] == poll_id), None)
+    if not poll:
+        return jsonify({"success": False, "error": "Poll not found"}), 404
+    voters = poll.get("voters", {})
+    prev_choice = voters.get(voter)
+    if prev_choice == choice_id:
+        return jsonify({"success": True, "data": poll}), 200
+    for ch in poll.get("choices", []):
+        if ch["id"] == choice_id:
+            ch["votes"] = ch.get("votes", 0) + 1
+        if prev_choice and ch["id"] == prev_choice:
+            ch["votes"] = max(0, ch.get("votes", 0) - 1)
+    voters[voter] = choice_id
+    poll["voters"] = voters
+    save_polls_file(polls)
+    return jsonify({"success": True, "data": poll}), 200
+
 # ============= CHAT (Supabase) =============
 
 @app.route('/api/messages/thread/<thread_id>', methods=['GET'])

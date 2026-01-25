@@ -1082,7 +1082,8 @@
             syncing: false,
             selectedDay: new Date().getDate(),
             stressLevels: {},
-            plannedTasks: {}
+            plannedTasks: {},
+            polls: []
         };
 
         const app = document.getElementById('app');
@@ -1200,6 +1201,7 @@
 
                 // ⭐ Sync silente in background
                 performSync(savedSession);
+                fetchPolls(); // Carica i sondaggi dedicati
             } else {
                 console.log("❌ No session - showing login");
                 state.isLoggedIn = false;
@@ -1334,8 +1336,7 @@
                     notifyPlannerChanged(); // aggiorna UI
                 }
             } catch (e) {
-                console.warn("Planner remote fetch failed:", e.message);
-                // Fallback: usa cache locale già caricata
+                console.error("fetchPlannerRemote failed:", e);
             }
         }
 
@@ -2407,11 +2408,13 @@
                     <input type="text" placeholder="Cerca persone o post..." value="${state.feed.search}" oninput="updateFeedSearch(this.value)" style="padding-left:38px; margin-bottom:0; height:38px;">
                 </div>
 
-                <div style="display:flex; gap:8px; overflow-x:auto; margin-bottom: 16px; padding-bottom:6px; scrollbar-width:none;">
+                <div style="display:flex; gap:8px; overflow-x:auto; margin-bottom: 20px; padding-bottom:6px; scrollbar-width:none;">
                     ${classes.map(c => `
                         <button onclick="setFeedClass('${c}')" style="padding:6px 16px; border-radius:16px; border:1px solid ${state.feed.classFilter === c ? 'var(--blue)' : 'rgba(255,255,255,0.2)'}; background:${state.feed.classFilter === c ? 'var(--blue)' : 'transparent'}; color:white; font-weight:700; cursor:pointer; font-size: 13px; white-space:nowrap;">${c}</button>
                     `).join('')}
                 </div>
+
+                ${renderPollWidget()}
 
                 ${displayPosts.length ? displayPosts.map(renderPostCard).join('') : `<div style="text-align:center; opacity:0.5; padding:32px;">Nessun post</div>`}
             </div>`;
@@ -3419,19 +3422,39 @@
 
             if (isPoll) {
                 const optInputs = document.querySelectorAll('.poll-opt-input');
-                newPost.pollOptions = Array.from(optInputs).map(i => i.value.trim()).filter(v => v !== '');
-                newPost.pollVotes = {};
-                newPost.pollOptions.forEach(o => newPost.pollVotes[o] = 0);
-            }
+                const choices = Array.from(optInputs).map(i => ({ text: i.value.trim() })).filter(v => v.text !== '');
 
-            // Aggiungi localmente per feedback immediato
-            state.posts.unshift(newPost);
+                if (choices.length >= 2) {
+                    try {
+                        const pollPayload = {
+                            question: text,
+                            choices: choices,
+                            author: state.user.name || "Utente",
+                            authorId: getUserId()
+                        };
+                        const res = await fetch(`${API_BASE_URL}/api/polls`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(pollPayload)
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            state.polls = data.data; // Aggiorna lista sondaggi
+                        }
+                    } catch (e) {
+                        console.error("Errore creazione sondaggio:", e);
+                    }
+                }
+            } else {
+                // Aggiungi localmente per feedback immediato
+                state.posts.unshift(newPost);
 
-            // Invia al server
-            try {
-                await submitPost(newPost);
-            } catch (e) {
-                console.error("Errore invio post:", e);
+                // Invia al server
+                try {
+                    await submitPost(newPost);
+                } catch (e) {
+                    console.error("Errore invio post:", e);
+                }
             }
 
             closeModal();
@@ -3854,6 +3877,8 @@
         window.navigate = navigate;
         window.showLoader = showLoader;
         window.hideLoader = hideLoader;
+        window.submitPollVote = submitPollVote;
+        window.fetchPolls = fetchPolls;
 
         // Mostra loader anche al ritorno da refresh / bfcache
         window.addEventListener('pageshow', () => {
