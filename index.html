@@ -1340,6 +1340,98 @@
             }
         }
 
+        // --- POLLS LOGIC ---
+        async function fetchPolls() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/polls`);
+                const data = await res.json();
+                if (data.success) {
+                    state.polls = data.data || [];
+                    localStorage.setItem(globalKey('polls'), JSON.stringify(state.polls));
+                    render();
+                }
+            } catch (e) {
+                console.warn("fetchPolls failed:", e.message);
+                const cached = localStorage.getItem(globalKey('polls'));
+                if (cached) state.polls = JSON.parse(cached);
+            }
+        }
+
+        async function submitPollVote(pollId, choiceId) {
+            const voterId = getUserId();
+            if (!voterId || voterId === 'guest') { alert('Devi essere loggato per votare'); return; }
+
+            const poll = state.polls.find(p => p.id === pollId);
+            if (poll) {
+                const prev = poll.voters ? poll.voters[voterId] : null;
+                if (prev === choiceId) return;
+                poll.voters = poll.voters || {};
+                poll.voters[voterId] = choiceId;
+                poll.choices = poll.choices.map(c => {
+                    if (c.id === choiceId) return { ...c, votes: (c.votes || 0) + 1 };
+                    if (prev && c.id === prev) return { ...c, votes: Math.max(0, (c.votes || 0) - 1) };
+                    return c;
+                });
+                render();
+            }
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/polls/${encodeURIComponent(pollId)}/vote`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ voterId, choiceId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const idx = state.polls.findIndex(p => p.id === pollId);
+                    if (idx > -1) state.polls[idx] = data.data;
+                    localStorage.setItem(globalKey('polls'), JSON.stringify(state.polls));
+                    render();
+                }
+            } catch (e) {
+                console.error("submitPollVote error:", e);
+            }
+        }
+
+        function renderPollWidget() {
+            const poll = (state.polls && state.polls[0]) || null;
+            if (!poll) return '';
+
+            const voterId = getUserId();
+            const userChoice = poll.voters ? poll.voters[voterId] : null;
+            const totalVotes = poll.choices.reduce((s, x) => s + (x.votes || 0), 0);
+
+            return `
+            <div class="card glass-panel" style="padding: 20px; margin-bottom: 24px; border: 1px solid rgba(10, 132, 255, 0.3);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:8px; height:8px; background:var(--blue); border-radius:50%; animation: pulse 2s infinite;"></div>
+                        <div style="font-weight:800; color: var(--blue); text-transform: uppercase; font-size:11px; letter-spacing:1px;">Sondaggio Community</div>
+                    </div>
+                </div>
+                <div style="font-size:19px; font-weight:800; color:white; margin-bottom:20px; line-height:1.3;">${poll.question}</div>
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    ${poll.choices.map(c => {
+                const pct = totalVotes ? Math.round(((c.votes || 0) / totalVotes) * 100) : 0;
+                const isSelected = userChoice === c.id;
+                return `
+                        <button onclick="submitPollVote('${poll.id}','${c.id}')" style="position:relative; overflow:hidden; display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-radius:14px; border:1px solid ${isSelected ? 'var(--blue)' : 'rgba(255,255,255,0.08)'}; background:${isSelected ? 'rgba(10, 132, 255, 0.1)' : 'rgba(255,255,255,0.03)'}; color:white; font-weight:700; cursor:pointer; transition: all 0.2s;">
+                            <div style="position:absolute; left:0; top:0; bottom:0; width:${pct}%; background:rgba(10, 132, 255, 0.1); z-index:0; transition: width 0.5s ease-out;"></div>
+                            <span style="position:relative; z-index:1; display:flex; align-items:center; gap:8px;">
+                                ${isSelected ? '<i class="ph-fill ph-check-circle" style="color:var(--blue);"></i>' : ''}
+                                ${c.text}
+                            </span>
+                            <span style="position:relative; z-index:1; font-size:13px; font-weight:800; color:${isSelected ? 'var(--blue)' : 'var(--text-muted)'};">${pct}%</span>
+                        </button>
+                        `;
+            }).join('')}
+                </div>
+                <div style="margin-top:16px; font-size:11px; color:var(--text-muted); font-weight:600; text-align:center;">
+                    ${totalVotes} voti totali • Pubblicato il ${new Date(poll.created_at).toLocaleDateString()}
+                </div>
+            </div>`;
+        }
+
         // Salva planner sul server quando cambia
         async function savePlannerRemote() {
             const userId = getUserId();
