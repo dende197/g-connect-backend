@@ -350,11 +350,11 @@
                     rgba(10, 17, 40, 0.00) 100%);
         }
 
-        /* Header Home con Cerca centrale */
+        /* Centered Search header */
         .home-hero {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: center;
             gap: 12px;
             margin-bottom: 12px;
         }
@@ -388,12 +388,13 @@
             background: rgba(255, 255, 255, 0.15);
         }
 
-        /* Card profilo */
-        .profile-card {
+        /* Profile row (no glass rectangle) */
+        .profile-row {
             display: flex;
             align-items: center;
             gap: 14px;
-            padding: 16px;
+            padding: 8px 0;
+            margin-bottom: 8px;
         }
 
         .profile-avatar {
@@ -702,6 +703,7 @@
             max-height: 90vh;
             overflow-y: auto;
             box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.8);
+            position: relative;
         }
 
         .offline-badge {
@@ -2495,25 +2497,17 @@
 
             return `
             <div class="view page-bg">
-                <!-- Header con Cerca centrale -->
+                <!-- Only centered Search -->
                 <div class="home-hero">
-                    <div style="display:flex; align-items:center; gap:12px;">
-                        <h1 style="margin:0; font-size:28px; font-weight:800; letter-spacing:-0.02em;">Dashboard</h1>
-                    </div>
                     <div class="home-search-center">
                         <button class="search-big" onclick="showSearchModal()" title="Cerca">
                             <i class="ph-bold ph-magnifying-glass" style="font-size:20px;"></i> Cerca
                         </button>
                     </div>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <button onclick="openArgoLogin()" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 12px; color: white; font-weight: 700; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
-                            <i class="ph-fill ph-user-switch"></i> Profilo
-                        </button>
-                    </div>
                 </div>
 
-                <!-- Profilo -->
-                <div class="card profile-card">
+                <!-- Profile row (no glass background) -->
+                <div class="profile-row">
                     <div class="profile-avatar">${(state.user?.name || 'U')[0]}</div>
                     <div class="profile-meta" style="flex:1; min-width:0;">
                         <div style="font-size:16px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
@@ -2528,9 +2522,9 @@
                     </div>` : ''}
                 </div>
 
-                <!-- ROW: Media + Stress (SOTTO profilo, SOPRA Organizza Oggi) -->
+                <!-- Media + Stress row -->
                 <div style="display:flex; gap:12px; margin: 12px 0;">
-                    <!-- Media gauge con sfondo dinamico -->
+                    <!-- Media gauge with dynamic background -->
                     <div class="card glass-panel gauge-card ${gaugeClass}" style="flex:1; margin-bottom:0;" onclick="showVotiView()">
                         <div class="gauge-label">Media</div>
                         <svg class="gauge-svg" viewBox="0 0 120 120">
@@ -2546,8 +2540,8 @@
                         <div class="gauge-value">${media ? m.toFixed(2) : '--'}</div>
                     </div>
 
-                    <!-- Stress card con wave e click per dettagli -->
-                    <div class="card stress-card" style="flex:1; margin-bottom:0;" onclick="showStressDetailsModal()" title="Stress">
+                    <!-- Stress card opening selection modal -->
+                    <div class="card stress-card" style="flex:1; margin-bottom:0;" onclick="showStressModal()" title="Stress">
                         <div class="stress-label">Stress</div>
                         <svg class="stress-wave" viewBox="0 0 120 60" preserveAspectRatio="none">
                             <path d="M5 30 Q 20 10, 35 30 T 65 30 T 95 25 T 115 30" stroke-dasharray="60 24"/>
@@ -2979,6 +2973,7 @@
         }
 
         // Stress Modal fluida (mantieni selezione senza ri-render)
+        // Stress selection modal: make buttons definitely clickable
         function showStressModal() {
             const todayStr = new Date().toISOString().split('T')[0];
             const currentLevel = state.stressLevels[todayStr] || 0;
@@ -2986,16 +2981,20 @@
             if (!modalContainer) return;
             modalContainer.innerHTML = `
             <div class="modal-overlay" onclick="closeModal(event)">
-                <div class="modal-content glass-panel" style="max-width: 420px; padding: 24px;">
+                <div class="modal-content glass-panel" onclick="event.stopPropagation()" style="max-width: 420px; padding: 24px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
                         <h2 style="margin:0;">Stress Giornaliero</h2>
                         <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size: 22px;"></i>
                     </div>
-                    <p style="opacity:.7; margin-bottom: 16px; font-size: 14px;">Seleziona il tuo livello di stress. L’animazione è fluida e non ricarica la vista.</p>
                     <div class="stress-level-grid">
-                        ${[1, 2, 3, 4, 5].map(lv => `<div class="stress-pill ${currentLevel === lv ? 'active' : ''}" data-stress="${lv}" onclick="setStressLevel(${lv}, true)">${lv}</div>`).join('')}
+                        ${[1, 2, 3, 4, 5].map(lv => `
+                            <div class="stress-pill ${currentLevel === lv ? 'active' : ''}" 
+                                data-stress="${lv}" 
+                                onclick="event.stopPropagation(); setStressLevel(${lv}, true)">
+                            ${lv}
+                            </div>`).join('')}
                     </div>
-                    <div style="display:flex; justify-content:center; margin-top: 24px;">
+                    <div style="display:flex; justify-content:center; margin-top: 16px;">
                         <button onclick="closeModal()" class="btn-primary" style="max-width: 220px;">Conferma</button>
                     </div>
                 </div>
