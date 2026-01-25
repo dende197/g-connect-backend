@@ -70,14 +70,12 @@ def register_planner_routes(app: Flask):
             stress_levels = body.get("stressLevels", {}) or {}
             planned_details = body.get("plannedDetails", {}) or {}
 
-            client_updated_at = body.get("updatedAt")
-
             payload = {
                 "user_id": user_id,
                 "planned_tasks": planned_tasks,
                 "stress_levels": stress_levels,
                 "planned_details": planned_details,
-                "updated_at": client_updated_at or datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
 
             url = f"{sb_table_url('planners')}?on_conflict=user_id"
