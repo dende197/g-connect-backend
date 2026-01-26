@@ -647,6 +647,34 @@ def extract_promemoria(dashboard_data):
     
     return promemoria
 
+# ✅ NEW: helper per estrarre nome/classe dalla FULL DASHBOARD
+def extract_student_from_dashboard(dashboard_data):
+    """
+    Prova a estrarre 'Nome Cognome' e la classe dalla dashboard completa.
+    Ritorna (name, class) oppure (None, None) se non trovati.
+    """
+    name = None
+    cls = None
+    try:
+        data_obj = dashboard_data.get('data', {})
+        dati_list = data_obj.get('dati', []) if isinstance(data_obj, dict) else []
+        if dati_list:
+            blocco = dati_list[0]
+            # punti possibili per l'anagrafica
+            alunno = blocco.get('alunno') or blocco.get('anagrafe') or blocco.get('anagrafica')
+            if isinstance(alunno, dict):
+                nome = (alunno.get('desNome') or '').strip()
+                cognome = (alunno.get('desCognome') or '').strip()
+                name = f"{nome} {cognome}".strip() if (nome or cognome) else None
+            elif isinstance(alunno, str) and alunno.strip():
+                name = alunno.strip()
+            # classe in vari campi
+            cls = blocco.get('desClasse') or blocco.get('classe') or blocco.get('desDenominazione')
+        return name, cls
+    except Exception as e:
+        debug_log("⚠️ extract_student_from_dashboard error", str(e))
+        return None, None
+
 
 # ============= HELPERS SESSIONI =============
 
@@ -1051,8 +1079,9 @@ def post_message():
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
-    school_code = data.get('schoolCode')
-    username = data.get('username')
+    # ✅ NORMALIZZA INPUT per evitare spazi in coda (visti nei log)
+    school_code = (data.get('schoolCode') or '').strip()
+    username = (data.get('username') or '').strip()
     password = data.get('password')
     # Nuovo parametro opzionale per selezione profilo
     selected_profile_index = data.get('profileIndex') 
@@ -1178,37 +1207,28 @@ def login():
         student_name = username
         student_class = "DidUP"
         
-        # 1. Prova a estrarre info più affidabili dalla dashboard (Nome REALE dello studente)
-        try:
-            if dashboard_data and 'dati' in dashboard_data and isinstance(dashboard_data['dati'], dict):
-                dati = dashboard_data['dati']
-                
-                # Nome Studente
-                if 'alunno' in dati and dati['alunno']:
-                    student_name = dati['alunno']
-                elif 'nome' in dati and dati['nome']:
-                    student_name = dati['nome']
-                
-                # Classe
-                if 'desDenominazione' in dati and dati['desDenominazione']:
-                    student_class = dati['desDenominazione']
-                elif 'classe' in dati and dati['classe']:
-                    student_class = dati['classe']
-                
-                debug_log("📋 Dati studente dalla dashboard", {
-                    "student_name": student_name,
-                    "student_class": student_class
-                })
-        except Exception as e_dash_extract:
-            debug_log("⚠️ Errore estrazione dati da dashboard", str(e_dash_extract))
-
-        # 2. Se fallisce dashboard, usa info dal profilo (Multi-Profile payload)
-        if (student_name == username or not student_name) and not fallback_mode and profiles and 'target_index' in locals() and target_profile:
+        # 1) Usa profilo selezionato se disponibile
+        if not fallback_mode and profiles and 'target_index' in locals() and target_profile:
              p = target_profile
              student_name = f"{p.get('alunno', {}).get('desNome', '')} {p.get('alunno', {}).get('desCognome', '')}".strip() or username
              student_class = p.get('desClasse', 'DidUP')
 
-        # ✅ NEW: Register/Update Profile in Supabase for Directory
+        # 2) Fallback: prova dalla FULL DASHBOARD
+        if (not student_name or student_name == username) or (student_class == "DidUP"):
+            try:
+                name_from_dash, class_from_dash = extract_student_from_dashboard(dashboard_data)
+                if name_from_dash:
+                    student_name = name_from_dash
+                if class_from_dash:
+                    student_class = class_from_dash
+                debug_log("📋 Dati studente (fallback da dashboard)", {
+                    "student_name": student_name,
+                    "student_class": student_class
+                })
+            except Exception as e_dash_extract:
+                debug_log("⚠️ Fallback estrazione nome da dashboard fallito", str(e_dash_extract))
+
+        # ✅ Sync profilo su Supabase con id normalizzato
         if supabase:
             try:
                 profile_id = f"{school_code}:{username.lower()}:{target_index}"
@@ -1250,14 +1270,15 @@ def login():
             }
         }
         
-        # ✅ NEW: Include profilo selezionato per il client
+        # ✅ Include profilo selezionato per la PWA
         if not fallback_mode and profiles and 'target_index' in locals() and target_profile:
             response_data["selectedProfile"] = {
                 "index": target_index,
                 "alunno": target_profile.get("alunno", {}),
                 "class": target_profile.get("desClasse"),
                 "school": target_profile.get("desScuola"),
-                "name": student_name
+                "name": student_name,
+                "raw": target_profile
             }
         
         # Se c'erano più profili, li aggiungiamo e settiamo status, MA con success=True
