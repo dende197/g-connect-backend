@@ -1403,7 +1403,7 @@
         // STATE MANAGEMENT
         const state = {
             view: 'login',
-            user: { name: 'Andrea', class: '5B' }, // ⭐ Verrà sovrascritto da localStorage
+            user: { name: 'Andrea', class: '5B', avatar: null }, // ⭐ Verrà sovrascritto da localStorage
             isLoggedIn: false,
             isOffline: false,
             didup: { connected: false },
@@ -2556,11 +2556,162 @@
             return '#60a5fa'; // Default fallback color
         }
 
-        function renderAvatar(displayName, size = 44) {
+        function renderAvatar(displayName, size = 44, avatarUrl = null) {
+            // Priorità: avatarUrl param > state.user.avatar se stesso utente
+            const img = avatarUrl || (displayName === state.user?.name ? state.user?.avatar : null);
+
+            // Se c'è un URL avatar valido (http), mostra immagine
+            if (img && img.startsWith('http')) {
+                return `<div style="width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;border:1.5px solid rgba(255,255,255,0.2);box-shadow:0 4px 12px rgba(37,99,235,0.2);flex-shrink:0;background:#1e293b;">
+                    <img src="${img}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;background:linear-gradient(135deg,var(--blue),#4f46e5);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:${size * 0.45}px;color:white;\\'>${(displayName || 'U')[0]?.toUpperCase()}</div>'">
+                </div>`;
+            }
+
+            // Fallback: lettera iniziale
             const name = (displayName || 'Utente').trim();
             const letter = name ? name[0].toUpperCase() : '?';
             return `<div style="width:${size}px; height:${size}px; background: linear-gradient(135deg, var(--blue), #4f46e5); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: ${size * 0.45}px; color: white; border: 1.5px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); flex-shrink: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${letter}</div>`;
         }
+
+        // ============= AVATAR MANAGEMENT FUNCTIONS =============
+
+        async function uploadAvatar(base64Image) {
+            try {
+                const userId = getUserId();
+                const response = await fetch(`${API_BASE_URL}/api/upload`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64Image, userId: userId })
+                });
+                const data = await response.json();
+                if (!data.success) throw new Error(data.error || 'Upload fallito');
+                console.log('✅ Avatar uploaded:', data.url);
+                return data.url;
+            } catch (error) {
+                console.error('❌ Upload avatar failed:', error);
+                throw error;
+            }
+        }
+
+        async function saveProfileToServer(profileData) {
+            try {
+                const userId = getUserId();
+                const response = await fetch(`${API_BASE_URL}/api/profile`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: userId,
+                        name: profileData.name || state.user.name,
+                        class: profileData.class || state.user.class,
+                        avatar: profileData.avatar
+                    })
+                });
+                const data = await response.json();
+                if (!data.success) throw new Error(data.error || 'Salvataggio profilo fallito');
+                console.log('✅ Profile saved to Supabase');
+                return data;
+            } catch (error) {
+                console.error('❌ Save profile failed:', error);
+                throw error;
+            }
+        }
+
+        async function loadProfileFromServer() {
+            try {
+                const userId = getUserId();
+                if (!userId || userId === 'guest') return null;
+
+                const response = await fetch(`${API_BASE_URL}/api/profile/${encodeURIComponent(userId)}`);
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    if (data.data.name) state.user.name = data.data.name;
+                    if (data.data.class) state.user.class = data.data.class;
+                    if (data.data.avatar && data.data.avatar.startsWith('http')) {
+                        state.user.avatar = data.data.avatar;
+                        console.log('✅ Avatar loaded from DB:', data.data.avatar);
+                    }
+                    localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
+                    return data.data;
+                }
+                return null;
+            } catch (error) {
+                console.warn('⚠️ Load profile failed (non-fatal):', error.message);
+                return null;
+            }
+        }
+
+        async function handleAvatarUpload(event) {
+            const file = event.target?.files?.[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                alert('Seleziona un\'immagine valida');
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Immagine troppo grande. Max 5MB');
+                return;
+            }
+
+            try {
+                showBoot("Caricamento avatar...");
+
+                const base64Image = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                const avatarUrl = await uploadAvatar(base64Image);
+                await saveProfileToServer({ avatar: avatarUrl });
+
+                state.user.avatar = avatarUrl;
+                localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
+
+                closeModal();
+                render();
+                hideBoot();
+                alert('✅ Avatar aggiornato!');
+
+            } catch (error) {
+                hideBoot();
+                console.error('❌ Avatar update failed:', error);
+                alert('❌ Errore: ' + error.message);
+            }
+        }
+
+        function showAvatarModal() {
+            const modalContainer = getModalContainer();
+            if (!modalContainer) return;
+
+            modalContainer.innerHTML = `
+                <div class="modal-overlay" onclick="closeModal(event)">
+                    <div class="modal-content glass-panel" onclick="event.stopPropagation()" style="max-width: 420px; padding: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2 style="margin: 0; font-size: 20px; font-weight: 800;">Cambia Avatar</h2>
+                            <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; cursor: pointer; font-size: 16px;">Chiudi</button>
+                        </div>
+                        <div style="text-align: center; margin-bottom: 24px;">
+                            <div style="display: inline-block;">${renderAvatar(state.user.name, 120)}</div>
+                            <div style="margin-top: 12px; font-size: 14px; color: var(--text-muted);">Avatar attuale</div>
+                        </div>
+                        <label for="avatar-upload-input" class="btn-primary" style="display: block; text-align: center; padding: 14px; border-radius: 14px; cursor: pointer; font-weight: 700; margin-bottom: 12px;">
+                            <i class="ph-bold ph-upload-simple" style="margin-right: 8px;"></i>Scegli Nuova Immagine
+                        </label>
+                        <input type="file" id="avatar-upload-input" accept="image/*" onchange="handleAvatarUpload(event)" style="display: none;"/>
+                        <div style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; font-size: 12px; color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1);">
+                            <i class="ph ph-info" style="margin-right: 4px;"></i>Formato: JPG, PNG, GIF • Max 5MB
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Expose avatar functions globally
+        window.handleAvatarUpload = handleAvatarUpload;
+        window.showAvatarModal = showAvatarModal;
 
         function renderHome() {
             const todayStr = new Date().toISOString().split('T')[0];
@@ -3796,6 +3947,9 @@
                     state.isOffline = false;
                     state.lastSync = new Date().toLocaleTimeString();
                     updateOfflineBadge();
+
+                    // ⭐ Carica profilo (incluso avatar) da Supabase
+                    await loadProfileFromServer();
 
                     closeModal();
                     alert(`✅ Benvenuto ${data.student?.name || user}! Dati sincronizzati.`);

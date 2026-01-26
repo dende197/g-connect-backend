@@ -611,6 +611,119 @@ def create_session(school, user, password, access_token, auth_token):
 def health():
     return jsonify({"status": "ok", "debug": DEBUG_MODE}), 200
 
+# ============= AVATAR & PROFILE ENDPOINTS =============
+
+@app.route('/api/upload', methods=['POST'])
+def upload_avatar():
+    """
+    Carica un'immagine avatar su Supabase Storage e restituisce l'URL pubblico.
+    Request: { "image": "data:image/png;base64,iVBORw0...", "userId": "user_id" }
+    Response: { "success": true, "url": "https://...supabase.co/.../avatars/file.png" }
+    """
+    if not supabase:
+        return jsonify({"success": False, "error": "Supabase non configurato"}), 500
+    
+    try:
+        payload = request.json or {}
+        base64_image = payload.get('image', '')
+        user_id = payload.get('userId', str(uuid.uuid4()))
+        
+        if not base64_image or not base64_image.startswith('data:image/'):
+            return jsonify({"success": False, "error": "Formato immagine non valido"}), 400
+        
+        # Estrai MIME type e dati
+        header, encoded = base64_image.split(',', 1)
+        mime_type = header.split(';')[0].split(':')[1]
+        file_extension = mime_type.split('/')[1]
+        
+        # Decodifica base64
+        image_bytes = base64.b64decode(encoded)
+        
+        # Nome file unico
+        filename = f"{user_id.replace(':', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_extension}"
+        
+        # Upload su Supabase Storage (bucket: avatars)
+        supabase.storage.from_('avatars').upload(
+            path=filename,
+            file=image_bytes,
+            file_options={"content-type": mime_type, "upsert": "true"}
+        )
+        
+        # Ottieni URL pubblico
+        public_url = supabase.storage.from_('avatars').get_public_url(filename)
+        
+        debug_log(f"✅ Avatar uploaded: {filename}", {"url": public_url})
+        return jsonify({"success": True, "url": public_url}), 200
+        
+    except Exception as e:
+        debug_log("❌ Avatar upload failed", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/profile', methods=['PUT'])
+def update_profile():
+    """
+    Aggiorna il profilo utente (incluso avatar URL).
+    Request: { "userId": "school:user:idx", "name": "...", "class": "...", "avatar": "https://..." }
+    """
+    if not supabase:
+        return jsonify({"success": False, "error": "Supabase non configurato"}), 500
+    
+    try:
+        payload = request.json or {}
+        user_id = payload.get('userId')
+        
+        if not user_id:
+            return jsonify({"success": False, "error": "userId mancante"}), 400
+        
+        profile_data = {
+            "userId": user_id,
+            "last_active": datetime.now().isoformat()
+        }
+        
+        if 'name' in payload:
+            profile_data['name'] = payload['name']
+        if 'class' in payload:
+            profile_data['class'] = payload['class']
+        if 'avatar' in payload:
+            avatar_url = payload['avatar']
+            if avatar_url and not avatar_url.startswith('http'):
+                return jsonify({"success": False, "error": "Avatar deve essere un URL"}), 400
+            profile_data['avatar'] = avatar_url
+        
+        supabase.table("profiles").upsert(profile_data).execute()
+        debug_log(f"✅ Profile updated: {user_id}")
+        return jsonify({"success": True}), 200
+        
+    except Exception as e:
+        debug_log("❌ Profile update failed", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/profile/<user_id>', methods=['GET'])
+def get_profile(user_id):
+    """
+    Recupera il profilo utente dal database.
+    Response: { "success": true, "data": { "userId": "...", "name": "...", "avatar": "..." } }
+    """
+    if not supabase:
+        return jsonify({"success": False, "error": "Supabase non configurato"}), 500
+    
+    try:
+        result = supabase.table("profiles").select("*").eq("userId", user_id).execute()
+        
+        if not result.data or len(result.data) == 0:
+            return jsonify({"success": False, "error": "Profilo non trovato"}), 404
+        
+        profile = result.data[0]
+        debug_log(f"✅ Profile retrieved: {user_id}", {"hasAvatar": bool(profile.get('avatar'))})
+        return jsonify({"success": True, "data": profile}), 200
+        
+    except Exception as e:
+        debug_log("❌ Profile retrieval failed", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # ============= PERSISTENCE ENDPOINTS =============
 
 @app.route('/api/posts', methods=['GET', 'POST'])
