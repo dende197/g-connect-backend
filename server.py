@@ -83,6 +83,7 @@ def debug_log(message, data=None):
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 SUPABASE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "uploads")
+STRICT_SUPABASE = os.environ.get("STRICT_SUPABASE", "false").lower() == "true"
 
 supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
@@ -737,6 +738,9 @@ def handle_posts():
             try:
                 resp = supabase.table("posts").select("*").order("created_at", desc=True).limit(100).execute()
                 posts = resp.data or []
+                if STRICT_SUPABASE and not posts:
+                    return jsonify({"success": False, "error": "Supabase posts empty"}), 502
+
                 # Enrich avatar
                 author_ids = list(set([p.get('author_id') or p.get('authorId') for p in posts if (p.get('author_id') or p.get('authorId'))]))
                 if author_ids:
@@ -745,12 +749,14 @@ def handle_posts():
                     for p in posts:
                         aid = p.get('author_id') or p.get('authorId')
                         p['author_avatar'] = prof_map.get(aid)
-                # Anti-wipe: se vuoto, restituisci lista locale come fallback
-                if not posts:
+                # Fallback solo se non strict
+                if not posts and not STRICT_SUPABASE:
                     posts = load_json_file(POSTS_FILE, [])
                 return jsonify({"success": True, "data": posts}), 200
             except Exception as e:
-                debug_log("⚠️ /api/posts GET (Supabase) error, falling back", str(e))
+                debug_log("⚠️ /api/posts GET (Supabase) error", str(e))
+                if STRICT_SUPABASE:
+                    return jsonify({"success": False, "error": str(e)}), 502
         else:
             try:
                 new_post = request.json or {}
@@ -776,7 +782,9 @@ def handle_posts():
                 posts = resp.data or []
                 return jsonify({"success": True, "data": posts}), 200
             except Exception as e:
-                debug_log("⚠️ /api/posts POST (Supabase) error, falling back", str(e))
+                debug_log("⚠️ /api/posts POST (Supabase) error", str(e))
+                if STRICT_SUPABASE:
+                    return jsonify({"success": False, "error": str(e)}), 502
 
     # JSON fallback mode
     try:
@@ -809,6 +817,9 @@ def handle_market():
             try:
                 resp = supabase.table("market_items").select("*").order("created_at", desc=True).limit(200).execute()
                 items = resp.data or []
+                if STRICT_SUPABASE and not items:
+                    return jsonify({"success": False, "error": "Supabase market empty"}), 502
+
                 seller_ids = list(set([it.get('seller_id') or it.get('sellerId') for it in items if (it.get('seller_id') or it.get('sellerId'))]))
                 if seller_ids:
                     prof_resp = supabase.table("profiles").select("userId,avatar").in_("userId", seller_ids).execute()
@@ -816,12 +827,15 @@ def handle_market():
                     for it in items:
                         sid = it.get('seller_id') or it.get('sellerId')
                         it['author_avatar'] = prof_map.get(sid)
-                # Anti-wipe fallback
-                if not items:
+                
+                # Fallback solo se non strict
+                if not items and not STRICT_SUPABASE:
                     items = load_json_file(MARKET_FILE, [])
                 return jsonify({"success": True, "data": items}), 200
             except Exception as e:
-                debug_log("⚠️ /api/market GET (Supabase) error, falling back", str(e))
+                debug_log("⚠️ /api/market GET (Supabase) error", str(e))
+                if STRICT_SUPABASE:
+                    return jsonify({"success": False, "error": str(e)}), 502
         else:
             try:
                 new_item = request.json or {}
@@ -846,7 +860,9 @@ def handle_market():
                 items = resp.data or []
                 return jsonify({"success": True, "data": items}), 200
             except Exception as e:
-                debug_log("⚠️ /api/market POST (Supabase) error, falling back", str(e))
+                debug_log("⚠️ /api/market POST (Supabase) error", str(e))
+                if STRICT_SUPABASE:
+                    return jsonify({"success": False, "error": str(e)}), 502
 
     # JSON fallback mode
     try:
