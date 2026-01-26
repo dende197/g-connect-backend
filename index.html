@@ -599,6 +599,33 @@
             background: var(--blue);
         }
 
+        /* Pulsante Cerca centrato sopra Organizza Oggi */
+        .search-row {
+            display: flex;
+            justify-content: center;
+            margin: 12px 0 16px 0;
+        }
+
+        /* Anteprima avatar nella modale profilo */
+        .avatar-preview {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .avatar-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
         /* 11) Sezione Circolari spostata in basso */
         .circolari-row {
             display: flex;
@@ -2556,7 +2583,14 @@
             return '#60a5fa'; // Default fallback color
         }
 
-        function renderAvatar(displayName, size = 44) {
+        /* Render avatar: usa immagine se disponibile */
+        function renderAvatar(displayName, size = 44, avatarUrl = null) {
+            const img = avatarUrl || (displayName === state.user?.name ? state.user?.avatar : null);
+            if (img) {
+                return `<div style="width:${size}px; height:${size}px; border-radius:50%; overflow:hidden; border:1.5px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(37,99,235,0.2); flex-shrink:0;">
+          <img src="${img}" alt="avatar" style="width:100%; height:100%; object-fit:cover;">
+        </div>`;
+            }
             const name = (displayName || 'Utente').trim();
             const letter = name ? name[0].toUpperCase() : '?';
             return `<div style="width:${size}px; height:${size}px; background: linear-gradient(135deg, var(--blue), #4f46e5); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: ${size * 0.45}px; color: white; border: 1.5px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); flex-shrink: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${letter}</div>`;
@@ -2568,28 +2602,14 @@
             const plannedTasks = state.tasks.filter(t => plannedIds.includes(t.id));
             const media = calcolaMedia(state.voti);
             const m = media ? parseFloat(media) : 0;
-            const pct = Math.max(0, Math.min(1, m / 10));
-            const C = { r: 46 };
-            const circumference = Math.PI * C.r;
-            const dash = circumference * pct;
             const level = state.stressLevels[todayStr] || 0;
-            const gaugeClass = gaugeClassForMedia(m);
 
             return `
             <div class="view page-bg">
-                <!-- Only centered Search -->
-                <div class="home-hero">
-                    <div class="home-search-center">
-                        <button class="search-big" onclick="showSearchModal()" title="Cerca">
-                            <i class="ph-bold ph-magnifying-glass" style="font-size:20px;"></i> Cerca
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Profile row (no glass background) -->
+                <!-- Profile row (click su avatar e nome apre Modifica profilo) -->
                 <div class="profile-row">
-                    <div class="profile-avatar">${(state.user?.name || 'U')[0]}</div>
-                    <div class="profile-meta" style="flex:1; min-width:0;">
+                    <div class="profile-avatar" onclick="showEditProfileModal()">${renderAvatar(state.user?.name, 56, state.user?.avatar)}</div>
+                    <div class="profile-meta" style="flex:1; min-width:0;" onclick="showEditProfileModal()">
                         <div style="font-size:16px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                             ${state.user?.name || 'Utente'}
                         </div>
@@ -2602,20 +2622,24 @@
                     </div>` : ''}
                 </div>
 
-                <!-- Media + Stress (Advanced Canvas Widgets) -->
+                <!-- Metrics (Stress + Media) -->
                 <div class="metrics-grid" style="margin:12px 0;">
-                    <!-- STRESS (Solo sfondo + onda) -->
                     <div class="metric-card stress" onclick="showStressCaptureModal()">
                         <div class="title">Stress</div>
                         <canvas id="stressWaveCanvas"></canvas>
                     </div>
-
-                    <!-- MEDIA -->
                     <div class="metric-card media" onclick="showVotiView()">
                         <div class="title">Media</div>
                         <canvas id="mediaGaugeCanvas" class="media-gauge"></canvas>
                         <div id="mediaValue" class="media-value">${media ? m.toFixed(2) : '0.00'}</div>
                     </div>
+                </div>
+
+                <!-- Cerca centrato appena sopra Organizza Oggi -->
+                <div class="search-row">
+                    <button class="search-big" onclick="showSearchModal()" title="Cerca">
+                        <i class="ph-bold ph-magnifying-glass" style="font-size:20px;"></i> Cerca
+                    </button>
                 </div>
 
                 <!-- Organizza Oggi -->
@@ -2725,7 +2749,7 @@
         function renderMarketCard(item) {
             const commentsHtml = (item.comments || []).map(c => `
                 <div style="display:flex; align-items:center; gap:8px; padding:8px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 4px;">
-                    ${renderAvatar(c.author || 'Utente', 28)}
+                    ${renderAvatar(c.author || 'Utente', 28, c.avatar || c.author_avatar)}
                     <div style="flex:1; text-align:left;">
                         <div style="font-weight:700; font-size:12px; color:white;">${c.author || 'Utente'}</div>
                         <div style="font-size:12px; color:rgba(255,255,255,0.8);">${c.text}</div>
@@ -2824,7 +2848,7 @@
                 html += filteredUsers.map(u => `
                     <div onclick="openChat('${u.name}')" style="display: flex; align-items: center; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 18px; margin-bottom: 10px; cursor:pointer;">
                         <div style="position: relative; margin-right: 12px;">
-                            ${renderAvatar(u.name, 44)}
+                            ${renderAvatar(u.name, 44, u.avatar)}
                             ${u.status === 'online' ? `<div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; background: var(--green); border: 2px solid black; border-radius: 50%;"></div>` : ''}
                         </div>
                         <div style="flex: 1; text-align:left;">
@@ -2899,7 +2923,7 @@
             return `
             <div class="card">
                 <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
-                    ${post.anon ? renderAvatar('Anonimo', 40) : renderAvatar(post.author || 'Utente', 40)}
+                    ${post.anon ? renderAvatar('Anonimo', 40) : renderAvatar(post.author || 'Utente', 40, post.author_avatar)}
                     <div style="flex:1; text-align:left;">
                         <div style="font-weight:700; color:white;">${post.anon ? 'Anonimo' : (post.author || 'Utente')}</div>
                         <div style="font-size:12px; opacity:0.6; color:var(--text-muted);">${post.anon ? 'Studente' : (post.class || '')}</div>
@@ -2951,7 +2975,7 @@
                 <div style="padding:20px; padding-top:calc(var(--safe-top) + 20px); background:rgba(0,0,0,0.6); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); display:flex; align-items:center; gap:16px; border-bottom:1px solid rgba(255,255,255,0.1);">
                     <button onclick="navigate('search')" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;"><i class="ph ph-arrow-left"></i></button>
                     <div style="display:flex; align-items:center; gap:10px;">
-                        ${renderAvatar(state.currentChatUser, 40)}
+                        ${renderAvatar(state.currentChatUser, 40, (typeof DIRECTORY !== 'undefined' ? DIRECTORY.find(u => u.name === state.currentChatUser)?.avatar : null))}
                         <h2 style="margin:0; font-size:18px;">${state.currentChatUser}</h2>
                     </div>
                 </div>
@@ -4604,8 +4628,93 @@
             });
         }
 
+        let __newAvatarData = null;
+
+        /* Modale modifica profilo */
+        function showEditProfileModal() {
+            const modal = getModalContainer();
+            if (!modal) return;
+            const user = state.user || {};
+            modal.innerHTML = `
+    <div class="modal-overlay" onclick="closeModal(event)">
+      <div class="modal-content glass-panel" onclick="event.stopPropagation()" style="max-width: 520px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h2 style="margin:0;">Modifica Profilo</h2>
+          <i class="ph ph-x" onclick="closeModal()" style="cursor:pointer; font-size:22px;"></i>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
+          <div class="avatar-preview" id="avatar-preview">
+            ${user.avatar ? `<img src="${user.avatar}" alt="avatar">` : `<span style="font-weight:800; color:white; font-size:22px;">${(user.name || 'U')[0]}</span>`}
+          </div>
+          <label style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.18); padding:10px 14px; border-radius:10px; color:white; font-weight:700; cursor:pointer;">
+            <i class="ph ph-image"></i> Cambia immagine
+            <input type="file" accept="image/*" style="display:none;" onchange="handleAvatarFileChange(event)">
+          </label>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <input id="edit-name" placeholder="Nome" value="${user.name || ''}" />
+          <input id="edit-class" placeholder="Classe (es. 5B)" value="${user.class || ''}" />
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button onclick="closeModal()" style="background:none; border:1px solid rgba(255,255,255,0.2); color:var(--text-muted); padding:10px 14px; border-radius:10px; cursor:pointer;">Annulla</button>
+          <button onclick="saveProfileEdits()" class="btn-primary" style="max-width:220px;">Salva</button>
+        </div>
+      </div>
+    </div>`;
+        }
+
+        /* Gestione avatar file → preview + memorizzazione base64 temporanea */
+        function handleAvatarFileChange(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (ev) {
+                __newAvatarData = ev.target.result; // dataURL
+                const prev = document.getElementById('avatar-preview');
+                if (prev) prev.innerHTML = `<img src="${__newAvatarData}" alt="avatar">`;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /* Salva profilo: locale + tentativo backend */
+        async function saveProfileEdits() {
+            const name = (document.getElementById('edit-name')?.value || '').trim();
+            const className = (document.getElementById('edit-class')?.value || '').trim();
+            const avatar = __newAvatarData || state.user?.avatar || null;
+
+            state.user = { ...(state.user || {}), name, class: className, avatar };
+            localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
+
+            // Tentativo salvataggio permanente su backend (stesso storage di feed/market)
+            try {
+                const payload = { userId: getUserId(), name, class: className, avatar }; // avatar dataURL
+                const res = await fetch(`${API_BASE_URL}/api/profile`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json().catch(() => ({ success: false }));
+                if (!data.success) throw new Error('save failed');
+                console.log('✅ Profilo salvato su backend');
+            } catch (e) {
+                console.warn('Profilo salvato solo localmente (backend non disponibile):', e.message);
+                // opzionale: enqueueOutbox('profile', { userId: getUserId(), name, class: className, avatar });
+            }
+
+            __newAvatarData = null;
+            closeModal();
+            render();
+        }
+
         window.showStressCaptureModal = showStressCaptureModal;
         window.drawWeeklyStressChart = drawWeeklyStressChart;
+        window.showEditProfileModal = showEditProfileModal;
+        window.handleAvatarFileChange = handleAvatarFileChange;
+        window.saveProfileEdits = saveProfileEdits;
     </script>
 </body>
 

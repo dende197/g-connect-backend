@@ -95,6 +95,7 @@ else:
 # ============= PERSISTENCE CONFIG =============
 POSTS_FILE = "posts.json"
 MARKET_FILE = "market.json"
+PROFILES_FILE = "profiles.json"
 
 def load_json_file(filename, default=[]):
     """Carica dati da file JSON locale"""
@@ -619,8 +620,20 @@ def handle_posts():
     if supabase:
         if request.method == 'GET':
             try:
+                # Get posts and join with profiles or fetch separately
+                # For simplicity in this hybrid model, we'll fetch posts then enrich
                 resp = supabase.table("posts").select("*").order("created_at", desc=True).limit(100).execute()
-                return jsonify({"success": True, "data": resp.data or []}), 200
+                posts = resp.data or []
+                
+                # Fetch profiles for these authors
+                author_ids = list(set([p.get('author_id') for p in posts if p.get('author_id')]))
+                if author_ids:
+                    prof_resp = supabase.table("profiles").select("userId,avatar").in_("userId", author_ids).execute()
+                    prof_map = {pr['userId']: pr['avatar'] for pr in (prof_resp.data or [])}
+                    for p in posts:
+                        p['author_avatar'] = prof_map.get(p.get('author_id'))
+                
+                return jsonify({"success": True, "data": posts}), 200
             except Exception as e:
                 debug_log("⚠️ /api/posts GET (Supabase) error, falling back", str(e))
                 # Fall through to JSON fallback
@@ -647,8 +660,13 @@ def handle_posts():
     # JSON fallback mode
     try:
         if request.method == 'GET':
-            data = load_json_file(POSTS_FILE, [])
-            return jsonify({"success": True, "data": data}), 200
+            posts = load_json_file(POSTS_FILE, [])
+            profiles = load_json_file(PROFILES_FILE, {})
+            for p in posts:
+                uid = p.get('authorId') or p.get('author_id')
+                if uid and uid in profiles:
+                    p['author_avatar'] = profiles[uid].get('avatar')
+            return jsonify({"success": True, "data": posts}), 200
         else:
             new_post = request.json or {}
             if 'id' not in new_post:
@@ -662,6 +680,33 @@ def handle_posts():
         debug_log("⚠️ /api/posts fallback error", str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/profile', methods=['PUT'])
+def handle_profile():
+    payload = request.json or {}
+    user_id = payload.get("userId")
+    if not user_id:
+        return jsonify({"success": False, "error": "Missing userId"}), 400
+    
+    # Supabase mode
+    if supabase:
+        try:
+            # Upsert in Supabase
+            supabase.table("profiles").upsert(payload).execute()
+            debug_log(f"👤 Profile updated in Supabase: {user_id}")
+        except Exception as e:
+            debug_log(f"⚠️ /api/profile Supabase error: {str(e)}")
+
+    # JSON fallback mode
+    try:
+        profiles = load_json_file(PROFILES_FILE, {})
+        if not isinstance(profiles, dict): profiles = {} # Safety
+        profiles[user_id] = payload
+        save_json_file(PROFILES_FILE, profiles)
+        return jsonify({"success": True, "message": "Profile saved local fallback"}), 200
+    except Exception as e:
+        debug_log(f"⚠️ /api/profile fallback error: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/api/market', methods=['GET', 'POST'])
 def handle_market():
     # Supabase mode
@@ -669,7 +714,17 @@ def handle_market():
         if request.method == 'GET':
             try:
                 resp = supabase.table("market_items").select("*").order("created_at", desc=True).limit(200).execute()
-                return jsonify({"success": True, "data": resp.data or []}), 200
+                items = resp.data or []
+                
+                # Fetch profiles
+                seller_ids = list(set([it.get('seller_id') for it in items if it.get('seller_id')]))
+                if seller_ids:
+                    prof_resp = supabase.table("profiles").select("userId,avatar").in_("userId", seller_ids).execute()
+                    prof_map = {pr['userId']: pr['avatar'] for pr in (prof_resp.data or [])}
+                    for it in items:
+                        it['author_avatar'] = prof_map.get(it.get('seller_id'))
+                
+                return jsonify({"success": True, "data": items}), 200
             except Exception as e:
                 debug_log("⚠️ /api/market GET (Supabase) error, falling back", str(e))
                 # Fall through to JSON fallback
@@ -696,6 +751,11 @@ def handle_market():
     try:
         if request.method == 'GET':
             items = load_json_file(MARKET_FILE, [])
+            profiles = load_json_file(PROFILES_FILE, {})
+            for it in items:
+                uid = it.get('sellerId') or it.get('seller_id')
+                if uid and uid in profiles:
+                    it['author_avatar'] = profiles[uid].get('avatar')
             return jsonify({"success": True, "data": items}), 200
         else:
             new_item = request.json or {}
