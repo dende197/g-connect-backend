@@ -677,7 +677,7 @@ def update_profile():
             return jsonify({"success": False, "error": "userId mancante"}), 400
         
         profile_data = {
-            "userId": user_id,
+            "id": user_id,  # ✅ Fixed: Table uses 'id'
             "last_active": datetime.now().isoformat()
         }
         
@@ -691,7 +691,8 @@ def update_profile():
                 return jsonify({"success": False, "error": "Avatar deve essere un URL"}), 400
             profile_data['avatar'] = avatar_url
         
-        supabase.table("profiles").upsert(profile_data).execute()
+        # ✅ Fixed: Explicit on_conflict for upsert
+        supabase.table("profiles").upsert(profile_data, on_conflict="id").execute()
         debug_log(f"✅ Profile updated: {user_id}")
         return jsonify({"success": True}), 200
         
@@ -704,13 +705,14 @@ def update_profile():
 def get_profile(user_id):
     """
     Recupera il profilo utente dal database.
-    Response: { "success": true, "data": { "userId": "...", "name": "...", "avatar": "..." } }
+    Response: { "success": true, "data": { "id": "...", "name": "...", "avatar": "..." } }
     """
     if not supabase:
         return jsonify({"success": False, "error": "Supabase non configurato"}), 500
     
     try:
-        result = supabase.table("profiles").select("*").eq("userId", user_id).execute()
+        # ✅ Fixed: Table uses 'id'
+        result = supabase.table("profiles").select("*").eq("id", user_id).execute()
         
         if not result.data or len(result.data) == 0:
             return jsonify({"success": False, "error": "Profilo non trovato"}), 404
@@ -1140,7 +1142,8 @@ def login():
                     "class": student_class,
                     "last_active": datetime.now().isoformat()
                 }
-                supabase.table("profiles").upsert(profile_payload).execute()
+                # ✅ Fixed: Explicit on_conflict for upsert
+                supabase.table("profiles").upsert(profile_payload, on_conflict="id").execute()
                 debug_log(f"👤 Profile sync'd to Supabase: {profile_id}")
             except Exception as e_prof:
                 debug_log("⚠️ Profile sync failed (non-fatal)", str(e_prof))
