@@ -2670,10 +2670,15 @@
                 state.user.avatar = avatarUrl;
                 localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
 
-                closeModal();
+                // Se la modale di modifica profilo è aperta, aggiorna la preview
+                const modalAvatarPreview = document.querySelector('#edit-profile-avatar-preview');
+                if (modalAvatarPreview) {
+                    modalAvatarPreview.innerHTML = renderAvatar(state.user.name, 100);
+                }
+
                 render();
                 hideBoot();
-                alert('✅ Avatar aggiornato!');
+                // alert('✅ Avatar aggiornato!'); // Rimosso per fluidità se dentro modale
 
             } catch (error) {
                 hideBoot();
@@ -2682,36 +2687,83 @@
             }
         }
 
-        function showAvatarModal() {
+        function showEditProfileModal() {
             const modalContainer = getModalContainer();
             if (!modalContainer) return;
 
             modalContainer.innerHTML = `
                 <div class="modal-overlay" onclick="closeModal(event)">
-                    <div class="modal-content glass-panel" onclick="event.stopPropagation()" style="max-width: 420px; padding: 24px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2 style="margin: 0; font-size: 20px; font-weight: 800;">Cambia Avatar</h2>
-                            <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; cursor: pointer; font-size: 16px;">Chiudi</button>
+                    <div class="modal-content glass-panel" onclick="event.stopPropagation()" style="max-width: 440px; padding: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                            <h2 style="margin: 0; font-size: 22px; font-weight: 800;">Modifica Profilo</h2>
+                            <button onclick="closeModal()" style="background: none; border: none; color: var(--blue); font-weight: 700; cursor: pointer; font-size: 16px;">Annulla</button>
                         </div>
-                        <div style="text-align: center; margin-bottom: 24px;">
-                            <div style="display: inline-block;">${renderAvatar(state.user.name, 120)}</div>
-                            <div style="margin-top: 12px; font-size: 14px; color: var(--text-muted);">Avatar attuale</div>
+                        
+                        <div style="text-align: center; margin-bottom: 24px; position: relative; width: 100px; margin-left: auto; margin-right: auto;">
+                            <div id="edit-profile-avatar-preview" onclick="document.getElementById('edit-avatar-input').click()" style="cursor: pointer; transition: opacity 0.2s;">
+                                ${renderAvatar(state.user.name, 100)}
+                            </div>
+                            <div onclick="document.getElementById('edit-avatar-input').click()" style="position: absolute; bottom: 0; right: 0; background: var(--blue); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #1a202c; cursor: pointer;">
+                                <i class="ph-bold ph-camera" style="color: white; font-size: 16px;"></i>
+                            </div>
+                            <input type="file" id="edit-avatar-input" accept="image/*" onchange="handleAvatarUpload(event)" style="display: none;"/>
                         </div>
-                        <label for="avatar-upload-input" class="btn-primary" style="display: block; text-align: center; padding: 14px; border-radius: 14px; cursor: pointer; font-weight: 700; margin-bottom: 12px;">
-                            <i class="ph-bold ph-upload-simple" style="margin-right: 8px;"></i>Scegli Nuova Immagine
-                        </label>
-                        <input type="file" id="avatar-upload-input" accept="image/*" onchange="handleAvatarUpload(event)" style="display: none;"/>
-                        <div style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; font-size: 12px; color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1);">
-                            <i class="ph ph-info" style="margin-right: 4px;"></i>Formato: JPG, PNG, GIF • Max 5MB
+                        
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; margin-left: 4px;">NOME E COGNOME</label>
+                            <input type="text" id="edit-user-name" value="${state.user.name || ''}" placeholder="Inserisci il tuo nome" style="width: 100%; height: 54px; border-radius: 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: white; padding: 0 16px; font-size: 16px; font-weight: 600; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='rgba(255,255,255,0.12)'">
                         </div>
+                        
+                        <div style="margin-bottom: 28px;">
+                            <label style="display: block; font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; margin-left: 4px;">CLASSE</label>
+                            <input type="text" id="edit-user-class" value="${state.user.class || ''}" placeholder="Es. 5B" style="width: 100%; height: 54px; border-radius: 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: white; padding: 0 16px; font-size: 16px; font-weight: 600; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='rgba(255,255,255,0.12)'">
+                        </div>
+                        
+                        <button onclick="saveProfileChanges()" class="btn-primary" style="width: 100%; height: 56px; border-radius: 16px; font-size: 18px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                            <i class="ph-bold ph-check-circle" style="font-size: 22px;"></i> Salva Modifiche
+                        </button>
                     </div>
                 </div>
             `;
         }
 
-        // Expose avatar functions globally
+        async function saveProfileChanges() {
+            const newName = document.getElementById('edit-user-name').value.trim();
+            const newClass = document.getElementById('edit-user-class').value.trim();
+
+            if (!newName) {
+                alert("Inserisci almeno il nome");
+                return;
+            }
+
+            try {
+                showBoot("Salvataggio profilo...");
+
+                await saveProfileToServer({
+                    name: newName,
+                    class: newClass,
+                    avatar: state.user.avatar // Già caricato se cambiato tramite handleAvatarUpload
+                });
+
+                state.user.name = newName;
+                state.user.class = newClass;
+                localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
+
+                closeModal();
+                render();
+                hideBoot();
+
+            } catch (error) {
+                hideBoot();
+                console.error("❌ Errore salvataggio profilo:", error);
+                alert("❌ Errore durante il salvataggio: " + error.message);
+            }
+        }
+
+        // Expose functions globally
         window.handleAvatarUpload = handleAvatarUpload;
-        window.showAvatarModal = showAvatarModal;
+        window.showEditProfileModal = showEditProfileModal;
+        window.saveProfileChanges = saveProfileChanges;
 
         function renderHome() {
             const todayStr = new Date().toISOString().split('T')[0];
@@ -2737,9 +2789,9 @@
                     </div>
                 </div>
 
-                <!-- Profile row (no glass background) -->
-                <div class="profile-row">
-                    <div class="profile-avatar">${(state.user?.name || 'U')[0]}</div>
+                <!-- Profile row (clickable to edit) -->
+                <div class="profile-row" onclick="showEditProfileModal()" style="cursor:pointer; transition: transform 0.2s ease;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                    ${renderAvatar(state.user?.name, 54)}
                     <div class="profile-meta" style="flex:1; min-width:0;">
                         <div style="font-size:16px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                             ${state.user?.name || 'Utente'}
