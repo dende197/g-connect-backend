@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import argofamiglia
 import uuid
@@ -14,7 +14,7 @@ from datetime import datetime
 from planner_routes import register_planner_routes
 
 # CREA UNA SOLA ISTANZA DI FLASK
-app = Flask(__name__)
+app = Flask(__name__, static_url_path="/static", static_folder="static")
 
 # CORS: configura una sola volta con i domini corretti
 CORS(app, origins=[
@@ -82,6 +82,7 @@ def debug_log(message, data=None):
 # ✅ NEW: Supabase client init
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "uploads")
 
 supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
@@ -92,16 +93,23 @@ if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
         debug_log("❌ Error initializing Supabase client", str(e))
 else:
     debug_log("⚠️ Supabase NOT configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+
 # ============= PERSISTENCE CONFIG =============
+DATA_DIR = os.path.abspath(".")
+STATIC_UPLOAD_DIR = os.path.join(DATA_DIR, "static", "uploads")
+os.makedirs(STATIC_UPLOAD_DIR, exist_ok=True)
+
 POSTS_FILE = "posts.json"
 MARKET_FILE = "market.json"
 PROFILES_FILE = "profiles.json"
+POLLS_FILE = "polls.json"
 
 def load_json_file(filename, default=[]):
     """Carica dati da file JSON locale"""
     try:
-        if os.path.exists(filename):
-            with open(filename, 'r', encoding='utf-8') as f:
+        path = os.path.join(DATA_DIR, filename)
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
     except Exception as e:
         debug_log(f"⚠️ Errore caricamento {filename}", str(e))
@@ -110,10 +118,36 @@ def load_json_file(filename, default=[]):
 def save_json_file(filename, data):
     """Salva dati su file JSON locale"""
     try:
-        with open(filename, 'w', encoding='utf-8') as f:
+        path = os.path.join(DATA_DIR, filename)
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         debug_log(f"⚠️ Errore salvataggio {filename}", str(e))
+
+# ============= UPLOAD HELPERS =============
+def save_image_local(b64data, prefix="img"):
+    try:
+        file_id = f"{prefix}_{uuid.uuid4().hex[:12]}.png"
+        file_path = os.path.join(STATIC_UPLOAD_DIR, file_id)
+        with open(file_path, "wb") as f:
+            f.write(base64.b64decode(b64data.split(",")[-1]))
+        return f"/static/uploads/{file_id}"
+    except Exception as e:
+        debug_log("❌ save_image_local error", str(e))
+        raise e
+
+def save_image_supabase(b64data, prefix="img"):
+    try:
+        file_id = f"{prefix}_{uuid.uuid4().hex[:12]}.png"
+        # Upload to Supabase Storage
+        content_bytes = base64.b64decode(b64data.split(",")[-1])
+        supabase.storage.from_(SUPABASE_BUCKET).upload(file_id, content_bytes, file_options={"content-type": "image/png", "upsert": True})
+        public_url = supabase.storage.from_(SUPABASE_BUCKET).get_public_url(file_id)
+        return public_url
+    except Exception as e:
+        debug_log("⚠️ save_image_supabase error", str(e))
+        # Fallback to local
+        return save_image_local(b64data, prefix=prefix)
 
 # ============= ADVANCED ARGO CLASS (MULTI-PROFILE) =============
 
@@ -614,29 +648,108 @@ def health():
 
 # ============= PERSISTENCE ENDPOINTS =============
 
+@app.route('/api/upload', methods=['POST'])
+def upload_image():
+    """
+    Accetta {image: base64DataUrl, kind: 'avatar'|'post'|'market'} e ritorna {url}
+    Usa Supabase Storage se disponibile, altrimenti filesystem locale.
+    """
+    body = request.json or {}
+    b64 = body.get("image")
+    kind = body.get("kind", "img")
+    if not b64 or not b64.startswith("data:image"):
+        return jsonify({"success": False, "error": "Missing/invalid image"}), 400
+    try:
+        if supabase:
+            url = save_image_supabase(b64, prefix=kind)
+        else:
+            url = save_image_local(b64, prefix=kind)
+        return jsonify({"success": True, "url": url}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/profile/<user_id>', methods=['GET'])
+def get_profile(user_id):
+    """
+    Restituisce il profilo persistito (name, class, avatar) per user_id
+    """
+    # Supabase mode
+    if supabase:
+        try:
+            resp = supabase.table("profiles").select("*").eq("userId", user_id).limit(1).execute()
+            rows = resp.data or []
+            if rows:
+                return jsonify({"success": True, "data": rows[0]}), 200
+        except Exception as e:
+            debug_log("⚠️ /api/profile GET (Supabase) error", str(e))
+    # JSON fallback
+    profiles = load_json_file(PROFILES_FILE, {})
+    data = profiles.get(user_id)
+    return jsonify({"success": True, "data": data}), 200
+
+@app.route('/api/profile', methods=['PUT'])
+def handle_profile():
+    """
+    Upsert del profilo persistito. Payload richiesto:
+    {
+      "userId": "...",            # chiave coerente: school:username:idx
+      "name": "Nome visibile",
+      "class": "5B" (opzionale),
+      "avatar": "URL immagine"    # opzionale
+    }
+    """
+    payload = request.json or {}
+    user_id = payload.get("userId")
+    if not user_id:
+        return jsonify({"success": False, "error": "Missing userId"}), 400
+    # Supabase mode
+    if supabase:
+        try:
+            supabase.table("profiles").upsert({
+                "userId": user_id,
+                "name": payload.get("name"),
+                "class": payload.get("class"),
+                "avatar": payload.get("avatar"),
+                "last_active": datetime.now().isoformat()
+            }).execute()
+            debug_log(f"👤 Profile upserted in Supabase: {user_id}")
+        except Exception as e:
+            debug_log(f"⚠️ /api/profile Supabase error: {str(e)}")
+    # JSON fallback
+    profiles = load_json_file(PROFILES_FILE, {})
+    if not isinstance(profiles, dict): profiles = {}
+    profiles[user_id] = {
+        "userId": user_id,
+        "name": payload.get("name"),
+        "class": payload.get("class"),
+        "avatar": payload.get("avatar"),
+        "last_active": datetime.now().isoformat()
+    }
+    save_json_file(PROFILES_FILE, profiles)
+    return jsonify({"success": True, "data": profiles[user_id]}), 200
+
 @app.route('/api/posts', methods=['GET', 'POST'])
 def handle_posts():
     # Supabase mode
     if supabase:
         if request.method == 'GET':
             try:
-                # Get posts and join with profiles or fetch separately
-                # For simplicity in this hybrid model, we'll fetch posts then enrich
                 resp = supabase.table("posts").select("*").order("created_at", desc=True).limit(100).execute()
                 posts = resp.data or []
-                
-                # Fetch profiles for these authors
-                author_ids = list(set([p.get('author_id') for p in posts if p.get('author_id')]))
+                # Enrich avatar
+                author_ids = list(set([p.get('author_id') or p.get('authorId') for p in posts if (p.get('author_id') or p.get('authorId'))]))
                 if author_ids:
                     prof_resp = supabase.table("profiles").select("userId,avatar").in_("userId", author_ids).execute()
-                    prof_map = {pr['userId']: pr['avatar'] for pr in (prof_resp.data or [])}
+                    prof_map = {pr['userId']: pr.get('avatar') for pr in (prof_resp.data or [])}
                     for p in posts:
-                        p['author_avatar'] = prof_map.get(p.get('author_id'))
-                
+                        aid = p.get('author_id') or p.get('authorId')
+                        p['author_avatar'] = prof_map.get(aid)
+                # Anti-wipe: se vuoto, restituisci lista locale come fallback
+                if not posts:
+                    posts = load_json_file(POSTS_FILE, [])
                 return jsonify({"success": True, "data": posts}), 200
             except Exception as e:
                 debug_log("⚠️ /api/posts GET (Supabase) error, falling back", str(e))
-                # Fall through to JSON fallback
         else:
             try:
                 new_post = request.json or {}
@@ -652,10 +765,10 @@ def handle_posts():
                 }
                 supabase.table("posts").insert(payload).execute()
                 resp = supabase.table("posts").select("*").order("created_at", desc=True).limit(100).execute()
-                return jsonify({"success": True, "data": resp.data or []}), 200
+                posts = resp.data or []
+                return jsonify({"success": True, "data": posts}), 200
             except Exception as e:
                 debug_log("⚠️ /api/posts POST (Supabase) error, falling back", str(e))
-                # Fall through to JSON fallback
 
     # JSON fallback mode
     try:
@@ -680,33 +793,6 @@ def handle_posts():
         debug_log("⚠️ /api/posts fallback error", str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/profile', methods=['PUT'])
-def handle_profile():
-    payload = request.json or {}
-    user_id = payload.get("userId")
-    if not user_id:
-        return jsonify({"success": False, "error": "Missing userId"}), 400
-    
-    # Supabase mode
-    if supabase:
-        try:
-            # Upsert in Supabase
-            supabase.table("profiles").upsert(payload).execute()
-            debug_log(f"👤 Profile updated in Supabase: {user_id}")
-        except Exception as e:
-            debug_log(f"⚠️ /api/profile Supabase error: {str(e)}")
-
-    # JSON fallback mode
-    try:
-        profiles = load_json_file(PROFILES_FILE, {})
-        if not isinstance(profiles, dict): profiles = {} # Safety
-        profiles[user_id] = payload
-        save_json_file(PROFILES_FILE, profiles)
-        return jsonify({"success": True, "message": "Profile saved local fallback"}), 200
-    except Exception as e:
-        debug_log(f"⚠️ /api/profile fallback error: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
 @app.route('/api/market', methods=['GET', 'POST'])
 def handle_market():
     # Supabase mode
@@ -715,19 +801,19 @@ def handle_market():
             try:
                 resp = supabase.table("market_items").select("*").order("created_at", desc=True).limit(200).execute()
                 items = resp.data or []
-                
-                # Fetch profiles
-                seller_ids = list(set([it.get('seller_id') for it in items if it.get('seller_id')]))
+                seller_ids = list(set([it.get('seller_id') or it.get('sellerId') for it in items if (it.get('seller_id') or it.get('sellerId'))]))
                 if seller_ids:
                     prof_resp = supabase.table("profiles").select("userId,avatar").in_("userId", seller_ids).execute()
-                    prof_map = {pr['userId']: pr['avatar'] for pr in (prof_resp.data or [])}
+                    prof_map = {pr['userId']: pr.get('avatar') for pr in (prof_resp.data or [])}
                     for it in items:
-                        it['author_avatar'] = prof_map.get(it.get('seller_id'))
-                
+                        sid = it.get('seller_id') or it.get('sellerId')
+                        it['author_avatar'] = prof_map.get(sid)
+                # Anti-wipe fallback
+                if not items:
+                    items = load_json_file(MARKET_FILE, [])
                 return jsonify({"success": True, "data": items}), 200
             except Exception as e:
                 debug_log("⚠️ /api/market GET (Supabase) error, falling back", str(e))
-                # Fall through to JSON fallback
         else:
             try:
                 new_item = request.json or {}
@@ -742,10 +828,10 @@ def handle_market():
                 }
                 supabase.table("market_items").insert(payload).execute()
                 resp = supabase.table("market_items").select("*").order("created_at", desc=True).limit(200).execute()
-                return jsonify({"success": True, "data": resp.data or []}), 200
+                items = resp.data or []
+                return jsonify({"success": True, "data": items}), 200
             except Exception as e:
                 debug_log("⚠️ /api/market POST (Supabase) error, falling back", str(e))
-                # Fall through to JSON fallback
 
     # JSON fallback mode
     try:
@@ -774,8 +860,9 @@ POLLS_FILE = "polls.json"
 
 def load_polls_file():
     try:
-        if os.path.exists(POLLS_FILE):
-            with open(POLLS_FILE, 'r', encoding='utf-8') as f:
+        path = os.path.join(DATA_DIR, POLLS_FILE)
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
     except Exception as e:
         debug_log("⚠️ load_polls_file error", str(e))
@@ -783,7 +870,8 @@ def load_polls_file():
 
 def save_polls_file(polls):
     try:
-        with open(POLLS_FILE, 'w', encoding='utf-8') as f:
+        path = os.path.join(DATA_DIR, POLLS_FILE)
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(polls, f, ensure_ascii=False, indent=2)
     except Exception as e:
         debug_log("⚠️ save_polls_file error", str(e))
@@ -1082,7 +1170,7 @@ def login():
             try:
                 profile_id = f"{school_code}:{username.lower()}:{target_index}"
                 profile_payload = {
-                    "id": profile_id,
+                    "userId": profile_id,
                     "name": student_name,
                     "class": student_class,
                     "last_active": datetime.now().isoformat()

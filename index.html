@@ -606,6 +606,29 @@
             margin: 12px 0 16px 0;
         }
 
+        .search-btn-large {
+            width: 100%;
+            padding: 14px 18px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            font-size: 15px;
+        }
+
+        .search-btn-large:active {
+            transform: scale(0.98);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
         /* Anteprima avatar nella modale profilo */
         .avatar-preview {
             width: 72px;
@@ -1398,155 +1421,158 @@
 
         // 🆕 PERSISTENT SESSION MANAGER
         const sessionManager = {
-            save(sessionData) {
-                try {
-                    localStorage.setItem('argo_session', JSON.stringify(sessionData));
-                    localStorage.setItem('argo_is_logged_in', 'true');
-                    console.log("✅ Sessione salvata");
-                } catch (e) {
-                    console.error("❌ Errore salvataggio sessione:", e);
-                    alert("Errore salvataggio dati locali. Prova a disabilitare modalità incognito.");
-                }
-            },
-            load() {
-                try {
-                    const saved = localStorage.getItem('argo_session');
-                    return saved ? JSON.parse(saved) : null;
-                } catch (e) {
-                    console.error("❌ Errore caricamento sessione:", e);
-                    return null;
-                }
-            },
-            isLoggedIn() {
-                return localStorage.getItem('argo_is_logged_in') === 'true';
-            },
-            clear() {
-                localStorage.removeItem('argo_session');
-                localStorage.removeItem('argo_is_logged_in');
-                console.log("🗑️ Sessione terminata (dati profilo rimangono in localStorage)");
-            }
+            save(s) { localStorage.setItem('argo_session', JSON.stringify(s)); localStorage.setItem('argo_is_logged_in', 'true'); },
+            load() { try { const s = localStorage.getItem('argo_session'); return s ? JSON.parse(s) : null; } catch { return null } },
+            isLoggedIn() { return localStorage.getItem('argo_is_logged_in') === 'true'; },
+            clear() { localStorage.removeItem('argo_session'); localStorage.removeItem('argo_is_logged_in'); }
         };
+        function getActiveProfileKey() {
+            const s = sessionManager.load();
+            if (!s || !sessionManager.isLoggedIn()) return 'guest';
+            const school = s.schoolCode || 'noschool';
+            const user = (s.userName || s.username || 'nouser').toLowerCase();
+            const idx = (s.profileIndex ?? 0);
+            return `p:${school}:${user}:${idx}`;
+        }
+        function lsKey(name) { return `${getActiveProfileKey()}:${name}`; }
+        function globalKey(name) { return `global:${name}`; }
+        function getUserId() {
+            const s = sessionManager.load();
+            if (!s) return 'guest';
+            const school = s.schoolCode || 'noschool';
+            const user = (s.userName || s.username || 'nouser').toLowerCase();
+            const idx = (s.profileIndex ?? 0);
+            return `${school}:${user}:${idx}`;
+        }
 
-        // STATE MANAGEMENT
+        // Stato app
         const state = {
             view: 'login',
-            user: { name: 'Andrea', class: '5B' }, // ⭐ Verrà sovrascritto da localStorage
+            user: { name: 'Utente', class: '5B', avatar: null },
             isLoggedIn: false,
             isOffline: false,
-            didup: { connected: false },
             feed: { search: '', classFilter: 'Tutte' },
-            tasks: [], // ⭐ Inizializza vuoto, carica da localStorage
-            posts: [], // Loaded from API
-            marketItems: [], // Loaded from API
-            messages: { 'Alessandro Russo': [{ text: 'Ciao Andrea! ', me: false }] },
-            news: [
-                { id: 128, title: 'Circolare n.  128 - Assemblea d\'Istituto 7 Febbraio', date: 'OGGI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' },
-                { id: 127, title: 'Circolare n. 127 - Variazione Calendario Scrutini', date: 'IERI', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' },
-                { id: 126, title: 'Circolare n. 126 - Saldo viaggio d\'istruzione', date: '2 GG FA', url: 'https://www.liceogandhi.edu.it/categoria/storico-circolari/' }
-            ],
-            grades: [],
-            announcements: [],
-            voti: [],        // ⭐ Added based on user request
+            posts: [],
+            marketItems: [],
+            tasks: [],
+            voti: [],
             promemoria: [],
-            reminders: [],
-            syncing: false,
-            selectedDay: new Date().getDate(),
             stressLevels: {},
             plannedTasks: {},
-            polls: []
+            polls: [],
+            syncing: false,
+            didup: { connected: false }
         };
 
         const app = document.getElementById('app');
         const modalContainer = document.getElementById('modals');
         const offlineBadge = document.getElementById('offline-badge');
 
-        // ⭐ INITIALIZE APP ON LOAD
         document.addEventListener('DOMContentLoaded', async () => {
             showBoot('Avvio G-Connect');
-
-            const desiredHashView = currentViewFromHash();
             const savedSession = sessionManager.load();
             const isLoggedIn = sessionManager.isLoggedIn();
-
             try {
                 if (isLoggedIn && savedSession) {
-                    // Cache locali immediate
-                    const cachedTasks = localStorage.getItem(lsKey('tasks'));
-                    if (cachedTasks) {
-                        try {
-                            const parsed = JSON.parse(cachedTasks);
-                            state.tasks = parsed.map(t => {
-                                if (t.due_date) {
-                                    t.dateObj = new Date(t.due_date);
-                                    t.hasValidDate = !isNaN(t.dateObj.getTime());
-                                }
-                                return t;
-                            });
-                        } catch { state.tasks = []; }
-                    }
-
-                    const cachedUser = localStorage.getItem(lsKey('user'));
-                    if (cachedUser) {
-                        try { state.user = JSON.parse(cachedUser); } catch { }
-                    } else if (savedSession.student) {
-                        state.user = savedSession.student;
-                        localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
-                    }
-
-                    const cachedVoti = localStorage.getItem(lsKey('voti'));
-                    if (cachedVoti) { try { state.voti = JSON.parse(cachedVoti); } catch { } }
-
-                    const cachedProm = localStorage.getItem(lsKey('promemoria'));
-                    if (cachedProm) { try { state.promemoria = JSON.parse(cachedProm); } catch { } }
-
-                    // Planner cache del profilo
-                    state.plannedTasks = JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}');
-                    state.stressLevels = JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}');
-                    state.reminders = JSON.parse(localStorage.getItem(lsKey('reminders')) || '[]');
-
-                    // Feed/Market cache globali
-                    const cachedPosts = localStorage.getItem(globalKey('posts'));
-                    if (cachedPosts) { try { state.posts = JSON.parse(cachedPosts); } catch { state.posts = []; } }
-                    const cachedMarket = localStorage.getItem(globalKey('market'));
-                    if (cachedMarket) { try { state.marketItems = JSON.parse(cachedMarket); } catch { state.marketItems = []; } }
-
-                    // Sondaggi cache globale
-                    const cachedPolls = localStorage.getItem(globalKey('polls'));
-                    if (cachedPolls) { try { state.polls = JSON.parse(cachedPolls); } catch { state.polls = []; } }
+                    // Carica cache locali
+                    try { state.posts = JSON.parse(localStorage.getItem(globalKey('posts')) || '[]'); } catch { }
+                    try { state.marketItems = JSON.parse(localStorage.getItem(globalKey('market')) || '[]'); } catch { }
+                    try { state.plannedTasks = JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}'); } catch { }
+                    try { state.stressLevels = JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}'); } catch { }
+                    try { state.user = JSON.parse(localStorage.getItem(lsKey('user')) || '{}'); } catch { }
 
                     state.isLoggedIn = true;
-                    state.didup.connected = true;
 
-                    // Kickoff fetch NON bloccanti
-                    const bootFetches = [
-                        fetchFeed().catch(() => { }),
-                        fetchMarket().catch(() => { }),
-                        fetchPlannerRemote().catch(() => { }),
-                        fetchPolls().catch(() => { }),
-                        flushOutbox().catch(() => { })
-                    ];
+                    // Carica profilo persistito dal backend (name + avatar) e sovrascrive cache locale
+                    await loadPersistentProfile();
 
-                    Promise.allSettled(bootFetches).then(() => {
-                        notifyPlannerChanged();
+                    // Fetch non bloccanti con anti-wipe
+                    Promise.allSettled([fetchFeed(), fetchMarket(), fetchPlannerRemote(), fetchPolls()]).then(() => {
+                        render();
                     });
 
-                    state.view = desiredHashView || 'home';
+                    state.view = currentViewFromHash() || 'home';
                     render();
-
-                    performSync(savedSession).catch(err => console.warn('sync error:', err));
+                    // Sincronizzazione DidUP in background
+                    performSync(savedSession).catch(() => { });
                 } else {
-                    state.isLoggedIn = false;
                     state.view = 'login';
                     render();
                 }
-            } catch (e) {
-                console.error("Boot error:", e);
-                state.view = isLoggedIn ? (desiredHashView || 'home') : 'login';
-                render();
             } finally {
                 setTimeout(hideBoot, 300);
             }
         });
+
+        async function loadPersistentProfile() {
+            const uid = getUserId();
+            if (uid === 'guest') return;
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/profile/${encodeURIComponent(uid)}`);
+                const data = await res.json();
+                if (data.success && data.data) {
+                    const p = data.data;
+                    state.user.name = p.name || state.user.name;
+                    state.user.class = p.class || state.user.class;
+                    state.user.avatar = p.avatar || state.user.avatar;
+                    localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
+                }
+            } catch (e) { console.warn('profile load error', e); }
+        }
+
+        // Anti-wipe feed
+        async function fetchFeed() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/posts`);
+                const data = await res.json();
+                if (data.success) {
+                    const incoming = Array.isArray(data.data) ? data.data : [];
+                    if (incoming.length === 0) {
+                        // non sovrascrivere cache locale
+                        const cached = JSON.parse(localStorage.getItem(globalKey('posts')) || '[]');
+                        state.posts = cached;
+                    } else {
+                        state.posts = incoming;
+                        localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
+                    }
+                }
+            } catch (e) {
+                const cached = JSON.parse(localStorage.getItem(globalKey('posts')) || '[]');
+                state.posts = cached;
+            }
+        }
+
+        // Anti-wipe market
+        async function fetchMarket() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/market`);
+                const data = await res.json();
+                if (data.success) {
+                    const incoming = Array.isArray(data.data) ? data.data : [];
+                    if (incoming.length === 0) {
+                        const cached = JSON.parse(localStorage.getItem(globalKey('market')) || '[]');
+                        state.marketItems = cached;
+                    } else {
+                        state.marketItems = incoming;
+                        localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
+                    }
+                }
+            } catch (e) {
+                const cached = JSON.parse(localStorage.getItem(globalKey('market')) || '[]');
+                state.marketItems = cached;
+            }
+        }
+
+        // Upload immagine (avatar/post/market)
+        async function uploadImageBase64(b64, kind = 'avatar') {
+            const res = await fetch(`${API_BASE_URL}/api/upload`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: b64, kind })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'upload fail');
+            return data.url;
+        }
 
         function updateOfflineBadge() {
             if (state.isOffline) {
@@ -1847,58 +1873,124 @@
             return d.getTime() >= today.getTime();
         }
 
+        // Modale modifica profilo
+        function showEditProfileModal() {
+            const currentName = state.user?.name || '';
+            const currentClass = state.user?.class || '';
+            const currentAvatar = state.user?.avatar || '';
+            modalContainer.innerHTML = `
+          <div class="modal-overlay" onclick="closeModal(event)">
+            <div class="modal-content glass-panel" onclick="event.stopPropagation()" style="max-width:520px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h2 style="margin:0;">Modifica profilo</h2>
+                <button onclick="closeModal()" style="background:none; border:none; color:#60a5fa; font-weight:700;">Chiudi</button>
+              </div>
+              <div style="display:flex; gap:16px; align-items:center; margin-bottom:16px;">
+                <div class="avatar-preview">
+                  ${currentAvatar ? `<img id="avatarPreviewImg" src="${currentAvatar}">` : `<span style="font-weight:800; color:white; font-size:20px;">${(currentName || 'U')[0]}</span>`}
+                </div>
+                <div>
+                  <input id="profileNameInput" placeholder="Nome visualizzato" value="${currentName}" style="margin-bottom:8px;">
+                  <input id="profileClassInput" placeholder="Classe (es. 5B)" value="${currentClass}" style="margin-bottom:8px;">
+                  <input id="profileAvatarFile" type="file" accept="image/*" style="margin-bottom:8px;" onchange="onAvatarFileChange(event)">
+                  <div style="font-size:12px; color:var(--text-muted)">L'immagine verrà salvata in modo permanente.</div>
+                </div>
+              </div>
+              <div style="display:flex; justify-content:center;">
+                <button class="btn-primary" style="max-width:240px;" onclick="saveProfile()">Salva modifiche</button>
+              </div>
+            </div>
+          </div>`;
+        }
+        let _pendingAvatarB64 = null;
+        function onAvatarFileChange(e) {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                _pendingAvatarB64 = ev.target.result; // data URL
+                const imgEl = document.getElementById('avatarPreviewImg');
+                if (imgEl) {
+                    imgEl.src = _pendingAvatarB64;
+                } else {
+                    const prev = document.querySelector('.avatar-preview');
+                    prev.innerHTML = `<img id="avatarPreviewImg" src="${_pendingAvatarB64}">`;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+        async function saveProfile() {
+            try {
+                const name = document.getElementById('profileNameInput').value.trim();
+                const klass = document.getElementById('profileClassInput').value.trim();
+                let avatarUrl = state.user.avatar || null;
+                if (_pendingAvatarB64) {
+                    avatarUrl = await uploadImageBase64(_pendingAvatarB64, 'avatar');
+                }
+                const uid = getUserId();
+                const payload = { userId: uid, name, class: klass || state.user.class, avatar: avatarUrl };
+                const res = await fetch(`${API_BASE_URL}/api/profile`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'profile save fail');
+                state.user.name = name || state.user.name;
+                state.user.class = klass || state.user.class;
+                state.user.avatar = avatarUrl || state.user.avatar;
+                localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
+                closeModal();
+                render();
+            } catch (e) {
+                alert('Errore salvataggio profilo: ' + (e.message || e));
+            }
+        }
 
         async function submitPost(postData) {
-            // optimistic: aggiorna subito UI/cache
-            state.posts = [postData, ...state.posts].slice(0, 100);
+            const uid = getUserId();
+            const payload = {
+                id: postData.id || Date.now(),
+                authorId: uid,
+                author: state.user.name,
+                class: state.user.class,
+                text: postData.text || '',
+                image: postData.image || null,
+                anon: !!postData.anon
+            };
+            // optimistic
+            state.posts = [payload, ...state.posts].slice(0, 100);
             localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
             render();
-
             try {
-                const res = await fetch(`${API_BASE_URL}/api/posts`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(postData)
-                });
+                const res = await fetch(`${API_BASE_URL}/api/posts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const data = await res.json();
                 if (data.success) {
                     state.posts = data.data || state.posts;
                     localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
-                    console.log("📝 Post pubblicato (server) e cache allineata");
-                } else {
-                    throw new Error(data.error || 'failed');
-                }
-            } catch (e) {
-                console.warn("Post → outbox (offline/errore):", e.message);
-                enqueueOutbox('posts', postData);
-                alert("Sei offline o il server non risponde: il post verrà inviato alla prossima connessione.");
-            }
+                } else throw new Error(data.error || 'failed');
+            } catch (e) { console.warn('Post → outbox/offline', e); alert("Sei offline: il post verrà inviato alla prossima connessione."); }
         }
 
         async function submitItem(itemData) {
-            state.marketItems = [itemData, ...state.marketItems];
+            const uid = getUserId();
+            const payload = {
+                id: itemData.id || Date.now(),
+                sellerId: uid,
+                seller: state.user.name,
+                title: itemData.title || '',
+                price: itemData.price || '',
+                image: itemData.image || null
+            };
+            state.marketItems = [payload, ...state.marketItems].slice(0, 200);
             localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
             render();
-
             try {
-                const res = await fetch(`${API_BASE_URL}/api/market`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(itemData)
-                });
+                const res = await fetch(`${API_BASE_URL}/api/market`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const data = await res.json();
                 if (data.success) {
                     state.marketItems = data.data || state.marketItems;
                     localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
-                    console.log("🛒 Item pubblicato (server) e cache allineata");
-                } else {
-                    throw new Error(data.error || 'failed');
-                }
-            } catch (e) {
-                console.warn("Market → outbox (offline/errore):", e.message);
-                enqueueOutbox('market', itemData);
-                alert("Sei offline o il server non risponde: l'oggetto verrà pubblicato alla prossima connessione.");
-            }
+                } else throw new Error(data.error || 'failed');
+            } catch (e) { console.warn('Market → outbox/offline', e); alert("Sei offline: l'oggetto verrà pubblicato alla prossima connessione."); }
         }
 
         async function performSync(sessionData) {
@@ -2584,16 +2676,16 @@
         }
 
         /* Render avatar: usa immagine se disponibile */
+        // Render avatar coerente (usa immagine se disponibile)
         function renderAvatar(displayName, size = 44, avatarUrl = null) {
             const img = avatarUrl || (displayName === state.user?.name ? state.user?.avatar : null);
             if (img) {
-                return `<div style="width:${size}px; height:${size}px; border-radius:50%; overflow:hidden; border:1.5px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(37,99,235,0.2); flex-shrink:0;">
-          <img src="${img}" alt="avatar" style="width:100%; height:100%; object-fit:cover;">
-        </div>`;
+                return `<div style="width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;border:1.5px solid rgba(255,255,255,0.2);box-shadow:0 4px 12px rgba(37,99,235,0.2);flex-shrink:0;">
+              <img src="${img}" alt="avatar" style="width:100%;height:100%;object-fit:cover;">
+            </div>`;
             }
-            const name = (displayName || 'Utente').trim();
-            const letter = name ? name[0].toUpperCase() : '?';
-            return `<div style="width:${size}px; height:${size}px; background: linear-gradient(135deg, var(--blue), #4f46e5); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: ${size * 0.45}px; color: white; border: 1.5px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); flex-shrink: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${letter}</div>`;
+            const letter = (displayName || 'Utente')[0]?.toUpperCase() || 'U';
+            return `<div style="width:${size}px;height:${size}px;background:linear-gradient(135deg,var(--blue),#4f46e5);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:${size * 0.45}px;color:white;border:1.5px solid rgba(255,255,255,0.2); box-shadow:0 4px 12px rgba(37,99,235,0.2);">${letter}</div>`;
         }
 
         function renderHome() {
@@ -2607,9 +2699,9 @@
             return `
             <div class="view page-bg">
                 <!-- Profile row (click su avatar e nome apre Modifica profilo) -->
-                <div class="profile-row">
-                    <div class="profile-avatar" onclick="showEditProfileModal()">${renderAvatar(state.user?.name, 56, state.user?.avatar)}</div>
-                    <div class="profile-meta" style="flex:1; min-width:0;" onclick="showEditProfileModal()">
+                <div class="profile-row" onclick="showEditProfileModal()" style="cursor:pointer;">
+                    <div class="profile-avatar">${renderAvatar(state.user?.name, 56, state.user?.avatar)}</div>
+                    <div class="profile-meta" style="flex:1; min-width:0;">
                         <div style="font-size:16px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                             ${state.user?.name || 'Utente'}
                         </div>
@@ -2749,7 +2841,7 @@
         function renderMarketCard(item) {
             const commentsHtml = (item.comments || []).map(c => `
                 <div style="display:flex; align-items:center; gap:8px; padding:8px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 4px;">
-                    ${renderAvatar(c.author || 'Utente', 28, c.avatar || c.author_avatar)}
+                    ${renderAvatar(c.author || 'Utente', 28, c.author_avatar)}
                     <div style="flex:1; text-align:left;">
                         <div style="font-weight:700; font-size:12px; color:white;">${c.author || 'Utente'}</div>
                         <div style="font-size:12px; color:rgba(255,255,255,0.8);">${c.text}</div>
@@ -2767,18 +2859,15 @@
                         <div style="font-weight:700; font-size:16px; color:white; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.title}</div>
                         <button onclick="togglePinItem(${item.id})" title="Fissa" style="background:none; border:none; color:${item.pinned ? 'var(--yellow)' : 'var(--text-muted)'}; cursor:pointer;"><i class="ph ph-pushpin"></i></button>
                     </div>
-                    <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px; text-align:left;">Venduto da ${item.seller || 'Utente'}</div>
+                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                      ${renderAvatar(item.seller || 'Utente', 20, item.author_avatar)}
+                      <div style="font-size:11px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis;">${item.seller || 'Utente'}</div>
+                    </div>
                     <div style="font-weight:800; color: var(--green); font-size:16px; margin-bottom:12px; text-align:left;">${item.price}</div>
                     <div style="display:flex; gap:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:8px;">
                         <button onclick="toggleItemCommentBox(${item.id})" style="background:none; border:none; color: var(--text-muted); cursor:pointer; display:flex; align-items:center; gap:4px; font-size:12px;"><i class="ph ph-chat-circle"></i> Commenta</button>
                     </div>
                     <div id="item-comments-${item.id}" style="margin-top:8px;">${commentsHtml}</div>
-                    <div id="item-comment-box-${item.id}" style="display:none; margin-top:8px;">
-                        <div style="display:flex; gap:8px;">
-                            <input id="item-comment-input-${item.id}" placeholder="..." style="margin-bottom:0; height:32px; font-size:13px; padding:0 8px;">
-                            <button onclick="addCommentToItem(${item.id})" style="background: var(--blue); color:white; border:none; border-radius: 8px; padding: 0 12px; font-weight:700; height:32px; font-size:12px;">Invia</button>
-                        </div>
-                    </div>
                 </div>
             </div>`;
         }
@@ -2912,7 +3001,7 @@
             const isPoll = post.type === 'poll';
             const commentsHtml = (post.comments || []).map(c => `
                 <div style="display:flex; align-items:center; gap:8px; padding:8px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 4px;">
-                    ${renderAvatar(c.author || 'Utente', 28)}
+                    ${renderAvatar(c.author || 'Utente', 28, c.author_avatar)}
                     <div style="flex:1; text-align:left;">
                         <div style="font-weight:700; font-size:12px; color:white;">${c.author || 'Utente'}</div>
                         <div style="font-size:12px; color:rgba(255,255,255,0.8);">${c.text}</div>
@@ -2946,6 +3035,39 @@
                         <input id="comment-input-${post.id}" placeholder="Scrivi un commento..." style="margin-bottom:0; height:34px; font-size:14px;">
                         <button onclick="addCommentToPost(${post.id})" style="background: var(--blue); color:white; border:none; border-radius: 10px; padding: 0 12px; font-weight:700; height:34px; font-size:13px;">Invia</button>
                     </div>
+                </div>
+            </div>`;
+        }
+        function renderMarketCard(item) {
+            const commentsHtml = (item.comments || []).map(c => `
+                <div style="display:flex; align-items:center; gap:8px; padding:8px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 4px;">
+                    ${renderAvatar(c.author || 'Utente', 28, c.author_avatar)}
+                    <div style="flex:1; text-align:left;">
+                        <div style="font-weight:700; font-size:12px; color:white;">${c.author || 'Utente'}</div>
+                        <div style="font-size:12px; color:rgba(255,255,255,0.8);">${c.text}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            return `
+            <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin-bottom:0;">
+                <div style="height:140px; background:#333; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                    ${item.image ? `<img src="${item.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-book-open" style="font-size:40px; color:rgba(255,255,255,0.2);"></i>`}
+                </div>
+                <div style="padding:12px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                        <div style="font-weight:700; font-size:16px; color:white; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.title}</div>
+                        <button onclick="togglePinItem(${item.id})" title="Fissa" style="background:none; border:none; color:${item.pinned ? 'var(--yellow)' : 'var(--text-muted)'}; cursor:pointer;"><i class="ph ph-pushpin"></i></button>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                      ${renderAvatar(item.seller || 'Utente', 20, item.author_avatar)}
+                      <div style="font-size:11px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis;">${item.seller || 'Utente'}</div>
+                    </div>
+                    <div style="font-weight:800; color: var(--green); font-size:16px; margin-bottom:12px; text-align:left;">${item.price}</div>
+                    <div style="display:flex; gap:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:8px;">
+                        <button onclick="toggleItemCommentBox(${item.id})" style="background:none; border:none; color: var(--text-muted); cursor:pointer; display:flex; align-items:center; gap:4px; font-size:12px;"><i class="ph ph-chat-circle"></i> Commenta</button>
+                    </div>
+                    <div id="item-comments-${item.id}" style="margin-top:8px;">${commentsHtml}</div>
                 </div>
             </div>`;
         }
