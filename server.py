@@ -1163,11 +1163,14 @@ def login():
         # --- SESSIONE 3: DASHBOARD ---
         debug_log("🔐 [3/3] Sessione DASHBOARD...")
         announcements_data = []
+        dashboard_data = {}
         try:
             argo_dash = create_session(school_code, username, password, access_token, auth_token)
-            # Usa la FULL dashboard anche qui per sicurezza
             dashboard_data = argo_dash.get_full_dashboard()
             announcements_data = extract_promemoria(dashboard_data)
+            
+            # ===== DEBUG: Stampa struttura dashboard per estrazione nome =====
+            debug_log("🔍 DASHBOARD COMPLETA (per debug nome studente)", dashboard_data)
         except Exception as e_dash:
             debug_log("⚠️ Errore sessione dashboard", str(e_dash))
             
@@ -1175,8 +1178,32 @@ def login():
         student_name = username
         student_class = "DidUP"
         
-        # Se avevamo profili dal advanced login, usiamo quelli per info più precise
-        if not fallback_mode and profiles and 'target_index' in locals() and target_profile:
+        # 1. Prova a estrarre info più affidabili dalla dashboard (Nome REALE dello studente)
+        try:
+            if dashboard_data and 'dati' in dashboard_data and isinstance(dashboard_data['dati'], dict):
+                dati = dashboard_data['dati']
+                
+                # Nome Studente
+                if 'alunno' in dati and dati['alunno']:
+                    student_name = dati['alunno']
+                elif 'nome' in dati and dati['nome']:
+                    student_name = dati['nome']
+                
+                # Classe
+                if 'desDenominazione' in dati and dati['desDenominazione']:
+                    student_class = dati['desDenominazione']
+                elif 'classe' in dati and dati['classe']:
+                    student_class = dati['classe']
+                
+                debug_log("📋 Dati studente dalla dashboard", {
+                    "student_name": student_name,
+                    "student_class": student_class
+                })
+        except Exception as e_dash_extract:
+            debug_log("⚠️ Errore estrazione dati da dashboard", str(e_dash_extract))
+
+        # 2. Se fallisce dashboard, usa info dal profilo (Multi-Profile payload)
+        if (student_name == username or not student_name) and not fallback_mode and profiles and 'target_index' in locals() and target_profile:
              p = target_profile
              student_name = f"{p.get('alunno', {}).get('desNome', '')} {p.get('alunno', {}).get('desCognome', '')}".strip() or username
              student_class = p.get('desClasse', 'DidUP')
@@ -1222,6 +1249,16 @@ def login():
                 "mode": "FALLBACK_HYBRID" if fallback_mode else "MULTI_PROFILE_FAST"
             }
         }
+        
+        # ✅ NEW: Include profilo selezionato per il client
+        if not fallback_mode and profiles and 'target_index' in locals() and target_profile:
+            response_data["selectedProfile"] = {
+                "index": target_index,
+                "alunno": target_profile.get("alunno", {}),
+                "class": target_profile.get("desClasse"),
+                "school": target_profile.get("desScuola"),
+                "name": student_name
+            }
         
         # Se c'erano più profili, li aggiungiamo e settiamo status, MA con success=True
         # Così il vecchio frontend entra (col profilo 0), il nuovo frontend vede status e apre modale
