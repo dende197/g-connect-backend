@@ -17,7 +17,7 @@ from planner_routes import register_planner_routes
 app = Flask(__name__, static_url_path="/static", static_folder="static")
 
 # CORS: configura una sola volta con i domini corretti
-CORS(app, resources={r"/api/*": {"origins": "*"}}, origins=[
+CORS(app, resources={r"/*": {"origins": "*"}}, origins=[
     "https://*.netlify.app",
     "http://127.0.0.1:*",
     "http://localhost:*",
