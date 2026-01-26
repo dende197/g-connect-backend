@@ -1451,6 +1451,8 @@
             user: { name: 'Utente', class: '5B', avatar: null },
             isLoggedIn: false,
             isOffline: false,
+            loadingFeed: false,
+            loadingMarket: false,
             feed: { search: '', classFilter: 'Tutte' },
             posts: [],
             marketItems: [],
@@ -1530,46 +1532,60 @@
             } catch (e) { console.warn('profile load error', e); }
         }
 
-        // Anti-wipe feed
+        // Fetchers con anti-wipe e loading state
         async function fetchFeed() {
+            state.loadingFeed = true;
             try {
                 const res = await fetch(`${API_BASE_URL}/api/posts`);
                 const data = await res.json();
                 if (data.success) {
                     const incoming = Array.isArray(data.data) ? data.data : [];
                     if (incoming.length === 0) {
-                        // non sovrascrivere cache locale
-                        const cached = JSON.parse(localStorage.getItem(globalKey('posts')) || '[]');
-                        state.posts = cached;
+                        console.warn("Feed remoto vuoto, tengo cache locale");
+                        const cached = localStorage.getItem(globalKey('posts'));
+                        state.posts = cached ? JSON.parse(cached).map(normalizePost) : [];
                     } else {
-                        state.posts = incoming;
+                        state.posts = incoming.map(normalizePost);
                         localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
                     }
+                } else {
+                    throw new Error(data.error || 'failed');
                 }
             } catch (e) {
-                const cached = JSON.parse(localStorage.getItem(globalKey('posts')) || '[]');
-                state.posts = cached;
+                console.warn("Feed offline/errore, uso cache:", e.message);
+                const cached = localStorage.getItem(globalKey('posts'));
+                state.posts = cached ? JSON.parse(cached).map(normalizePost) : [];
+            } finally {
+                state.loadingFeed = false;
+                render();
             }
         }
 
-        // Anti-wipe market
         async function fetchMarket() {
+            state.loadingMarket = true;
             try {
                 const res = await fetch(`${API_BASE_URL}/api/market`);
                 const data = await res.json();
                 if (data.success) {
                     const incoming = Array.isArray(data.data) ? data.data : [];
                     if (incoming.length === 0) {
-                        const cached = JSON.parse(localStorage.getItem(globalKey('market')) || '[]');
-                        state.marketItems = cached;
+                        console.warn("Market remoto vuoto, tengo cache locale");
+                        const cached = localStorage.getItem(globalKey('market'));
+                        state.marketItems = cached ? JSON.parse(cached).map(normalizeMarketItem) : [];
                     } else {
-                        state.marketItems = incoming;
+                        state.marketItems = incoming.map(normalizeMarketItem);
                         localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
                     }
+                } else {
+                    throw new Error(data.error || 'failed');
                 }
             } catch (e) {
-                const cached = JSON.parse(localStorage.getItem(globalKey('market')) || '[]');
-                state.marketItems = cached;
+                console.warn("Market offline/errore, uso cache:", e.message);
+                const cached = localStorage.getItem(globalKey('market'));
+                state.marketItems = cached ? JSON.parse(cached).map(normalizeMarketItem) : [];
+            } finally {
+                state.loadingMarket = false;
+                render();
             }
         }
 
@@ -1619,42 +1635,6 @@
             };
         }
 
-        // ⭐ PERSISTENCE HELPERS (New API)
-        async function fetchFeed() {
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/posts`);
-                const data = await res.json();
-                if (data.success) {
-                    state.posts = (data.data || []).map(normalizePost);
-                    localStorage.setItem(globalKey('posts'), JSON.stringify(state.posts));
-                    console.log("📝 Feed (server) → cache global & normalized:", state.posts.length);
-                } else {
-                    throw new Error(data.error || 'failed');
-                }
-            } catch (e) {
-                console.warn("Feed offline/errore, uso cache:", e.message);
-                const cached = localStorage.getItem(globalKey('posts'));
-                state.posts = cached ? JSON.parse(cached).map(normalizePost) : [];
-            }
-        }
-
-        async function fetchMarket() {
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/market`);
-                const data = await res.json();
-                if (data.success) {
-                    state.marketItems = (data.data || []).map(normalizeMarketItem);
-                    localStorage.setItem(globalKey('market'), JSON.stringify(state.marketItems));
-                    console.log("🛒 Market (server) → cache global & normalized:", state.marketItems.length);
-                } else {
-                    throw new Error(data.error || 'failed');
-                }
-            } catch (e) {
-                console.warn("Market offline/errore, uso cache:", e.message);
-                const cached = localStorage.getItem(globalKey('market'));
-                state.marketItems = cached ? JSON.parse(cached).map(normalizeMarketItem) : [];
-            }
-        }
 
         // Carica planner dal server: non sovrascrivere locale se il remoto è vuoto e il locale ha dati
         // --- FETCH: blindato anti-wipe + last-write-wins ---
@@ -2840,7 +2820,10 @@
             <div class="view page-bg">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                     <h1>Market Libri</h1>
-                    <button onclick="openNewItemModal()" style="background:var(--green); color:black; padding:8px 16px; border-radius:20px; border:none; font-weight:700; cursor:pointer;">+ Vendi</button>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        ${state.loadingMarket ? `<i class="ph ph-circle-notch" style="animation: spin 1s linear infinite; color:var(--green);"></i>` : ''}
+                        <button onclick="openNewItemModal()" style="background:var(--green); color:black; padding:8px 16px; border-radius:20px; border:none; font-weight:700; cursor:pointer;">+ Vendi</button>
+                    </div>
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     ${list.map(renderMarketCard).join('')}
@@ -2987,7 +2970,10 @@
             <div class="view">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h1>Feed</h1>
-                    <button onclick="openNewPostModal()" style="background:var(--blue); color:white; padding:8px 16px; border-radius: 20px; border:none; font-weight:700; cursor:pointer;">+ Post/Sondaggio</button>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        ${state.loadingFeed ? `<i class="ph ph-circle-notch" style="animation: spin 1s linear infinite; color:var(--blue);"></i>` : ''}
+                        <button onclick="openNewPostModal()" style="background:var(--blue); color:white; padding:8px 16px; border-radius: 20px; border:none; font-weight:700; cursor:pointer;">+ Post/Sondaggio</button>
+                    </div>
                 </div>
 
                 <div style="position:relative; margin-bottom:12px;">

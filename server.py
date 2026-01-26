@@ -715,6 +715,7 @@ def handle_profile():
             debug_log(f"👤 Profile upserted in Supabase: {user_id}")
         except Exception as e:
             debug_log(f"⚠️ /api/profile Supabase error: {str(e)}")
+            return jsonify({"success": False, "error": str(e)}), 500
     # JSON fallback
     profiles = load_json_file(PROFILES_FILE, {})
     if not isinstance(profiles, dict): profiles = {}
@@ -755,6 +756,8 @@ def handle_posts():
                 new_post = request.json or {}
                 if not new_post.get("text"):
                     return jsonify({"success": False, "error": "Missing text"}), 400
+
+                now = datetime.now().isoformat()
                 payload = {
                     "author_id": new_post.get("authorId") or new_post.get("author_id"),
                     "author_name": new_post.get("author") or new_post.get("author_name"),
@@ -762,8 +765,13 @@ def handle_posts():
                     "text": new_post.get("text"),
                     "image": new_post.get("image"),
                     "anon": bool(new_post.get("anon", False)),
+                    "created_at": now,
                 }
-                supabase.table("posts").insert(payload).execute()
+
+                resp_ins = supabase.table("posts").insert(payload).execute()
+                if getattr(resp_ins, "error", None):
+                    raise Exception(resp_ins.error)
+
                 resp = supabase.table("posts").select("*").order("created_at", desc=True).limit(100).execute()
                 posts = resp.data or []
                 return jsonify({"success": True, "data": posts}), 200
@@ -819,14 +827,21 @@ def handle_market():
                 new_item = request.json or {}
                 if not new_item.get("title") or not new_item.get("price"):
                     return jsonify({"success": False, "error": "Missing title/price"}), 400
+
+                now = datetime.now().isoformat()
                 payload = {
                     "seller_id": new_item.get("sellerId") or new_item.get("seller_id"),
                     "seller_name": new_item.get("seller") or new_item.get("seller_name"),
                     "title": new_item.get("title"),
                     "price": new_item.get("price"),
                     "image": new_item.get("image"),
+                    "created_at": now,
                 }
-                supabase.table("market_items").insert(payload).execute()
+
+                resp_ins = supabase.table("market_items").insert(payload).execute()
+                if getattr(resp_ins, "error", None):
+                    raise Exception(resp_ins.error)
+
                 resp = supabase.table("market_items").select("*").order("created_at", desc=True).limit(200).execute()
                 items = resp.data or []
                 return jsonify({"success": True, "data": items}), 200
