@@ -14,7 +14,6 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Urbanist:wght@500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/main.min.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 
@@ -1493,6 +1492,7 @@
             syncing: false,
             didup: { connected: false },
             messages: {}, // FIX: chat support
+            savingPlanner: false,
             currentChatUser: null,
             currentChatId: null,
             currentThreadId: null
@@ -2080,6 +2080,9 @@
                         state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
                         localStorage.setItem(lsKey('promemoria'), JSON.stringify(state.promemoria));
                     }
+
+                    // ⭐ Gestione profilo (Avatar/Nome)
+                    await hydrateProfileOnBoot();
 
                     state.lastSync = new Date().toLocaleTimeString();
                     state.isOffline = false;

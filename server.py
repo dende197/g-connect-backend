@@ -17,7 +17,7 @@ from planner_routes import register_planner_routes
 app = Flask(__name__, static_url_path="/static", static_folder="static")
 
 # CORS: configura una sola volta con i domini corretti
-CORS(app, origins=[
+CORS(app, resources={r"/api/*": {"origins": "*"}}, origins=[
     "https://*.netlify.app",
     "http://127.0.0.1:*",
     "http://localhost:*",
@@ -99,6 +99,17 @@ else:
 DATA_DIR = os.path.abspath(".")
 STATIC_UPLOAD_DIR = os.path.join(DATA_DIR, "static", "uploads")
 os.makedirs(STATIC_UPLOAD_DIR, exist_ok=True)
+
+PLANNER_FILE = "planner.json"
+
+def load_planner(user_id):
+    planners = load_json_file(PLANNER_FILE, {})
+    return planners.get(user_id, {})
+
+def save_planner(user_id, data):
+    planners = load_json_file(PLANNER_FILE, {})
+    planners[user_id] = data
+    save_json_file(PLANNER_FILE, planners)
 
 POSTS_FILE = "posts.json"
 MARKET_FILE = "market.json"
@@ -648,6 +659,42 @@ def health():
     return jsonify({"status": "ok", "debug": DEBUG_MODE}), 200
 
 # ============= PERSISTENCE ENDPOINTS =============
+
+@app.route('/api/planner/<user_id>', methods=['GET', 'PUT'])
+def handle_planner(user_id):
+    """
+    Gestisce il caricamento e salvataggio del planner (compiti pianificati, stress)
+    per un utente specifico. Supporta Supabase (tabella 'planner') e JSON fallback.
+    """
+    if supabase:
+        try:
+            if request.method == 'GET':
+                resp = supabase.table("planner").select("*").eq("userId", user_id).limit(1).execute()
+                rows = resp.data or []
+                if STRICT_SUPABASE and not rows:
+                    return jsonify({"success": False, "error": "Supabase planner empty"}), 502
+                if rows:
+                    return jsonify({"success": True, "data": rows[0].get("payload", {})}), 200
+                # Fallback locale solo se non strict
+                if not STRICT_SUPABASE:
+                    return jsonify({"success": True, "data": load_planner(user_id)}), 200
+                return jsonify({"success": True, "data": {}}), 200
+            else:
+                body = request.json or {}
+                supabase.table("planner").upsert({"userId": user_id, "payload": body}).execute()
+                return jsonify({"success": True}), 200
+        except Exception as e:
+            debug_log("⚠️ /api/planner Supabase error", str(e))
+            if STRICT_SUPABASE:
+                return jsonify({"success": False, "error": str(e)}), 502
+    
+    # JSON fallback
+    if request.method == 'GET':
+        return jsonify({"success": True, "data": load_planner(user_id)}), 200
+    else:
+        body = request.json or {}
+        save_planner(user_id, body)
+        return jsonify({"success": True}), 200
 
 @app.route('/api/upload', methods=['POST'])
 def upload_image():
