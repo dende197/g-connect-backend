@@ -1457,11 +1457,16 @@
             tasks: [],
             voti: [],
             promemoria: [],
+            news: [], // FIX: news for home
             stressLevels: {},
             plannedTasks: {},
             polls: [],
             syncing: false,
-            didup: { connected: false }
+            didup: { connected: false },
+            messages: {}, // FIX: chat support
+            currentChatUser: null,
+            currentChatId: null,
+            currentThreadId: null
         };
 
         const app = document.getElementById('app');
@@ -1480,6 +1485,11 @@
                     try { state.plannedTasks = JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}'); } catch { }
                     try { state.stressLevels = JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}'); } catch { }
                     try { state.user = JSON.parse(localStorage.getItem(lsKey('user')) || '{}'); } catch { }
+                    // FIX: complete cache restoration
+                    try { state.tasks = JSON.parse(localStorage.getItem(lsKey('tasks')) || '[]'); } catch { state.tasks = []; }
+                    try { state.voti = JSON.parse(localStorage.getItem(lsKey('voti')) || '[]'); } catch { state.voti = []; }
+                    try { state.promemoria = JSON.parse(localStorage.getItem(lsKey('promemoria')) || '[]'); } catch { state.promemoria = []; }
+                    try { state.polls = JSON.parse(localStorage.getItem(globalKey('polls')) || '[]'); } catch { state.polls = []; }
 
                     state.isLoggedIn = true;
 
@@ -2768,7 +2778,7 @@
                         <button onclick="window.open('https://www.liceogandhi.edu.it/categoria/storico-circolari/','_blank')" style="background:none; border:none; color:#60a5fa; font-size:14px; font-weight:700; cursor:pointer;">Vedi tutte</button>
                     </div>
                     <div class="circolari-row">
-                        ${state.news.map(n => `
+                        ${(Array.isArray(state.news) ? state.news : []).map(n => `
                             <div class="circolare-card" onclick="window.open('${n.url}', '_blank')" style="cursor:pointer;">
                                 <i class="ph-fill ph-file-pdf" style="position:absolute; right:-10px; bottom:-10px; font-size:80px; color: rgba(255,255,255,0.05); transform: rotate(-15deg);"></i>
                                 <div>
@@ -3646,7 +3656,7 @@
                     <input id="argo-school" placeholder="Codice Scuola" value="${localStorage.getItem('argo_school') || ''}">
                     <input id="argo-user" placeholder="Nome Utente">
                     <input type="password" id="argo-pass" placeholder="Password">
-                    <button onclick="performArgoSync()" class="btn-primary" style="width:100%; margin-top:10px;">Accedi e Sincronizza</button>
+                    <button id="login-btn" onclick="performArgoSync()" class="btn-primary" style="width:100%; margin-top:10px;">Accedi e Sincronizza</button>
                     <button onclick="closeModal()" style="width:100%; background:none; border:none; color:var(--text-muted); margin-top:12px; cursor:pointer;">Annulla</button>
                 </div>
             </div>`;
@@ -3845,8 +3855,10 @@
                     console.log("👥 Backend richiede selezione profilo");
                     showProfileSelectionModal(data.profiles);
                     // Reset pulsante login
-                    btn.innerText = "Accedi";
-                    btn.disabled = false;
+                    if (btn) {
+                        btn.innerText = "Accedi";
+                        btn.disabled = false;
+                    }
                     return; // Stop qui, l'utente sceglierà
                 }
 
