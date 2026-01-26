@@ -33,6 +33,55 @@ from dotenv import load_dotenv
 
 load_dotenv() # Load local .env if present
 
+# ============= DEBUG SUPABASE KEY =============
+print("\n" + "="*70)
+print("🔍 DEBUG: Verifica Supabase Configuration")
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
+if url:
+    print(f"✅ SUPABASE_URL: {url}")
+else:
+    print("❌ SUPABASE_URL: NOT SET")
+
+if key:
+    print(f"✅ SUPABASE_SERVICE_ROLE_KEY presente ({len(key)} caratteri)")
+    print(f"   Primi 50 caratteri: {key[:50]}...")
+    
+    # Decodifica JWT per verificare il ruolo
+    try:
+        import base64
+        import json
+        # Il JWT è formato da 3 parti separate da punti
+        parts = key.split('.')
+        if len(parts) >= 2:
+            # Decodifica la seconda parte (payload)
+            payload_b64 = parts[1]
+            # Aggiungi padding se necessario
+            payload_b64 += '=' * (4 - len(payload_b64) % 4)
+            # Decodifica
+            payload_json = base64.urlsafe_b64decode(payload_b64)
+            payload = json.loads(payload_json)
+            
+            role = payload.get('role', 'UNKNOWN')
+            print(f"   Ruolo decodificato dal JWT: {role}")
+            
+            if role == 'service_role':
+                print("   ✅✅✅ PERFETTO! Stai usando la chiave SERVICE_ROLE")
+            elif role == 'anon':
+                print("   ❌❌❌ ERRORE! Stai usando la chiave ANON (pubblica)")
+                print("   ❌ Devi cambiare con la chiave service_role da Supabase Settings → API")
+            else:
+                print(f"   ⚠️ Ruolo sconosciuto: {role}")
+    except Exception as e:
+        print(f"   ⚠️ Impossibile decodificare JWT: {e}")
+else:
+    print("❌ SUPABASE_SERVICE_ROLE_KEY: NOT SET")
+
+print("="*70 + "\n")
+# ============= FINE DEBUG =============
+
+
 # ============= CONSTANTS =============
 CHALLENGE_URL = "https://auth.portaleargo.it/oauth2/auth"
 LOGIN_URL = "https://www.portaleargo.it/auth/sso/login"
