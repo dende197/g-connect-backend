@@ -3777,34 +3777,45 @@
 
         // ⭐ Funzione Globale di Selezione
         // ⭐ Funzione Globale di Selezione
-        window.selectProfileGlobal = function (index, btnElement) {
-            console.log("✅ CLICK BUTTON PROFILO:", index);
-
-            // 1. Disabilita TUTTI i bottoni nella modale per evitare doppi click
-            const allBtns = document.querySelectorAll('.modal-content button');
-            allBtns.forEach(b => {
-                b.disabled = true;
-                b.style.pointerEvents = 'none';
-                b.style.opacity = '0.5';
-            });
-
-            // 2. Feedback visivo sul bottone cliccato
-            if (btnElement) {
-                btnElement.style.opacity = '1'; // Mantieni focus su questo
-                btnElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;gap:10px;"><i class="ph-bold ph-spinner ph-spin"></i> Caricamento Dati...</div>';
+        // ⭐ HELPERS LOGIN
+        function setLoginBtnText(txt) {
+            const btn = document.getElementById('login-btn') ||
+                document.querySelector('.login-btn') ||
+                document.querySelector('#loginBtn') ||
+                document.querySelector('button[onclick*="performArgoSync"]');
+            if (btn) {
+                btn.innerText = txt;
+                btn.disabled = txt.toLowerCase().includes('... ');
             }
+        }
 
-            // 3. Procedi
-            performArgoSync(index);
+        function showBoot(msg) {
+            // Se esiste un overlay di boot, mostralo
+            const boot = document.getElementById('boot-overlay');
+            if (boot) {
+                boot.style.display = 'flex';
+                boot.style.opacity = '1';
+                const label = boot.querySelector('.boot-label');
+                if (label) label.innerText = msg;
+            }
+        }
+
+        function hideBoot() {
+            const boot = document.getElementById('boot-overlay');
+            if (boot) {
+                boot.style.opacity = '0';
+                setTimeout(() => boot.style.display = 'none', 300);
+            }
         }
 
         // ⭐ SELEZIONE PROFILO (Multi-Figlio)
-        function showProfileSelectionModal(profiles) {
+        function showProfileSelectionModal(profiles, credentials) {
             console.log("👥 Mostro modale selezione profili:", profiles);
+            if (!modalContainer) return;
 
             modalContainer.innerHTML = `
             <div class="modal-overlay" style="z-index: 9999; animation: fadeIn 0.3s ease-out;">
-                <div class="modal-content" style="max-width: 400px; padding: 0; background: var(--surface-color); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+                <div class="modal-content glass-panel" style="max-width: 440px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
                     <div style="padding: 24px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05);">
                         <div style="width: 64px; height: 64px; background: rgba(10, 132, 255, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
                             <i class="ph-fill ph-users" style="font-size: 32px; color: var(--blue);"></i>
@@ -3813,77 +3824,96 @@
                         <p style="font-size: 14px; color: var(--text-secondary); margin: 0;">Scegli quale studente visualizzare</p>
                     </div>
                     
-                    <div style="padding: 24px; display: flex; flex-direction: column; gap: 12px; max-height: 50vh; overflow-y: auto;">
+                    <div class="profiles-list" style="padding: 24px; display: flex; flex-direction: column; gap: 12px; max-height: 50vh; overflow-y: auto;">
                         ${profiles.map(p => {
-                // Fallback per nome vuoto
-                const displayName = (p.name && p.name.trim().length > 0 && p.name !== " ") ? p.name : `Studente ${p.index + 1}`;
+                const displayName = (p.name && p.name.trim().length > 0) ? p.name : `Studente ${p.index + 1}`;
                 return `
-                        <button onclick="window.selectProfileGlobal(${p.index}, this)" 
-                                style="background: var(--surface-highlight); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 16px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s; width: 100%; text-align: left; -webkit-tap-highlight-color: transparent;">
-                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, var(--blue), var(--indigo)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: white; flex-shrink: 0;">
-                                ${displayName.charAt(0)}
-                            </div>
-                            <div style="flex-grow: 1;">
-                                <div style="font-weight: 600; font-size: 16px; color: white; margin-bottom: 4px;">${displayName}</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">${p.school} • ${p.class}</div>
-                            </div>
-                            <i class="ph-bold ph-caret-right" style="color: var(--text-secondary);"></i>
-                        </button>
-                        `}).join('')}
+                            <button class="btn-profile" 
+                                    data-index="${p.index}"
+                                    style="background: var(--surface-highlight); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 16px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s; width: 100%; text-align: left; -webkit-tap-highlight-color: transparent;">
+                                <div style="width: 44px; height: 44px; background: linear-gradient(135deg, var(--blue), var(--indigo)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; color: white; flex-shrink: 0;">
+                                    ${displayName.charAt(0)}
+                                </div>
+                                <div style="flex-grow: 1;">
+                                    <div style="font-weight: 700; font-size: 16px; color: white; margin-bottom: 4px;">${displayName}</div>
+                                    <div style="font-size: 13px; color: var(--text-secondary);">${p.class || ''} • ${p.school || ''}</div>
+                                </div>
+                                <i class="ph-bold ph-caret-right" style="color: var(--text-secondary);"></i>
+                            </button>
+                            `;
+            }).join('')}
                     </div>
                 </div>
             </div>`;
+
+            // Event Delegation per evitare onclick rischiosi
+            const list = modalContainer.querySelector('.profiles-list');
+            list.addEventListener('click', async (ev) => {
+                const btn = ev.target.closest('.btn-profile');
+                if (!btn) return;
+                const idx = parseInt(btn.dataset.index, 10);
+
+                // Disabilita UI
+                const allBtns = list.querySelectorAll('.btn-profile');
+                allBtns.forEach(b => {
+                    b.disabled = true;
+                    b.style.opacity = '0.5';
+                    b.style.pointerEvents = 'none';
+                });
+
+                btn.style.opacity = '1';
+                btn.innerHTML += '<i class="ph-bold ph-spinner ph-spin" style="margin-left:auto"></i>';
+
+                await selectProfile(idx, credentials);
+            }, { once: true });
         }
 
-        async function performArgoSync(profileIndex = null) {
-            const btn = document.getElementById('login-btn');
+        async function selectProfile(profileIndex, credentials) {
+            closeModal();
+            showBoot('Sincronizzazione profilo...');
+            await performArgoSync(profileIndex, credentials);
+            hideBoot();
+        }
 
-            // Tentativo lettura DOM
+        async function performArgoSync(profileIndex = null, passedCreds = null) {
+            // Prepara credenziali (dal DOM o passate dalla modale)
             const inputSchool = document.getElementById('argo-school');
             const inputUser = document.getElementById('argo-user');
             const inputPass = document.getElementById('argo-pass');
 
-            let school = inputSchool ? inputSchool.value : tempCreds.school;
-            let user = inputUser ? inputUser.value : tempCreds.user;
-            let pass = inputPass ? inputPass.value : tempCreds.pass;
+            const credentials = passedCreds || {
+                schoolCode: (inputSchool ? inputSchool.value : tempCreds.school)?.trim(),
+                username: (inputUser ? inputUser.value : tempCreds.user)?.trim(),
+                password: inputPass ? inputPass.value : tempCreds.pass
+            };
 
-            // Aggiorna cache se abbiamo letto dal DOM
-            if (inputSchool && inputUser && inputPass) {
-                tempCreds = { school, user, pass };
-            }
-
-            if (!school || !user || !pass) {
+            if (!credentials.schoolCode || !credentials.username || !credentials.password) {
                 alert("Dati mancanti! Reinserisci le credenziali.");
-                // Se mancano e non sono nel DOM, forse dobbiamo ricaricare la login view?
-                if (!inputSchool) render();
+                if (!inputSchool) render(); // Torna alla login se siamo "persi"
                 return;
             }
 
-            if (btn) {
-                btn.innerText = "Connessione... ";
-                btn.disabled = true;
-            }
+            // Cache per step successivi (es. dopo MULTIPLE_PROFILES)
+            if (inputSchool) tempCreds = { school: credentials.schoolCode, user: credentials.username, pass: credentials.password };
+
+            setLoginBtnText("Connessione... ");
 
             try {
-                // Prepara payload
                 const payload = {
-                    schoolCode: school,
-                    username: user,
-                    password: pass
+                    schoolCode: credentials.schoolCode,
+                    username: credentials.username,
+                    password: credentials.password,
+                    profileIndex: profileIndex
                 };
 
-                // Se abbiamo un indice profilo (o era salvato in sessione), mandiamolo
-                if (profileIndex !== null) {
-                    payload.profileIndex = profileIndex;
-                } else {
-                    // Controlla se c'è un profilo salvato in sessione precedente
+                // Se non passed index e non passato esplicitamente, controlla sessione
+                if (profileIndex === null) {
                     const savedSession = sessionManager.load();
                     if (savedSession && savedSession.profileIndex !== undefined) {
                         payload.profileIndex = savedSession.profileIndex;
                     }
                 }
 
-                // Timeout 60s per connessioni lente
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000);
 
@@ -3900,136 +3930,89 @@
                 // ⭐ GESTIONE MULTI-PROFILO
                 if (response.ok && data.status === 'MULTIPLE_PROFILES') {
                     console.log("👥 Backend richiede selezione profilo");
-                    showProfileSelectionModal(data.profiles);
-                    // Reset pulsante login
-                    btn.innerText = "Accedi";
-                    btn.disabled = false;
-                    return; // Stop qui, l'utente sceglierà
+                    showProfileSelectionModal(data.profiles, credentials);
+                    setLoginBtnText("Accedi");
+                    return;
                 }
 
-                if (!response.ok) {
-                    throw new Error(data.error || "Errore Server");
-                }
+                if (!response.ok) throw new Error(data.error || "Errore Server");
 
                 if (data.success) {
-                    console.log("✅ Login OK, saving...");
-                    console.log("📥 Dati ricevuti dal login:", {
-                        tasks: data.tasks?.length || 0,
-                        voti: data.voti?.length || 0,
-                        promemoria: data.promemoria?.length || data.announcements?.length || 0,
-                        student: data.student
-                    });
-
-                    // ⭐ CRITICO: Salva sessione con credenziali codificate (come nel codice vecchio che funzionava)
-                    if (data.session) {
-                        data.session.storedUser = btoa(unescape(encodeURIComponent(user)));
-                        data.session.storedPass = btoa(unescape(encodeURIComponent(pass)));
-                        data.session.schoolCode = school;
-                        sessionManager.save(data.session);
-                        console.log("💾 Sessione salvata con credenziali");
-                    } else {
-                        // ⭐ Se non c'è sessione dal backend, crea una con le credenziali
-                        sessionManager.save({
-                            schoolCode: school,
-                            storedUser: btoa(unescape(encodeURIComponent(user))),
-                            storedPass: btoa(unescape(encodeURIComponent(pass)))
-                        });
-                        console.log("💾 Sessione minima creata con credenziali");
-                    }
-
-                    // ⭐ Salva user
-                    if (data.student) {
-                        state.user = data.student;
-                        localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
-                        console.log("💾 User salvato:", state.user.name);
-                    }
-
-                    // ⭐ RE-HYDRATE: Carica planner dal namespace del nuovo profilo
-                    state.plannedTasks = JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}');
-                    state.stressLevels = JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}');
-                    state.reminders = JSON.parse(localStorage.getItem(lsKey('reminders')) || '[]');
-                    console.log("🧩 Planner re-idratato dopo login:", Object.keys(state.plannedTasks).length, "giorni");
-
-                    // ⭐ Sincronizza da server (source of truth)
-                    await fetchPlannerRemote();
-
-                    // ⭐ Carica compiti con updateTasks per preservare date
-                    if (data.tasks && data.tasks.length > 0) {
-                        updateTasks(data.tasks, false);
-                        console.log("✅ Compiti caricati:", state.tasks.length);
-                    }
-
-                    // ⭐ CRITICO: Carica voti e salva SEMPRE
-                    console.log("🎓 LOGIN - Controllo voti in data:", data);
-                    console.log("🎓 LOGIN - data.voti:", data.voti);
-                    console.log("🎓 LOGIN - typeof data.voti:", typeof data.voti);
-                    console.log("🎓 LOGIN - Array.isArray(data.voti):", Array.isArray(data.voti));
-
-                    if (data.voti !== undefined) {
-                        state.voti = Array.isArray(data.voti) ? data.voti : [];
-                        localStorage.setItem(lsKey('voti'), JSON.stringify(state.voti));
-                        console.log("✅ Voti caricati e salvati:", state.voti.length);
-                        console.log("✅ Voti salvati - contenuto completo:", JSON.stringify(state.voti));
-                        if (state.voti.length === 0) {
-                            console.warn("⚠️ ATTENZIONE: Array voti vuoto - il backend NON sta recuperando i voti da DidUP");
-                        } else {
-                            console.log("✅ Primo voto esempio:", state.voti[0]);
-                        }
-                    } else {
-                        console.error("❌ ERRORE CRITICO: Campo 'voti' non presente nella risposta del login!");
-                        console.error("❌ Chiavi disponibili in data:", Object.keys(data));
-                        console.error("❌ Risposta completa:", data);
-                    }
-
-                    // ⭐ CRITICO: Carica promemoria e salva SEMPRE
-                    const promemoriaData = data.promemoria || data.announcements;
-                    if (promemoriaData !== undefined) {
-                        state.promemoria = Array.isArray(promemoriaData) ? promemoriaData : [];
-                        localStorage.setItem(lsKey('promemoria'), JSON.stringify(state.promemoria));
-                        console.log("✅ Promemoria caricati e salvati:", state.promemoria.length);
-                        if (state.promemoria.length === 0) {
-                            console.warn("⚠️ ATTENZIONE: Array promemoria vuoto - il backend NON sta recuperando i promemoria da DidUP");
-                        }
-                    } else {
-                        console.warn("⚠️ ATTENZIONE: Campo 'promemoria'/'announcements' non presente nella risposta del login");
-                    }
-
-                    state.isLoggedIn = true;
-                    state.didup.connected = true;
-                    state.isOffline = false;
-                    state.lastSync = new Date().toLocaleTimeString();
-                    updateOfflineBadge();
-
-                    // ⭐ Carica profilo (incluso avatar) da Supabase
-                    await loadProfileFromServer();
-
-                    closeModal();
-                    alert(`✅ Benvenuto ${data.student?.name || user}! Dati sincronizzati.`);
-                    render();
+                    handleLoginSuccess(data, credentials.password);
                 } else {
-                    alert("❌ Credenziali errate: " + (data.error || "Errore sconosciuto"));
-                    console.error("❌ Login fallito:", data);
+                    throw new Error(data.error || "Login fallito");
                 }
             } catch (e) {
                 console.error("❌ Errore Login:", e);
-                if (e.name === 'AbortError') {
-                    alert("⚠️ Tempo scaduto! La connessione a DidUP è lenta o instabile. Riprova.");
-                } else {
-                    alert("❌ Errore durante il login: " + e.message);
-                }
-                // Riabilita bottoni modale se presente
-                const allBtns = document.querySelectorAll('.modal-content button');
-                allBtns.forEach(b => {
-                    b.disabled = false;
-                    b.style.pointerEvents = 'auto';
-                    b.style.opacity = '1';
-                });
+                const msg = e.name === 'AbortError' ? "⚠️ Tempo scaduto! DidUP è lento. Riprova." : "❌ Errore: " + e.message;
+                alert(msg);
+                navigate('login');
             } finally {
-                if (btn) {
-                    btn.innerText = "Accedi";
-                    btn.disabled = false;
-                }
+                setLoginBtnText("Accedi");
             }
+        }
+
+        function handleLoginSuccess(data, rawPassword) {
+            console.log("✅ Login OK, hydrating state...");
+
+            const school = data.session.schoolCode;
+            const user = data.session.userName;
+            const pass = rawPassword || tempCreds.pass;
+
+            // 1. Salva Sessione (con credenziali legacy per compatibilità /sync backend)
+            if (data.session) {
+                data.session.storedUser = btoa(unescape(encodeURIComponent(user)));
+                data.session.storedPass = btoa(unescape(encodeURIComponent(pass)));
+                sessionManager.save(data.session);
+            }
+
+            // 2. Idrata User (Identità Reale dallo Studente)
+            if (data.student) {
+                state.user = {
+                    ...data.student,
+                    id: `${data.session.schoolCode.toUpperCase()}:${data.session.userName.toLowerCase()}:${data.session.profileIndex || 0}`
+                };
+                localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
+                console.log("👤 User Hydrated:", state.user.name);
+            }
+
+            // 3. Idrata Dati (Voti, Compiti, Promemoria)
+            if (data.tasks) {
+                updateTasks(data.tasks, false);
+                console.log("✅ Compiti caricati:", state.tasks.length);
+            }
+            if (data.voti) {
+                state.voti = Array.isArray(data.voti) ? data.voti : [];
+                localStorage.setItem(lsKey('voti'), JSON.stringify(state.voti));
+                console.log("🎓 Voti caricati:", state.voti.length);
+            }
+            if (data.promemoria || data.announcements) {
+                const list = data.promemoria || data.announcements;
+                state.promemoria = Array.isArray(list) ? list : [];
+                localStorage.setItem(lsKey('promemoria'), JSON.stringify(state.promemoria));
+            }
+
+            // 4. Re-idrata Planner Locali
+            state.plannedTasks = JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}');
+            state.stressLevels = JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}');
+            state.reminders = JSON.parse(localStorage.getItem(lsKey('reminders')) || '[]');
+
+            // 5. Sync Finali
+            state.isLoggedIn = true;
+            state.didup.connected = true;
+            state.isOffline = false;
+            state.lastSync = new Date().toLocaleTimeString();
+            updateOfflineBadge();
+
+            Promise.all([
+                fetchPlannerRemote(),
+                loadProfileFromServer()
+            ]).then(() => {
+                closeModal();
+                alert(`✅ Benvenuto ${state.user.name}!`);
+                navigate('home');
+                render();
+            });
         }
 
         async function publishPost() {
