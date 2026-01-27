@@ -1282,10 +1282,15 @@ def login():
             if len(profiles) > 1:
                 for idx, p in enumerate(profiles):
                     alunno = p.get('alunno', {})
+                    # Priorità 1: Dati diretti dal profilo
                     nome = (alunno.get('desNome') or '').strip()
                     cognome = (alunno.get('desCognome') or '').strip()
-                    if not nome and not cognome: nome_completo = f"Studente {idx + 1}"
-                    else: nome_completo = f"{cognome} {nome}".strip() # Cognome Nome per coerenza
+                    
+                    if nome or cognome:
+                        nome_completo = f"{cognome} {nome}".strip().upper()
+                    else:
+                        # Fallback estremo se proprio non c'è nulla nel profilo
+                        nome_completo = f"Studente {idx + 1}"
                     
                     profiles_payload.append({
                         "index": idx,
@@ -1354,6 +1359,7 @@ def login():
         # Sync Supabase
         if supabase:
             try:
+                # Normalizzazione rigorosa ID profilo
                 pid = f"{school.strip().upper()}:{username.strip().lower()}:{target_index}"
                 supabase.table("profiles").upsert({
                     "id": pid, "name": student_name, "class": student_class, "last_active": datetime.now().isoformat()

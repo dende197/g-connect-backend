@@ -3775,8 +3775,6 @@
         // ⭐ Credenziali Temporanee (per sopravvivere alla modale se il DOM cambia)
         let tempCreds = { school: '', user: '', pass: '' };
 
-        // ⭐ Funzione Globale di Selezione
-        // ⭐ Funzione Globale di Selezione
         // ⭐ HELPERS LOGIN
         function setLoginBtnText(txt) {
             const btn = document.getElementById('login-btn') ||
@@ -3790,7 +3788,6 @@
         }
 
         function showBoot(msg) {
-            // Se esiste un overlay di boot, mostralo
             const boot = document.getElementById('boot-overlay');
             if (boot) {
                 boot.style.display = 'flex';
@@ -3811,9 +3808,10 @@
         // ⭐ SELEZIONE PROFILO (Multi-Figlio)
         function showProfileSelectionModal(profiles, credentials) {
             console.log("👥 Mostro modale selezione profili:", profiles);
-            if (!modalContainer) return;
+            const container = getModalContainer();
+            if (!container) return;
 
-            modalContainer.innerHTML = `
+            container.innerHTML = `
             <div class="modal-overlay" style="z-index: 9999; animation: fadeIn 0.3s ease-out;">
                 <div class="modal-content glass-panel" style="max-width: 440px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
                     <div style="padding: 24px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05);">
@@ -3825,33 +3823,29 @@
                     </div>
                     
                     <div class="profiles-list" style="padding: 24px; display: flex; flex-direction: column; gap: 12px; max-height: 50vh; overflow-y: auto;">
-                        ${profiles.map(p => {
-                const displayName = (p.name && p.name.trim().length > 0) ? p.name : `Studente ${p.index + 1}`;
-                return `
+                        ${profiles.map(p => `
                             <button class="btn-profile" 
                                     data-index="${p.index}"
                                     style="background: var(--surface-highlight); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 16px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s; width: 100%; text-align: left; -webkit-tap-highlight-color: transparent;">
                                 <div style="width: 44px; height: 44px; background: linear-gradient(135deg, var(--blue), var(--indigo)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; color: white; flex-shrink: 0;">
-                                    ${displayName.charAt(0)}
+                                    ${(p.name || 'S')[0].toUpperCase()}
                                 </div>
                                 <div style="flex-grow: 1;">
-                                    <div style="font-weight: 700; font-size: 16px; color: white; margin-bottom: 4px;">${displayName}</div>
-                                    <div style="font-size: 13px; color: var(--text-secondary);">${p.class || ''} • ${p.school || ''}</div>
+                                    <div style="font-weight: 700; font-size: 16px; color: white; margin-bottom: 4px;">${p.name || ('Studente ' + (p.index + 1))}</div>
+                                    <div style="font-size: 13px; color: var(--text-secondary);">${p.class || p.school || ''}</div>
                                 </div>
                                 <i class="ph-bold ph-caret-right" style="color: var(--text-secondary);"></i>
                             </button>
-                            `;
-            }).join('')}
+                        `).join('')}
                     </div>
                 </div>
             </div>`;
 
-            // Event Delegation per evitare onclick rischiosi
-            const list = modalContainer.querySelector('.profiles-list');
+            // Event Delegation
+            const list = container.querySelector('.profiles-list');
             list.addEventListener('click', async (ev) => {
                 const btn = ev.target.closest('.btn-profile');
                 if (!btn) return;
-                const idx = parseInt(btn.dataset.index, 10);
 
                 // Disabilita UI
                 const allBtns = list.querySelectorAll('.btn-profile');
@@ -3864,7 +3858,7 @@
                 btn.style.opacity = '1';
                 btn.innerHTML += '<i class="ph-bold ph-spinner ph-spin" style="margin-left:auto"></i>';
 
-                await selectProfile(idx, credentials);
+                await selectProfile(parseInt(btn.dataset.index, 10), credentials);
             }, { once: true });
         }
 
@@ -3876,24 +3870,22 @@
         }
 
         async function performArgoSync(profileIndex = null, passedCreds = null) {
-            // Prepara credenziali (dal DOM o passate dalla modale)
             const inputSchool = document.getElementById('argo-school');
             const inputUser = document.getElementById('argo-user');
             const inputPass = document.getElementById('argo-pass');
 
             const credentials = passedCreds || {
-                schoolCode: (inputSchool ? inputSchool.value : tempCreds.school)?.trim(),
-                username: (inputUser ? inputUser.value : tempCreds.user)?.trim(),
-                password: inputPass ? inputPass.value : tempCreds.pass
+                schoolCode: (inputSchool ? inputSchool.value : (tempCreds.school || "")).trim(),
+                username: (inputUser ? inputUser.value : (tempCreds.user || "")).trim(),
+                password: inputPass ? inputPass.value : (tempCreds.pass || "")
             };
 
             if (!credentials.schoolCode || !credentials.username || !credentials.password) {
                 alert("Dati mancanti! Reinserisci le credenziali.");
-                if (!inputSchool) render(); // Torna alla login se siamo "persi"
+                if (!inputSchool) render();
                 return;
             }
 
-            // Cache per step successivi (es. dopo MULTIPLE_PROFILES)
             if (inputSchool) tempCreds = { school: credentials.schoolCode, user: credentials.username, pass: credentials.password };
 
             setLoginBtnText("Connessione... ");
@@ -3906,7 +3898,7 @@
                     profileIndex: profileIndex
                 };
 
-                // Se non passed index e non passato esplicitamente, controlla sessione
+                // Fallback a profilo salvato se non specificato
                 if (profileIndex === null) {
                     const savedSession = sessionManager.load();
                     if (savedSession && savedSession.profileIndex !== undefined) {
@@ -3927,11 +3919,8 @@
 
                 const data = await response.json();
 
-                // ⭐ GESTIONE MULTI-PROFILO
                 if (response.ok && data.status === 'MULTIPLE_PROFILES') {
-                    console.log("👥 Backend richiede selezione profilo");
                     showProfileSelectionModal(data.profiles, credentials);
-                    setLoginBtnText("Accedi");
                     return;
                 }
 
@@ -3943,9 +3932,8 @@
                     throw new Error(data.error || "Login fallito");
                 }
             } catch (e) {
-                console.error("❌ Errore Login:", e);
-                const msg = e.name === 'AbortError' ? "⚠️ Tempo scaduto! DidUP è lento. Riprova." : "❌ Errore: " + e.message;
-                alert(msg);
+                console.error("❌ Login error:", e);
+                alert(e.name === 'AbortError' ? "⚠️ Tempo scaduto!" : "❌ Errore: " + e.message);
                 navigate('login');
             } finally {
                 setLoginBtnText("Accedi");
@@ -3955,28 +3943,25 @@
         function handleLoginSuccess(data, rawPassword) {
             console.log("✅ Login OK, hydrating state...");
 
-            const school = data.session.schoolCode;
             const user = data.session.userName;
             const pass = rawPassword || tempCreds.pass;
 
-            // 1. Salva Sessione (con credenziali legacy per compatibilità /sync backend)
+            // 1. Sessione
             if (data.session) {
                 data.session.storedUser = btoa(unescape(encodeURIComponent(user)));
                 data.session.storedPass = btoa(unescape(encodeURIComponent(pass)));
                 sessionManager.save(data.session);
             }
 
-            // 2. Idrata User (Identità Reale dallo Studente)
+            // 2. Idratazione Identità (Nomi Reali dal Backend)
+            state.user = state.user || {};
             if (data.student) {
-                state.user = {
-                    ...data.student,
-                    id: `${data.session.schoolCode.toUpperCase()}:${data.session.userName.toLowerCase()}:${data.session.profileIndex || 0}`
-                };
+                state.user.name = data.student.name; // es. "ALTOBELLO ANDREA"
+                state.user.class = data.student.class; // es. "5H"
                 localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
-                console.log("👤 User Hydrated:", state.user.name);
             }
 
-            // 3. Idrata Dati (Voti, Compiti, Promemoria)
+            // 3. Idratazione Dati Scolastici
             if (data.tasks) {
                 updateTasks(data.tasks, false);
                 console.log("✅ Compiti caricati:", state.tasks.length);
@@ -3984,20 +3969,17 @@
             if (data.voti) {
                 state.voti = Array.isArray(data.voti) ? data.voti : [];
                 localStorage.setItem(lsKey('voti'), JSON.stringify(state.voti));
-                console.log("🎓 Voti caricati:", state.voti.length);
             }
             if (data.promemoria || data.announcements) {
-                const list = data.promemoria || data.announcements;
-                state.promemoria = Array.isArray(list) ? list : [];
+                state.promemoria = Array.isArray(data.promemoria || data.announcements) ? (data.promemoria || data.announcements) : [];
                 localStorage.setItem(lsKey('promemoria'), JSON.stringify(state.promemoria));
             }
 
-            // 4. Re-idrata Planner Locali
+            // 4. PlannerLocali
             state.plannedTasks = JSON.parse(localStorage.getItem(lsKey('planned_tasks')) || '{}');
             state.stressLevels = JSON.parse(localStorage.getItem(lsKey('stress_levels')) || '{}');
             state.reminders = JSON.parse(localStorage.getItem(lsKey('reminders')) || '[]');
 
-            // 5. Sync Finali
             state.isLoggedIn = true;
             state.didup.connected = true;
             state.isOffline = false;
@@ -4014,6 +3996,12 @@
                 render();
             });
         }
+
+        // Esposizione Globale
+        window.performArgoSync = performArgoSync;
+        window.handleLoginSuccess = handleLoginSuccess;
+        window.showProfileSelectionModal = showProfileSelectionModal;
+        window.selectProfile = selectProfile;
 
         async function publishPost() {
             const textEl = document.getElementById('new-post-text');
