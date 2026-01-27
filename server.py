@@ -453,10 +453,10 @@ def strategia_2_api_diretta(argo_instance):
                                     debug_log(f"✅ Trovati {len(data[key])} voti in {endpoint}.{key}")
                                     for v in data[key]:
                                         grades.append({
-                                            "materia": v.get('desMateria') or v.get('materia', 'N/D'),
-                                            "valore": v.get('codVoto') or v.get('voto') or v.get('valore'),
-                                            "data": v.get('datGiorno') or v.get('data'),
-                                            "tipo": v.get('desVoto') or v.get('tipo', 'N/D'),
+                                            "materia": v.get('desMateria', 'N/D'),
+                                            "valore": v.get('codVoto', ''),
+                                            "data": v.get('datGiorno', ''),
+                                            "tipo": v.get('desVoto', 'N/D'),
                                             "peso": v.get('numPeso', '100'),
                                             "subject": v.get('desMateria', 'N/D'),
                                             "value": v.get('codVoto', ''),
@@ -525,47 +525,75 @@ def strategia_3_metodo_diretto(argo_instance):
 
 
 def extract_grades_multi_strategy(argo_instance):
-    """
-    MASTER FUNCTION: Prova tutte le strategie in sequenza
-    """
-    all_grades = []
+    grades = []
     
-    # Strategia 1
-    grades_s1 = strategia_1_dashboard(argo_instance)
-    if grades_s1:
-        debug_log(f"✅ Strategia 1: {len(grades_s1)} voti")
-        all_grades.extend(grades_s1)
-        return all_grades  # Ferma se trovati
-    
-    # Strategia 2
-    grades_s2 = strategia_2_api_diretta(argo_instance)
-    if grades_s2:
-        debug_log(f"✅ Strategia 2: {len(grades_s2)} voti")
-        all_grades.extend(grades_s2)
-        return all_grades
-    
-    # Strategia 3
-    grades_s3 = strategia_3_metodo_diretto(argo_instance)
-    if grades_s3:
-        debug_log(f"✅ Strategia 3: {len(grades_s3)} voti")
-        all_grades.extend(grades_s3)
-        return all_grades
-    
-    debug_log("❌ NESSUNA STRATEGIA ha restituito voti")
-    return all_grades
+    # 1. Dashboard Strategy
+    try:
+        dashboard_data = argo_instance.dashboard()
+        data_obj = dashboard_data.get('data', {})
+        dati_list = data_obj.get('dati', []) if isinstance(data_obj, dict) else []
+        if not dati_list and 'dati' in dashboard_data:
+             dati_list = dashboard_data.get('dati', [])
+        
+        if dati_list:
+            main_data = dati_list[0]
+            voti_keys = ['votiGiornalieri', 'votiPeriodici', 'votiScrutinio', 'voti', 'valutazioni']
+            for key in voti_keys:
+                voti_raw = main_data.get(key, [])
+                if voti_raw:
+                    for v in voti_raw:
+                        valore = v.get('codVoto') or v.get('voto') or v.get('valore')
+                        materia = v.get('desMateria') or v.get('materia', 'N/D')
+                        grades.append({
+                            "materia": materia,
+                            "valore": valore,
+                            "data": v.get('datGiorno') or v.get('data'),
+                            "tipo": v.get('desVoto') or v.get('tipo', 'N/D'),
+                            "subject": materia,
+                            "value": valore,
+                            "date": v.get('datGiorno', ''),
+                            "id": str(uuid.uuid4())[:12]
+                        })
+                    return grades
+    except:
+        pass
+        
+    # 2. Direct API Strategy (fallback)
+    try:
+        headers = argo_instance._ArgoFamiglia__headers
+        base_url = "https://www.portaleargo.it/famiglia/api/rest"
+        endpoints = ["/votiGiornalieri", "/voti"]
+        for endpoint in endpoints:
+            try:
+                res = requests.get(base_url + endpoint, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    if isinstance(data, list):
+                        for v in data:
+                            grades.append({
+                                "materia": v.get('desMateria', 'N/D'),
+                                "valore": v.get('codVoto', ''),
+                                "data": v.get('datGiorno', ''),
+                                "subject": v.get('desMateria', 'N/D'),
+                                "value": v.get('codVoto', ''),
+                                "date": v.get('datGiorno', ''),
+                                "id": str(uuid.uuid4())[:12]
+                            })
+                        if grades: return grades
+            except:
+                continue
+    except:
+        pass
+        
+    return grades
 
 
 # ============= ESTRAZIONE COMPITI =============
 
 def extract_homework_safe(argo_instance):
-    """Recupera compiti con gestione errori"""
     tasks_data = []
     try:
-        debug_log("📚 Extraction Compiti via FULL DASHBOARD")
-        # Usa la nostra chiamata custom che parte da inizio anno
         dashboard_data = argo_instance.get_full_dashboard()
-        
-        # Parsing manuale simile a getCompitiByDate ma su dati custom
         raw_homework = {}
         if 'data' in dashboard_data and 'dati' in dashboard_data['data']:
             dati = dashboard_data['data']['dati']
@@ -579,43 +607,22 @@ def extract_homework_safe(argo_instance):
                         raw_homework[data_consegna]["compiti"].append(compito.get("compito"))
                         raw_homework[data_consegna]["materie"].append(element.get("materia"))
 
-        debug_log(f"Compiti Estratti (Giorni): {len(raw_homework)}")
-        
-        if isinstance(raw_homework, dict):
-            for date_str, details in raw_homework.items():
-                compiti_list = details.get('compiti', [])
-                materie_list = details.get('materie', [])
-                
-                for i, desc in enumerate(compiti_list):
-                    mat = materie_list[i] if i < len(materie_list) else "Generico"
-                    tasks_data.append({
-                        "id": str(uuid.uuid4())[:12],
-                        "text": desc,
-                        "subject": mat,
-                        "due_date": date_str,
-                        "datCompito": date_str,  # ✅ AGGIUNTO
-                        "materia": mat,          # ✅ AGGIUNTO
-                        "done": False
-                    })
-                    
-        elif isinstance(raw_homework, list):
-            for t in raw_homework:
+        for date_str, details in raw_homework.items():
+            compiti_list = details.get('compiti', [])
+            materie_list = details.get('materie', [])
+            for i, desc in enumerate(compiti_list):
+                mat = materie_list[i] if i < len(materie_list) else "Generico"
                 tasks_data.append({
                     "id": str(uuid.uuid4())[:12],
-                    "text": t.get('desCompito', '') or t.get('compito', ''),
-                    "subject": t.get('desMateria', '') or t.get('materia', 'Generico'),
-                    "due_date": t.get('datCompito', ''),
-                    "datCompito": t.get('datCompito', ''),  # ✅ AGGIUNTO
-                    "materia": t.get('desMateria', 'Generico'),  # ✅ AGGIUNTO
+                    "text": desc,
+                    "subject": mat,
+                    "due_date": date_str,
+                    "datCompito": date_str,
+                    "materia": mat,
                     "done": False
                 })
-                
     except Exception as e:
         debug_log(f"⚠️ Errore compiti", str(e))
-        import traceback
-        traceback.print_exc()
-    
-    debug_log(f"✅ Totale compiti: {len(tasks_data)}")
     return tasks_data
 
 
@@ -650,30 +657,46 @@ def extract_promemoria(dashboard_data):
 # ✅ NEW: helper per estrarre nome/classe dalla FULL DASHBOARD
 def extract_student_from_dashboard(dashboard_data):
     """
-    Prova a estrarre 'Nome Cognome' e la classe dalla dashboard completa.
-    Ritorna (name, class) oppure (None, None) se non trovati.
+    Estrae il nome (Andrea/Matteo) dalla dashboard, cercando specificamente
+    i campi anagrafici che DidUP usa per mostrare il nome nell'header.
     """
     name = None
     cls = None
     try:
         data_obj = dashboard_data.get('data', {})
         dati_list = data_obj.get('dati', []) if isinstance(data_obj, dict) else []
+        
+        if not dati_list and 'dati' in dashboard_data:
+            dati_list = dashboard_data.get('dati', [])
+
         if dati_list:
             blocco = dati_list[0]
-            # punti possibili per l'anagrafica
+            
+            # 1. Cerca nell'oggetto 'alunno' (dove Argo mette i dati personali)
             alunno = blocco.get('alunno') or blocco.get('anagrafe') or blocco.get('anagrafica')
+            
             if isinstance(alunno, dict):
-                nome = (alunno.get('desNome') or '').strip()
-                cognome = (alunno.get('desCognome') or '').strip()
-                name = f"{nome} {cognome}".strip() if (nome or cognome) else None
-            elif isinstance(alunno, str) and alunno.strip():
-                name = alunno.strip()
-            # classe in vari campi
+                nome = (alunno.get('desNome') or alunno.get('nome') or '').strip()
+                cognome = (alunno.get('desCognome') or alunno.get('cognome') or '').strip()
+                if nome or cognome:
+                    # Formato: ALTOBELLO ANDREA
+                    name = f"{cognome} {nome}".strip().upper() 
+            
+            # 2. Fallback su campi diretti
+            if not name:
+                nome = (blocco.get('desNome') or '').strip()
+                cognome = (blocco.get('desCognome') or '').strip()
+                if nome or cognome:
+                    name = f"{cognome} {nome}".strip().upper()
+
+            # 3. Classe
             cls = blocco.get('desClasse') or blocco.get('classe') or blocco.get('desDenominazione')
-        return name, cls
+            
+            debug_log("🔍 Extract Student Name Result:", {"name": name, "class": cls})
+            
     except Exception as e:
         debug_log("⚠️ extract_student_from_dashboard error", str(e))
-        return None, None
+    return name, cls
 
 
 # ============= HELPERS SESSIONI =============
@@ -1079,200 +1102,127 @@ def post_message():
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
-    # ✅ NORMALIZZA INPUT per evitare spazi in coda (visti nei log)
-    school_code = (data.get('schoolCode') or '').strip()
+    school = (data.get('schoolCode') or '').strip()
     username = (data.get('username') or '').strip()
     password = data.get('password')
-    # Nuovo parametro opzionale per selezione profilo
     selected_profile_index = data.get('profileIndex') 
 
-    if not all([school_code, username, password]):
+    if not all([school, username, password]):
         return jsonify({"success": False, "error": "Dati mancanti"}), 400
 
     try:
-        debug_log("LOGIN REQUEST", {
-            "school": school_code,
-            "username": username,
-            "profileIndex": selected_profile_index
-        })
-        
-        # 1. Login Avanzato (Ottieni Access Token + Lista Profili)
-        # Tentativo A: Flow Manuale (Supporta Multi-Profilo)
+        debug_log("LOGIN REQUEST", {"school": school, "username": username, "idx": selected_profile_index})
         
         access_token = None
         auth_token = None
         profiles = []
         fallback_mode = False
         
+        # 1. Login Avanzato
         try:
-            debug_log("🔐 Tentativo A: AdvancedArgo.raw_login (Multi-Profilo)")
-            login_result = AdvancedArgo.raw_login(school_code, username, password)
+            login_result = AdvancedArgo.raw_login(school, username, password)
             access_token = login_result['access_token']
             profiles = login_result['profiles']
-            debug_log(f"✅ Advanced Login OK. Profili trovati: {len(profiles)}")
-            
-        except Exception as e_advanced:
-            debug_log(f"⚠️ Advanced Login Fallito: {str(e_advanced)}. Attivo FALLBACK.")
+        except Exception as e:
+            debug_log(f"⚠️ Advanced Login Fallito: {str(e)}")
             fallback_mode = True
-        
-        # 2. Gestione Profili Multipli (Solo se tentativo A ok)
-        # MODIFICA COMPATIBILITÀ: Non blocchiamo più se non c'è selezione.
-        # Se front-end è vecchio, non sa gestire MULTIPLE_PROFILES.
-        # Quindi: default a 0, ma mandiamo lista profili per frontend aggiornati.
-        
+
+        # 2. Gestione Profili
         profiles_payload = []
         if not fallback_mode and profiles:
             if len(profiles) > 1:
-                # Prepariamo lista per dopo
                 for idx, p in enumerate(profiles):
                     alunno = p.get('alunno', {})
-                    nome = alunno.get('desNome', '').strip()
-                    cognome = alunno.get('desCognome', '').strip()
+                    nome = (alunno.get('desNome') or '').strip()
+                    cognome = (alunno.get('desCognome') or '').strip()
+                    if not nome and not cognome: nome_completo = f"Studente {idx + 1}"
+                    else: nome_completo = f"{cognome} {nome}".strip() # Cognome Nome per coerenza
                     
-                    # Fallback robusto per il nome
-                    if not nome and not cognome:
-                         nome_completo = f"Studente {idx + 1}"
-                    else:
-                         nome_completo = f"{nome} {cognome}".strip()
-
                     profiles_payload.append({
                         "index": idx,
                         "name": nome_completo,
                         "school": p.get('desScuola', 'Scuola'),
                         "class": p.get('desClasse', '')
                     })
-                debug_log(f"⚠️ Rilevati {len(profiles)} profili. Auto-select index 0 per compatibilità.")
 
-        # 3. Selezione Profilo (default 0 se unico o non specificato)
+        # Selezione Profilo
         target_index = int(selected_profile_index) if selected_profile_index is not None else 0
+        target_profile = None
         
-        # Security check su indice
-        if not profiles:
-            target_profile = None # Fallback mode gestirà
-        elif target_index < len(profiles):
-            target_profile = profiles[target_index]
-            auth_token = target_profile['token']
-            debug_log(f"✅ Profilo selezionato: Indice {target_index}", target_profile.get('alunno', {}))
-        else:
-             target_index = 0
-             target_profile = profiles[0]
-             auth_token = target_profile['token']
-        
-        # 3. Setup Sessione Operativa
-        # Se siamo in fallack o se advanced ha fallito qualcosa, usiamo Standard Login
+        if not fallback_mode and profiles:
+            if target_index < len(profiles):
+                target_profile = profiles[target_index]
+                auth_token = target_profile.get('token')
+            else:
+                 target_index = 0
+                 target_profile = profiles[0]
+                 auth_token = target_profile.get('token')
         
         if fallback_mode or not access_token or not auth_token:
-            debug_log("🔐 Attivazione Fallback: Standard ArgoFamiglia Login")
-            # Login Standard (fa rete)
-            temp_argo = argofamiglia.ArgoFamiglia(school_code, username, password)
-            # Estrai token dalla sessione standard
+            temp_argo = argofamiglia.ArgoFamiglia(school, username, password)
             headers = temp_argo._ArgoFamiglia__headers
             auth_token = headers.get('x-auth-token', '')
             access_token = headers.get('Authorization', '').replace("Bearer ", "")
-            debug_log("✅ Fallback Login OK")
 
-        # 4. Strategia Sessioni Isolate (Voti -> Compiti -> Dashboard)
-        
-        # --- SESSIONE 1: VOTI ---
-        debug_log("🔐 [1/3] Sessione VOTI...")
-        argo_voti = create_session(school_code, username, password, access_token, auth_token)
+        # 3. Sessioni dati
+        argo_voti = create_session(school, username, password, access_token, auth_token)
         grades_data = extract_grades_multi_strategy(argo_voti)
-        debug_log(f"✅ Voti recuperati: {len(grades_data)}")
-
-        # --- SESSIONE 2: COMPITI ---
-        debug_log("🔐 [2/3] Sessione COMPITI...")
+        
+        tasks_data = []
         try:
-            argo_tasks = create_session(school_code, username, password, access_token, auth_token)
+            argo_tasks = create_session(school, username, password, access_token, auth_token)
             tasks_data = extract_homework_safe(argo_tasks)
-            debug_log(f"✅ Compiti recuperati: {len(tasks_data)}")
-        except Exception as e_tasks:
-            debug_log("⚠️ Errore sessione compiti", str(e_tasks))
-            tasks_data = []
+        except: pass
 
-        # --- SESSIONE 3: DASHBOARD ---
-        debug_log("🔐 [3/3] Sessione DASHBOARD...")
         announcements_data = []
         dashboard_data = {}
         try:
-            argo_dash = create_session(school_code, username, password, access_token, auth_token)
+            argo_dash = create_session(school, username, password, access_token, auth_token)
             dashboard_data = argo_dash.get_full_dashboard()
             announcements_data = extract_promemoria(dashboard_data)
+        except: pass
             
-            # ===== DEBUG: Stampa struttura dashboard per estrazione nome =====
-            debug_log("🔍 DASHBOARD COMPLETA (per debug nome studente)", dashboard_data)
-        except Exception as e_dash:
-            debug_log("⚠️ Errore sessione dashboard", str(e_dash))
-            
-        # Dati studente (Best effort)
+        # 4. DETERMINAZIONE NOME STUDENTE (PRIORITÀ CRITICA)
         student_name = username
         student_class = "DidUP"
         
-        # 1) Usa profilo selezionato se disponibile
-        if not fallback_mode and profiles and 'target_index' in locals() and target_profile:
-             p = target_profile
-             student_name = f"{p.get('alunno', {}).get('desNome', '')} {p.get('alunno', {}).get('desCognome', '')}".strip() or username
-             student_class = p.get('desClasse', 'DidUP')
+        # A: Prova dal profilo API raw (se disponibile)
+        if target_profile:
+            al = target_profile.get('alunno', {})
+            n = (al.get('desNome') or '').strip()
+            c = (al.get('desCognome') or '').strip()
+            if n or c: student_name = f"{c} {n}".strip().upper()
+            student_class = target_profile.get('desClasse', 'DidUP')
 
-        # 2) Fallback: prova dalla FULL DASHBOARD
-        if (not student_name or student_name == username) or (student_class == "DidUP"):
-            try:
-                name_from_dash, class_from_dash = extract_student_from_dashboard(dashboard_data)
-                if name_from_dash:
-                    student_name = name_from_dash
-                if class_from_dash:
-                    student_class = class_from_dash
-                debug_log("📋 Dati studente (fallback da dashboard)", {
-                    "student_name": student_name,
-                    "student_class": student_class
-                })
-            except Exception as e_dash_extract:
-                debug_log("⚠️ Fallback estrazione nome da dashboard fallito", str(e_dash_extract))
+        # B: SOVRASCRIVI con dato Dashboard (più affidabile per l'anno corrente)
+        dash_name, dash_class = extract_student_from_dashboard(dashboard_data)
+        if dash_name and len(dash_name) > 3:
+            student_name = dash_name
+            debug_log(f"✅ Nome studente aggiornato da Dashboard: {student_name}")
+        if dash_class:
+            student_class = dash_class
 
-        # ✅ Sync profilo su Supabase con id normalizzato
+        # Sync Supabase
         if supabase:
             try:
-                profile_id = f"{school_code}:{username.lower()}:{target_index}"
-                profile_payload = {
-                    "id": profile_id,
-                    "name": student_name,
-                    "class": student_class,
-                    "last_active": datetime.now().isoformat()
-                }
-                # ✅ Fixed: Explicit on_conflict for upsert
-                supabase.table("profiles").upsert(profile_payload, on_conflict="id").execute()
-                debug_log(f"👤 Profile sync'd to Supabase: {profile_id}")
-            except Exception as e_prof:
-                debug_log("⚠️ Profile sync failed (non-fatal)", str(e_prof))
+                pid = f"{school}:{username.lower()}:{target_index}"
+                supabase.table("profiles").upsert({
+                    "id": pid, "name": student_name, "class": student_class, "last_active": datetime.now().isoformat()
+                }, on_conflict="id").execute()
+            except: pass
 
-        # Risposta finale
-        response_data = {
+        resp = {
             "success": True,
-            "session": {
-                "schoolCode": school_code,
-                "authToken": auth_token,
-                "accessToken": access_token,
-                "userName": username,
-                "profileIndex": target_index
-            },
-            "student": {
-                "name": student_name,
-                "class": student_class,
-                "school": school_code
-            },
+            "session": {"schoolCode": school, "authToken": auth_token, "accessToken": access_token, "userName": username, "profileIndex": target_index},
+            "student": {"name": student_name, "class": student_class, "school": school},
             "tasks": tasks_data,
             "voti": grades_data,
-            "promemoria": announcements_data,
-            "debug_info": {
-                "voti_count": len(grades_data),
-                "tasks_count": len(tasks_data),
-                "timestamp": datetime.now().isoformat(),
-                "mode": "FALLBACK_HYBRID" if fallback_mode else "MULTI_PROFILE_FAST"
-            }
+            "promemoria": announcements_data
         }
         
         # ✅ Include profilo selezionato per la PWA
-        if not fallback_mode and profiles and 'target_index' in locals() and target_profile:
-            response_data["selectedProfile"] = {
+        if target_profile:
+            resp["selectedProfile"] = {
                 "index": target_index,
                 "alunno": target_profile.get("alunno", {}),
                 "class": target_profile.get("desClasse"),
@@ -1280,16 +1230,13 @@ def login():
                 "name": student_name,
                 "raw": target_profile
             }
-        
-        # Se c'erano più profili, li aggiungiamo e settiamo status, MA con success=True
-        # Così il vecchio frontend entra (col profilo 0), il nuovo frontend vede status e apre modale
-        # FIX: Aggiungiamo status SOLO se client NON ha già scelto (profileIndex is None).
+            
         if profiles_payload and selected_profile_index is None:
-            response_data["status"] = "MULTIPLE_PROFILES"
-            response_data["profiles"] = profiles_payload
+            resp["status"] = "MULTIPLE_PROFILES"
+            resp["profiles"] = profiles_payload
         
-        debug_log("RISPOSTA FINALE", response_data)
-        return jsonify(response_data), 200
+        debug_log("RISPOSTA FINALE", resp)
+        return jsonify(resp), 200
 
     except Exception as e:
         import traceback
