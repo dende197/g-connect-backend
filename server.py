@@ -657,26 +657,45 @@ def extract_promemoria(dashboard_data):
 # ✅ NEW: helper per estrarre nome/classe dalla FULL DASHBOARD
 def extract_student_from_dashboard(dashboard_data):
     """
-    Estrae nome e classe dello studente dalla 'full dashboard' di DidUP in modo tollerante:
-    - Ispeziona tutti i blocchi 'dati', non solo il primo
-    - Cerca chiavi note: alunno/anagrafe/anagrafica/profilo/header/intestazione
-    - Gestisce liste: alunni/studenti/students
-    - Fallback: ricerca profonda su tutto il JSON e parsing da stringhe in maiuscolo tipo 'COGNOME NOME LICEO STATALE'
+    Estrae nome e classe dello studente dalla 'full dashboard' di DidUP in modo tollerante, evitando falsi positivi:
+    - Ispeziona TUTTI i blocchi di 'data.dati'
+    - Cerca solo in chiavi anagrafiche note (alunno/anagrafe/anagrafica/profilo/header/intestazione)
+    - Evita parsing da stringhe generiche (es. 'STORIA TRIENNIO') usando una blacklist di materie/parole scolastiche
+    - Valida la classe con regex ^[1-5][A-Z]$
     Restituisce (name, class) oppure (None, None).
     """
     import re
 
-    SCHOOL_TOKENS = {
-        "LICEO", "SCUOLA", "ISTITUTO", "COMPRENSIVO", "STATALE",
-        "PARITARIO", "MEDIA", "PRIMARIA", "TECNICO", "PROFESSIONALE"
+    # Materie e parole scolastiche comuni: evita di trattarle come "COGNOME NOME"
+    SUBJECT_TOKENS = {
+        "ITALIANO","INGLESE","STORIA","GEOGRAFIA","FILOSOFIA","MATEMATICA","SCIENZE","BIOLOGIA",
+        "FISICA","ARTE","DISEGNO","RELIGIONE","RELIGIOSA","EDUCAZIONE","MUSICA","TECNOLOGIE",
+        "TECNOLOGIA","TRIENNIO","BIENNIO","SCIENZE NATURALI","SCIENZE UMANE","STORIA E GEOGRAFIA",
+        "DISEGNO E STORIA DELL'ARTE","INFORMATICA","CHIMICA"
     }
 
-    CLASS_REGEX = re.compile(r"\b([1-5][A-Z])\b")  # es. 1A, 2B, 5H
+    SCHOOL_TOKENS = {
+        "LICEO", "SCUOLA", "ISTITUTO", "COMPRENSIVO", "STATALE", "PARITARIO", "MEDIA", "PRIMARIA",
+        "TECNICO", "PROFESSIONALE"
+    }
+
+    CLASS_REGEX = re.compile(r"^[1-5][A-Z]$")  # es. 1A, 2B, 5H
+
+    def looks_like_subject(text: str) -> bool:
+        if not isinstance(text, str):
+            return False
+        s = text.strip().upper()
+        # Se contiene uno dei token di materia → è una materia, NON un nome
+        for tok in SUBJECT_TOKENS:
+            if tok in s:
+                return True
+        return False
 
     def parse_display_name(text: str):
         """
         Prova ad estrarre 'COGNOME NOME' da una stringa in maiuscolo,
-        rimuovendo eventuali token scuola (es. '... LICEO STATALE').
+        tronca eventuali token scuola (es. '... LICEO STATALE').
+        Non tenta il parsing se la stringa somiglia a una materia.
         """
         if not isinstance(text, str):
             return None
@@ -685,11 +704,15 @@ def extract_student_from_dashboard(dashboard_data):
         if not s or not s.isupper() or len(s) < 5:
             return None
 
+        # Evita soggetti evidenti
+        if looks_like_subject(s):
+            return None
+
         parts = [p for p in s.split() if p]
         if len(parts) < 2:
             return None
 
-        # Se la stringa contiene token della scuola, tronca prima del primo di essi
+        # Tronca a sinistra prima dei token scuola
         idx_stop = None
         for i, tok in enumerate(parts):
             if tok in SCHOOL_TOKENS:
@@ -698,26 +721,33 @@ def extract_student_from_dashboard(dashboard_data):
         if idx_stop is not None and idx_stop >= 2:
             parts = parts[:idx_stop]
 
-        # Teniamo idealmente i primi 2 token come cognome nome
+        # Teniamo idealmente i primi 2 token come COGNOME NOME
         if len(parts) >= 2:
-            name = f"{parts[0]} {parts[1]}".strip().upper()
-            # Minimizza falsi positivi: entrambi i token almeno 2 lettere
-            if len(parts[0]) >= 2 and len(parts[1]) >= 2:
-                return name
+            p0, p1 = parts[0], parts[1]
+            # Evita 'STORIA TRIENNIO' & simili
+            if looks_like_subject(p0) or looks_like_subject(p1):
+                return None
+            if p0.isalpha() and p1.isalpha() and len(p0) >= 2 and len(p1) >= 2:
+                return f"{p0} {p1}".strip().upper()
 
         return None
 
     def _extract_from_obj(obj):
+        """Estrazione diretta da un oggetto anagrafico (senza scandire stringhe arbitrarie)."""
         try:
             if not isinstance(obj, dict):
                 return None, None
 
-            # Campi possibili per nome/cognome
+            # Campi possibili per nome/cognome (preferiti)
             nome = (obj.get('desNome') or obj.get('nome') or obj.get('fullName') or obj.get('name') or '').strip()
             cognome = (obj.get('desCognome') or obj.get('cognome') or obj.get('surname') or obj.get('lastName') or '').strip()
 
-            # Campi possibili per classe
-            cls = (
+            name = None
+            if nome or cognome:
+                name = f"{(cognome or '').strip()} {(nome or '').strip()}".strip().upper()
+
+            # Classe diretta
+            cls_raw = (
                 obj.get('desClasse')
                 or obj.get('classe')
                 or obj.get('class')
@@ -725,57 +755,31 @@ def extract_student_from_dashboard(dashboard_data):
                 or obj.get('desDenominazione')
                 or obj.get('denominazione')
             )
-
-            name = None
-            if nome or cognome:
-                # Formato coerente: COGNOME NOME
-                name = f"{(cognome or '').strip()} {(nome or '').strip()}".strip().upper()
-
-            # Fallback: prova parsing da stringhe "COGNOME NOME ..." se i campi dedicati mancano
-            if not name:
-                for k, v in obj.items():
-                    if isinstance(v, str):
-                        parsed = parse_display_name(v)
-                        if parsed:
-                            name = parsed
-                            break
-
-            # Fallback classe: cerca pattern tipo "2B" nelle stringhe
-            if not cls:
-                for k, v in obj.items():
-                    if isinstance(v, str):
-                        m = CLASS_REGEX.search(v)
-                        if m:
-                            cls = m.group(1)
-                            break
+            cls = None
+            if isinstance(cls_raw, str):
+                cls_candidate = cls_raw.strip().upper()
+                if CLASS_REGEX.match(cls_candidate):
+                    cls = cls_candidate
 
             return name, cls
         except Exception:
             return None, None
 
     try:
-        # Colleziona tutti i blocchi candidati
         candidates = []
-
         if isinstance(dashboard_data, dict):
-            candidates.append(dashboard_data)
-
             data_obj = dashboard_data.get('data')
-            if isinstance(data_obj, dict):
-                candidates.append(data_obj)
-
-                dati_list = data_obj.get('dati')
-                if isinstance(dati_list, list):
-                    # ✅ Ispeziona TUTTI i blocchi dati, non solo il primo
-                    for item in dati_list:
-                        if isinstance(item, dict):
-                            candidates.append(item)
+            dati_list = data_obj.get('dati') if isinstance(data_obj, dict) else None
+            if isinstance(dati_list, list):
+                for item in dati_list:
+                    if isinstance(item, dict):
+                        candidates.append(item)
 
         def try_block(block):
             if not isinstance(block, dict):
                 return None, None
 
-            # Oggetti anagrafici noti
+            # Chiavi anagrafiche note
             for key in ('alunno', 'anagrafe', 'anagrafica', 'profilo', 'header', 'intestazione'):
                 obj = block.get(key)
                 if isinstance(obj, dict):
@@ -783,13 +787,38 @@ def extract_student_from_dashboard(dashboard_data):
                     if name or cls:
                         return name, cls
                 elif isinstance(obj, str):
+                    # Parsing SOLO da stringhe potenzialmente intestazione
                     parsed = parse_display_name(obj)
                     if parsed:
+                        # Classe non disponibile in stringhe 'header'; lasciamo cls=None
                         return parsed, None
+
+            # Fallback: tenta campi diretti nel blocco (ma NON scandisce stringhe generiche)
+            name, cls = _extract_from_obj(block)
+            if name or cls:
+                return name, cls
 
             # Liste di studenti/alunni
             for key in ('alunni', 'studenti', 'students'):
                 arr = block.get(key)
+                if isinstance(arr, list) and arr:
+                    for el in arr:
+                        name, cls = _extract_from_obj(el)
+                        if name or cls:
+                            return name, cls
+            return None, None
+
+        for cand in candidates:
+            name, cls = try_block(cand)
+            if name or cls:
+                debug_log("🔍 Extract Student Name Result:", {"name": name, "class": cls})
+                return name, cls
+
+    except Exception as e:
+        debug_log("⚠️ extract_student_from_dashboard error", str(e))
+
+    debug_log("🔍 Extract Student Name Result:", {"name": None, "class": None})
+    return None, None
                 if isinstance(arr, list) and arr:
                     # prova ciascun elemento della lista
                     for el in arr:

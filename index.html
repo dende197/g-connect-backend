@@ -2186,6 +2186,12 @@
             setTimeout(() => { el.style.display = 'none'; }, 280);
         }
 
+        // ✅ Classe valida (es. 1A..5Z)
+        function isValidClass(cls) {
+            const c = String(cls || '').trim().toUpperCase();
+            return /^[1-5][A-Z]$/.test(c);
+        }
+
         function navigate(v) {
             if (!allowedViews.includes(v)) v = 'home';
             const targetHash = '#' + v;
@@ -2796,8 +2802,9 @@
                         <div style="font-size:16px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                             ${state.user?.name || 'Utente'}
                         </div>
+                        <!-- ✅ Badge 'CinqueAnna' + classe valida opzionale -->
                         <div class="tag-cinqueanna">
-                            <i class="ph-bold ph-graduation-cap"></i> CinqueAnna • ${state.user?.class || '5B'}
+                            <i class="ph-bold ph-graduation-cap"></i> CinqueAnna${isValidClass(state.user?.class) ? ` • ${String(state.user.class).trim().toUpperCase()}` : ''}
                         </div>
                     </div>
                     ${state.lastSync ? `<div style="font-size:11px; color: rgba(255,255,255,0.6); display:flex; align-items:center; gap:6px;">
