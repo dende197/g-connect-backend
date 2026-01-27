@@ -2186,7 +2186,14 @@
             setTimeout(() => { el.style.display = 'none'; }, 280);
         }
 
-        // ✅ Classe valida (es. 1A..5Z)
+        // ✅ Funzioni di validazione nome/classe (Bug #5)
+        function isValidName(name) {
+            if (!name || typeof name !== 'string') return false;
+            const parts = name.trim().toUpperCase().split(/\s+/);
+            // Almeno 2 parole, tutte alfabetiche, min 2 caratteri
+            return parts.length >= 2 && parts.every(p => /^[A-Z]{2,}$/i.test(p));
+        }
+
         function isValidClass(cls) {
             const c = String(cls || '').trim().toUpperCase();
             return /^[1-5][A-Z]$/.test(c);
@@ -2631,14 +2638,29 @@
                 const data = await response.json();
 
                 if (data.success && data.data) {
-                    if (data.data.name) state.user.name = data.data.name;
-                    if (data.data.class) state.user.class = data.data.class;
-                    if (data.data.avatar && data.data.avatar.startsWith('http')) {
-                        state.user.avatar = data.data.avatar;
-                        console.log('✅ Avatar loaded from DB:', data.data.avatar);
+                    const profile = data.data;
+                    console.log("📥 Profilo Supabase ricevuto:", profile);
+
+                    // ✅ Merge intelligente (Bug #6)
+                    if (profile.avatar && profile.avatar.startsWith('http')) {
+                        state.user.avatar = profile.avatar;
+                        console.log('✅ Avatar loaded from DB:', profile.avatar);
                     }
+
+                    // Aggiorna nome SOLO se locale non valido e remoto è valido
+                    if (!isValidName(state.user.name) && profile.name && isValidName(profile.name)) {
+                        state.user.name = profile.name;
+                        console.log("✅ Nome aggiornato da Supabase:", profile.name);
+                    }
+
+                    // Aggiorna classe SOLO se locale non valida e remota è valida
+                    if (!isValidClass(state.user.class) && profile.class && isValidClass(profile.class)) {
+                        state.user.class = profile.class;
+                        console.log("✅ Classe aggiornata da Supabase:", profile.class);
+                    }
+
                     localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
-                    return data.data;
+                    return profile;
                 }
                 return null;
             } catch (error) {
@@ -3965,11 +3987,49 @@
                 sessionManager.save(data.session);
             }
 
-            // 2. Idratazione Identità (Nomi Reali dal Backend)
+            // 2. Idratazione Identità (con validazione) (Bug #5)
             state.user = state.user || {};
             if (data.student) {
-                state.user.name = data.student.name; // es. "ALTOBELLO ANDREA"
-                state.user.class = data.student.class; // es. "5H"
+                // Nome: valida che non sia username
+                const receivedName = data.student.name;
+                if (isValidName(receivedName)) {
+                    state.user.name = receivedName;
+                    console.log("✅ Nome valido ricevuto:", receivedName);
+                } else {
+                    console.warn("⚠️ Nome non valido ricevuto dal backend:", receivedName);
+
+                    // Fallback 1: cerca in selectedProfile
+                    if (data.selectedProfile?.name && isValidName(data.selectedProfile.name)) {
+                        state.user.name = data.selectedProfile.name;
+                        console.log("✅ Nome da selectedProfile:", state.user.name);
+                    } else {
+                        // Fallback 2: mantieni esistente o usa placeholder
+                        if (!state.user.name || !isValidName(state.user.name)) {
+                            state.user.name = "Studente";
+                            console.log("⚠️ Uso placeholder: Studente");
+                        }
+                    }
+                }
+
+                // Classe: valida formato
+                const receivedClass = data.student.class;
+                if (isValidClass(receivedClass)) {
+                    state.user.class = receivedClass;
+                    console.log("✅ Classe valida ricevuta:", receivedClass);
+                } else {
+                    console.warn("⚠️ Classe non valida ricevuta:", receivedClass);
+
+                    // Cerca alternative
+                    if (data.selectedProfile?.class && isValidClass(data.selectedProfile.class)) {
+                        state.user.class = data.selectedProfile.class;
+                        console.log("✅ Classe da selectedProfile:", state.user.class);
+                    } else {
+                        // Ometti se non valida (isValidClass nel rendering gestirà)
+                        state.user.class = null;
+                    }
+                }
+
+                // Salva con dati validati
                 localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
             }
 

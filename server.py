@@ -93,7 +93,77 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 
 
 # ============= CONFIGURAZIONE DEBUG =============
-DEBUG_MODE = True  # Imposta False in produzione
+DEBUG_MODE = os.environ.get("DEBUG_MODE", "false").lower() == "true" or True # Default as True for local dev if not set
+
+# Regex per validazione classe (1A-5Z)
+CLASS_REGEX = re.compile(r"^[1-5][A-Z]$")
+
+# Materie e parole scolastiche comuni: evita di trattarle come "COGNOME NOME" (Bug #1)
+SUBJECT_TOKENS = {
+    "ITALIANO","INGLESE","STORIA","GEOGRAFIA","FILOSOFIA","MATEMATICA","SCIENZE","BIOLOGIA",
+    "FISICA","ARTE","DISEGNO","RELIGIONE","RELIGIOSA","EDUCAZIONE","MUSICA","TECNOLOGIE",
+    "TECNOLOGIA","TRIENNIO","BIENNIO","SCIENZE NATURALI","SCIENZE UMANE","STORIA E GEOGRAFIA",
+    "DISEGNO E STORIA DELL'ARTE","INFORMATICA","CHIMICA"
+}
+
+SCHOOL_TOKENS = {
+    "LICEO", "SCUOLA", "ISTITUTO", "COMPRENSIVO", "STATALE", "PARITARIO", "MEDIA", "PRIMARIA",
+    "TECNICO", "PROFESSIONALE"
+}
+
+def is_valid_name(name):
+    """
+    Valida che una stringa sia un nome reale (non username). (Bug #2)
+    Deve avere almeno 2 parole, tutte alfabetiche, min 2 caratteri ciascuna.
+    """
+    if not name or not isinstance(name, str):
+        return False
+    parts = name.strip().upper().split()
+    return len(parts) >= 2 and all(p.isalpha() and len(p) >= 2 for p in parts)
+
+def looks_like_subject(text: str) -> bool:
+    """Verifica se una stringa sembra una materia scolastica"""
+    if not isinstance(text, str):
+        return False
+    s = text.strip().upper()
+    return any(tok in s for tok in SUBJECT_TOKENS)
+
+def parse_display_name(text: str):
+    """
+    Estrae 'COGNOME NOME' da una stringa, evitando materie e token scuola.
+    """
+    if not isinstance(text, str):
+        return None
+    
+    s = text.strip()
+    if not s or not s.isupper() or len(s) < 5:
+        return None
+    
+    if looks_like_subject(s):
+        return None
+    
+    parts = [p for p in s.split() if p]
+    if len(parts) < 2:
+        return None
+    
+    # Tronca prima dei token scuola
+    idx_stop = None
+    for i, tok in enumerate(parts):
+        if tok in SCHOOL_TOKENS:
+            idx_stop = i
+            break
+    if idx_stop is not None and idx_stop >= 2:
+        parts = parts[:idx_stop]
+    
+    # Prendi primi 2 token come COGNOME NOME
+    if len(parts) >= 2:
+        p0, p1 = parts[0], parts[1]
+        if looks_like_subject(p0) or looks_like_subject(p1):
+            return None
+        if p0.isalpha() and p1.isalpha() and len(p0) >= 2 and len(p1) >= 2:
+            return f"{p0} {p1}".strip().upper()
+    
+    return None
 
 import logging
 
@@ -657,7 +727,7 @@ def extract_promemoria(dashboard_data):
 # ✅ NEW: helper per estrarre nome/classe dalla FULL DASHBOARD
 def extract_student_from_dashboard(dashboard_data):
     """
-    Estrae nome e classe dello studente dalla 'full dashboard' di DidUP in modo tollerante, evitando falsi positivi:
+    Estrae nome e classe dello studente dalla 'full dashboard' di DidUP in modo tollerante, evitando falsi positivi: (Bug #1)
     - Ispeziona TUTTI i blocchi di 'data.dati'
     - Cerca solo in chiavi anagrafiche note (alunno/anagrafe/anagrafica/profilo/header/intestazione)
     - Evita parsing da stringhe generiche (es. 'STORIA TRIENNIO') usando una blacklist di materie/parole scolastiche
@@ -732,38 +802,18 @@ def extract_student_from_dashboard(dashboard_data):
 
         return None
 
-    def _extract_from_obj(obj):
-        """Estrazione diretta da un oggetto anagrafico (senza scandire stringhe arbitrarie)."""
-        try:
-            if not isinstance(obj, dict):
-                return None, None
-
-            # Campi possibili per nome/cognome (preferiti)
-            nome = (obj.get('desNome') or obj.get('nome') or obj.get('fullName') or obj.get('name') or '').strip()
-            cognome = (obj.get('desCognome') or obj.get('cognome') or obj.get('surname') or obj.get('lastName') or '').strip()
-
-            name = None
-            if nome or cognome:
-                name = f"{(cognome or '').strip()} {(nome or '').strip()}".strip().upper()
-
-            # Classe diretta
-            cls_raw = (
-                obj.get('desClasse')
-                or obj.get('classe')
-                or obj.get('class')
-                or obj.get('className')
-                or obj.get('desDenominazione')
-                or obj.get('denominazione')
-            )
-            cls = None
-            if isinstance(cls_raw, str):
-                cls_candidate = cls_raw.strip().upper()
-                if CLASS_REGEX.match(cls_candidate):
-                    cls = cls_candidate
-
-            return name, cls
-        except Exception:
-            return None, None
+    def is_valid_name(name: str) -> bool:
+        """Controlla che il nome estratto non sia una stringa generica o un placeholder."""
+        if not name:
+            return False
+        name = name.strip().upper()
+        if len(name) < 5: # Troppo corto per essere un nome completo
+            return False
+        if "N/D" in name or "NON DISPONIBILE" in name:
+            return False
+        if looks_like_subject(name):
+            return False
+        return True
 
     try:
         candidates = []
@@ -774,6 +824,39 @@ def extract_student_from_dashboard(dashboard_data):
                 for item in dati_list:
                     if isinstance(item, dict):
                         candidates.append(item)
+
+        def _extract_from_obj(obj):
+            """Estrazione diretta da un oggetto anagrafico (senza scandire stringhe arbitrarie)."""
+            try:
+                if not isinstance(obj, dict):
+                    return None, None
+
+                # Campi possibili per nome/cognome (preferiti)
+                nome = (obj.get('desNome') or obj.get('nome') or obj.get('fullName') or obj.get('name') or '').strip()
+                cognome = (obj.get('desCognome') or obj.get('cognome') or obj.get('surname') or obj.get('lastName') or '').strip()
+
+                name = None
+                if nome and cognome:
+                    name = f"{(cognome or '').strip()} {(nome or '').strip()}".strip().upper()
+
+                # Classe diretta
+                cls_raw = (
+                    obj.get('desClasse')
+                    or obj.get('classe')
+                    or obj.get('class')
+                    or obj.get('className')
+                    or obj.get('desDenominazione')
+                    or obj.get('denominazione')
+                )
+                cls = None
+                if isinstance(cls_raw, str):
+                    cls_candidate = cls_raw.strip().upper()
+                    if CLASS_REGEX.match(cls_candidate):
+                        cls = cls_candidate
+
+                return name, cls
+            except Exception:
+                return None, None
 
         def try_block(block):
             if not isinstance(block, dict):
@@ -789,8 +872,7 @@ def extract_student_from_dashboard(dashboard_data):
                 elif isinstance(obj, str):
                     # Parsing SOLO da stringhe potenzialmente intestazione
                     parsed = parse_display_name(obj)
-                    if parsed:
-                        # Classe non disponibile in stringhe 'header'; lasciamo cls=None
+                    if parsed and is_valid_name(parsed):
                         return parsed, None
 
             # Fallback: tenta campi diretti nel blocco (ma NON scandisce stringhe generiche)
@@ -802,47 +884,22 @@ def extract_student_from_dashboard(dashboard_data):
             for key in ('alunni', 'studenti', 'students'):
                 arr = block.get(key)
                 if isinstance(arr, list) and arr:
-                    for el in arr:
-                        name, cls = _extract_from_obj(el)
-                        if name or cls:
-                            return name, cls
-            return None, None
-
-        for cand in candidates:
-            name, cls = try_block(cand)
-            if name or cls:
-                debug_log("🔍 Extract Student Name Result:", {"name": name, "class": cls})
-                return name, cls
-
-    except Exception as e:
-        debug_log("⚠️ extract_student_from_dashboard error", str(e))
-
-    debug_log("🔍 Extract Student Name Result:", {"name": None, "class": None})
-    return None, None
-                if isinstance(arr, list) and arr:
                     # prova ciascun elemento della lista
                     for el in arr:
                         name, cls = _extract_from_obj(el)
                         if name or cls:
                             return name, cls
-
-            # Fallback: campi diretti nel blocco
-            name, cls = _extract_from_obj(block)
-            if name or cls:
-                return name, cls
-
             return None, None
 
-        # Prova i candidati principali
+        # 1. Prova candidati principali (data.dati)
         for cand in candidates:
             name, cls = try_block(cand)
             if name or cls:
-                debug_log("🔍 Extract Student Name Result:", {"name": name, "class": cls})
+                debug_log("🔍 Extract Student Name Result (candidates):", {"name": name, "class": cls})
                 return name, cls
 
-        # Ricerca profonda su tutto il JSON
+        # 2. Ricerca profonda su tutto il JSON (fallback finale)
         def deep_search(node):
-            # Se è un dict, prova estrarre e poi visita figli
             if isinstance(node, dict):
                 name, cls = _extract_from_obj(node)
                 if name or cls:
@@ -851,23 +908,21 @@ def extract_student_from_dashboard(dashboard_data):
                     found = deep_search(v)
                     if found:
                         return found
-            # Se è una lista, visita ogni elemento
             elif isinstance(node, list):
                 for el in node:
                     found = deep_search(el)
                     if found:
                         return found
-            # Se è una stringa, prova parsing diretto
             elif isinstance(node, str):
                 parsed = parse_display_name(node)
-                if parsed:
+                if parsed and is_valid_name(parsed):
                     return parsed, None
             return None
 
         found = deep_search(dashboard_data)
         if found:
             name, cls = found
-            debug_log("🔍 Extract Student Name Result (deep)", {"name": name, "class": cls})
+            debug_log("🔍 Extract Student Name Result (deep search):", {"name": name, "class": cls})
             return name, cls
 
     except Exception as e:
@@ -1305,28 +1360,49 @@ def login():
             debug_log(f"⚠️ Advanced Login Fallito: {str(e)}")
             fallback_mode = True
 
-        # 2. Gestione Profili
+        # 2. Gestione Profili CON VALIDAZIONE (Bug #9)
         profiles_payload = []
         if not fallback_mode and profiles:
-            # costruisci SEMPRE il payload, anche se c'è un solo profilo
             for idx, p in enumerate(profiles):
                 alunno = p.get('alunno', {}) or {}
-                # Priorità 1: Dati diretti dal profilo
+                
+                # Estrai nome/cognome
                 nome = (alunno.get('desNome') or '').strip()
                 cognome = (alunno.get('desCognome') or '').strip()
                 
-                if nome or cognome:
-                    nome_completo = f"{cognome} {nome}".strip().upper()
+                if nome and cognome:
+                    candidate_name = f"{cognome} {nome}".strip().upper()
+                    if is_valid_name(candidate_name):
+                        nome_completo = candidate_name
+                    else:
+                        nome_completo = None
                 else:
-                    # Fallback estremo se proprio non c'è nulla nel profilo
-                    nome_completo = f"Studente {idx + 1}"
+                    nome_completo = None
+                
+                # Se nome non valido, costruisci placeholder descrittivo
+                if not nome_completo:
+                    scuola_short = p.get('desScuola', '')[:30]
+                    classe = p.get('desClasse', '')
+                    if scuola_short:
+                        nome_completo = f"Studente - {scuola_short}"
+                    elif classe and CLASS_REGEX.match(str(classe).strip().upper()):
+                        nome_completo = f"Studente {classe}"
+                    else:
+                        nome_completo = f"Profilo {idx + 1}"
+                
+                # Valida classe
+                classe_raw = p.get('desClasse', '')
+                classe_valida = None
+                if classe_raw and CLASS_REGEX.match(str(classe_raw).strip().upper()):
+                    classe_valida = str(classe_raw).strip().upper()
                 
                 profiles_payload.append({
                     "index": idx,
                     "name": nome_completo,
                     "school": p.get('desScuola', 'Scuola'),
-                    "class": p.get('desClasse', '')
+                    "class": classe_valida
                 })
+                debug_log(f"📋 Profilo {idx} costruito:", profiles_payload[-1])
 
         # Selezione Profilo
         target_index = int(selected_profile_index) if selected_profile_index is not None else 0
@@ -1365,45 +1441,98 @@ def login():
             announcements_data = extract_promemoria(dashboard_data)
         except: pass
             
-        # 4. DETERMINAZIONE NOME STUDENTE (PRIORITÀ CRITICA)
-        student_name = username
-        student_class = "DidUP"
+        # 4. DETERMINAZIONE NOME STUDENTE (PRIORITÀ CORRETTA) (Bug #2)
+        student_name = None
+        student_class = None
         
-        # A: Prova dal profilo API raw (se disponibile)
+        # PRIORITÀ A: Profilo API raw (se disponibile)
         if target_profile:
             al = target_profile.get('alunno', {})
             n = (al.get('desNome') or '').strip()
             c = (al.get('desCognome') or '').strip()
-            if n or c: student_name = f"{c} {n}".strip().upper()
-            student_class = target_profile.get('desClasse', 'DidUP')
-
-        # B: SOVRASCRIVI con dato Dashboard (più affidabile per l'anno corrente)
+            
+            if n and c:  # Entrambi obbligatori
+                candidate_name = f"{c} {n}".strip().upper()
+                if is_valid_name(candidate_name):
+                    student_name = candidate_name
+                    debug_log("✅ Nome da profilo API:", student_name)
+            
+            # Classe dal profilo
+            cls_raw = target_profile.get('desClasse')
+            if cls_raw and CLASS_REGEX.match(str(cls_raw).strip().upper()):
+                student_class = str(cls_raw).strip().upper()
+        
+        # PRIORITÀ B: Dashboard (SOVRASCRIVE se più affidabile)
         dash_name, dash_class = extract_student_from_dashboard(dashboard_data)
-        if dash_name and len(dash_name) > 3:
+        
+        if dash_name and is_valid_name(dash_name):
             student_name = dash_name
-            debug_log(f"✅ Nome studente aggiornato da Dashboard: {student_name}")
-        if dash_class:
+            debug_log("✅ Nome aggiornato da Dashboard:", student_name)
+        
+        if dash_class and CLASS_REGEX.match(dash_class):
             student_class = dash_class
-
-        # 🔁 Aggiorna anche il profilo selezionato nel payload, così il frontend vede il nome reale
+            debug_log("✅ Classe aggiornata da Dashboard:", student_class)
+        
+        # PRIORITÀ C: Fallback - cerca in altri campi del profilo
+        if not student_name and target_profile:
+            for field in ['desIntestazione', 'intestazione', 'header', 'fullName']:
+                raw = target_profile.get(field)
+                if raw and isinstance(raw, str):
+                    parsed = parse_display_name(raw)
+                    if parsed and is_valid_name(parsed):
+                        student_name = parsed
+                        debug_log("✅ Nome da fallback profilo:", student_name)
+                        break
+        
+        # PRIORITÀ D: Placeholder finale (NON username)
+        if not student_name:
+            # Costruisci placeholder descrittivo
+            if target_profile:
+                scuola = target_profile.get('desScuola', '')[:30]
+                if scuola:
+                    student_name = f"Studente - {scuola}"
+                elif student_class:
+                    student_name = f"Studente {student_class}"
+                else:
+                    student_name = f"Profilo {target_index + 1}"
+            else:
+                student_name = "Studente"
+            debug_log("⚠️ Nome non trovato - uso placeholder:", student_name)
+        
+        # 🔁 Aggiorna profiles_payload con dati validati (Bug #4)
         if profiles_payload:
             for p in profiles_payload:
                 if p["index"] == target_index:
-                    if dash_name and len(dash_name) > 3:
-                        p["name"] = dash_name
-                    if dash_class:
-                        p["class"] = dash_class
+                    if student_name and is_valid_name(student_name):
+                        p["name"] = student_name
+                    if student_class and CLASS_REGEX.match(student_class):
+                        p["class"] = student_class
                     break
+        
+        # ✅ Aggiorna anche target_profile per coerenza
+        if target_profile and student_name and is_valid_name(student_name):
+            if 'alunno' not in target_profile:
+                target_profile['alunno'] = {}
+            # Splitta per aggiornare cognome/nome separati
+            parts = student_name.strip().split(maxsplit=1)
+            if len(parts) == 2:
+                target_profile['alunno']['desCognome'] = parts[0]
+                target_profile['alunno']['desNome'] = parts[1]
 
-        # Sync Supabase
+        # Sync Supabase con dati VALIDATI
         if supabase:
             try:
-                # Normalizzazione rigorosa ID profilo
                 pid = f"{school.strip().upper()}:{username.strip().lower()}:{target_index}"
-                supabase.table("profiles").upsert({
-                    "id": pid, "name": student_name, "class": student_class, "last_active": datetime.now().isoformat()
-                }, on_conflict="id").execute()
-            except: pass
+                profile_update = {
+                    "id": pid,
+                    "name": student_name,
+                    "class": student_class,
+                    "last_active": datetime.now().isoformat()
+                }
+                supabase.table("profiles").upsert(profile_update, on_conflict="id").execute()
+                debug_log("✅ Profilo Supabase aggiornato:", profile_update)
+            except Exception as e:
+                debug_log("⚠️ Supabase profile update failed (non-fatal)", str(e))
 
         resp = {
             "success": True,
