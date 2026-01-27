@@ -1279,25 +1279,25 @@ def login():
         # 2. Gestione Profili
         profiles_payload = []
         if not fallback_mode and profiles:
-            if len(profiles) > 1:
-                for idx, p in enumerate(profiles):
-                    alunno = p.get('alunno', {})
-                    # Priorità 1: Dati diretti dal profilo
-                    nome = (alunno.get('desNome') or '').strip()
-                    cognome = (alunno.get('desCognome') or '').strip()
-                    
-                    if nome or cognome:
-                        nome_completo = f"{cognome} {nome}".strip().upper()
-                    else:
-                        # Fallback estremo se proprio non c'è nulla nel profilo
-                        nome_completo = f"Studente {idx + 1}"
-                    
-                    profiles_payload.append({
-                        "index": idx,
-                        "name": nome_completo,
-                        "school": p.get('desScuola', 'Scuola'),
-                        "class": p.get('desClasse', '')
-                    })
+            # costruisci SEMPRE il payload, anche se c'è un solo profilo
+            for idx, p in enumerate(profiles):
+                alunno = p.get('alunno', {}) or {}
+                # Priorità 1: Dati diretti dal profilo
+                nome = (alunno.get('desNome') or '').strip()
+                cognome = (alunno.get('desCognome') or '').strip()
+                
+                if nome or cognome:
+                    nome_completo = f"{cognome} {nome}".strip().upper()
+                else:
+                    # Fallback estremo se proprio non c'è nulla nel profilo
+                    nome_completo = f"Studente {idx + 1}"
+                
+                profiles_payload.append({
+                    "index": idx,
+                    "name": nome_completo,
+                    "school": p.get('desScuola', 'Scuola'),
+                    "class": p.get('desClasse', '')
+                })
 
         # Selezione Profilo
         target_index = int(selected_profile_index) if selected_profile_index is not None else 0
@@ -1355,6 +1355,16 @@ def login():
             debug_log(f"✅ Nome studente aggiornato da Dashboard: {student_name}")
         if dash_class:
             student_class = dash_class
+
+        # 🔁 Aggiorna anche il profilo selezionato nel payload, così il frontend vede il nome reale
+        if profiles_payload:
+            for p in profiles_payload:
+                if p["index"] == target_index:
+                    if dash_name and len(dash_name) > 3:
+                        p["name"] = dash_name
+                    if dash_class:
+                        p["class"] = dash_class
+                    break
 
         # Sync Supabase
         if supabase:

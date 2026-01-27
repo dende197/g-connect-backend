@@ -3703,7 +3703,7 @@
                     <input id="argo-school" placeholder="Codice Scuola" value="${localStorage.getItem('argo_school') || ''}">
                     <input id="argo-user" placeholder="Nome Utente">
                     <input type="password" id="argo-pass" placeholder="Password">
-                    <button onclick="performArgoSync()" class="btn-primary" style="width:100%; margin-top:10px;">Accedi e Sincronizza</button>
+                    <button id="login-btn" onclick="performArgoSync()" class="btn-primary" style="width:100%; margin-top:10px;">Accedi e Sincronizza</button>
                     <button onclick="closeModal()" style="width:100%; background:none; border:none; color:var(--text-muted); margin-top:12px; cursor:pointer;">Annulla</button>
                 </div>
             </div>`;
@@ -3780,11 +3780,16 @@
             const btn = document.getElementById('login-btn') ||
                 document.querySelector('.login-btn') ||
                 document.querySelector('#loginBtn') ||
-                document.querySelector('button[onclick*="performArgoSync"]');
-            if (btn) {
-                btn.innerText = txt;
-                btn.disabled = txt.toLowerCase().includes('... ');
+                document.querySelector('button[onclick*="performArgoSync"]') ||
+                document.querySelector('button[type="submit"]');
+
+            if (!btn) {
+                console.warn('setLoginBtnText: nessun bottone trovato, skip');
+                return;
             }
+
+            btn.innerText = txt;
+            btn.disabled = /\.\.\.|Connessione|Sincronizzazione/.test(txt);
         }
 
         function showBoot(msg) {
