@@ -19,85 +19,98 @@ def sb_headers():
 def sb_table_url(table: str):
     return f"{SUPABASE_URL}/rest/v1/{table}"
 
+from urllib.parse import unquote
+
 def register_planner_routes(app: Flask):
 
-    @app.get("/api/planner/<path:user_id>")
-    def get_planner(user_id):
-        try:
-            url = sb_table_url("planners")
-            params = {
-                "select": "user_id,planned_tasks,stress_levels,planned_details,updated_at",
-                "user_id": f"eq.{user_id}",
-                "order": "updated_at.desc",
-                "limit": "1"
-            }
-            r = requests.get(url, headers=sb_headers(), params=params, timeout=15)
-            if not r.ok:
-                return jsonify({"success": False, "error": r.text}), r.status_code
+    @app.route("/api/planner/<path:user_id>", methods=["GET", "PUT", "OPTIONS"])
+    def planner_manager(user_id):
+        if request.method == "OPTIONS":
+            return jsonify({"success": True}), 200
+            
+        user_id = unquote(user_id)
+        
+        # =========================
+        # GET → carica planner
+        # =========================
+        if request.method == "GET":
+            try:
+                url = sb_table_url("planner")
+                params = {
+                    "select": "user_id,planned_tasks,stress_levels,planned_details,updated_at",
+                    "user_id": f"eq.{user_id}",
+                    "order": "updated_at.desc",
+                    "limit": "1"
+                }
+                r = requests.get(url, headers=sb_headers(), params=params, timeout=15)
+                if not r.ok:
+                    return jsonify({"success": False, "error": r.text}), r.status_code
 
-            rows = r.json() or []
-            if not rows:
+                rows = r.json() or []
+                if not rows:
+                    return jsonify({
+                        "success": True,
+                        "data": {
+                            "userId": user_id,
+                            "plannedTasks": {},
+                            "stressLevels": {},
+                            "plannedDetails": {},
+                            "updatedAt": None
+                        }
+                    })
+
+                row = rows[0]
                 return jsonify({
                     "success": True,
                     "data": {
-                        "userId": user_id,
-                        "plannedTasks": {},
-                        "stressLevels": {},
-                        "plannedDetails": {},
-                        "updatedAt": None
+                        "userId": row.get("user_id"),
+                        "plannedTasks": row.get("planned_tasks") or {},
+                        "stressLevels": row.get("stress_levels") or {},
+                        "plannedDetails": row.get("planned_details") or {},
+                        "updatedAt": row.get("updated_at"),
                     }
                 })
+            except Exception as e:
+                return jsonify({"success": False, "error": str(e)}), 500
 
-            row = rows[0]
-            return jsonify({
-                "success": True,
-                "data": {
-                    "userId": row.get("user_id"),
-                    "plannedTasks": row.get("planned_tasks") or {},
-                    "stressLevels": row.get("stress_levels") or {},
-                    "plannedDetails": row.get("planned_details") or {},
-                    "updatedAt": row.get("updated_at"),
+        # =========================
+        # PUT → salva planner
+        # =========================
+        if request.method == "PUT":
+            try:
+                body = request.get_json(force=True) or {}
+                planned_tasks = body.get("plannedTasks", {}) or {}
+                stress_levels = body.get("stressLevels", {}) or {}
+                planned_details = body.get("plannedDetails", {}) or {}
+
+                payload = {
+                    "user_id": user_id,
+                    "planned_tasks": planned_tasks,
+                    "stress_levels": stress_levels,
+                    "planned_details": planned_details,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
                 }
-            })
-        except Exception as e:
-            return jsonify({"success": False, "error": str(e)}), 500
 
-    @app.put("/api/planner/<path:user_id>")
-    def put_planner(user_id):
-        try:
-            body = request.get_json(force=True) or {}
-            planned_tasks = body.get("plannedTasks", {}) or {}
-            stress_levels = body.get("stressLevels", {}) or {}
-            planned_details = body.get("plannedDetails", {}) or {}
+                url = f"{sb_table_url('planner')}?on_conflict=user_id"
+                headers = sb_headers()
+                headers["Prefer"] = "resolution=merge-duplicates,return=representation"
 
-            payload = {
-                "user_id": user_id,
-                "planned_tasks": planned_tasks,
-                "stress_levels": stress_levels,
-                "planned_details": planned_details,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
+                r = requests.post(url, headers=headers, json=payload, timeout=15)
+                if not r.ok:
+                    return jsonify({"success": False, "error": r.text}), r.status_code
 
-            url = f"{sb_table_url('planners')}?on_conflict=user_id"
-            headers = sb_headers()
-            headers["Prefer"] = "resolution=merge-duplicates,return=representation"
+                rows = r.json() or []
+                row = rows[0] if rows else payload
 
-            r = requests.post(url, headers=headers, json=payload, timeout=15)
-            if not r.ok:
-                return jsonify({"success": False, "error": r.text}), r.status_code
-
-            rows = r.json() or []
-            row = rows[0] if rows else payload
-
-            return jsonify({
-                "success": True,
-                "data": {
-                    "userId": row.get("user_id", user_id),
-                    "plannedTasks": row.get("planned_tasks", planned_tasks),
-                    "stressLevels": row.get("stress_levels", stress_levels),
-                    "plannedDetails": row.get("planned_details", planned_details),
-                    "updatedAt": row.get("updated_at"),
-                }
-            })
-        except Exception as e:
-            return jsonify({"success": False, "error": str(e)}), 500
+                return jsonify({
+                    "success": True,
+                    "data": {
+                        "userId": row.get("user_id", user_id),
+                        "plannedTasks": row.get("planned_tasks", planned_tasks),
+                        "stressLevels": row.get("stress_levels", stress_levels),
+                        "plannedDetails": row.get("planned_details", planned_details),
+                        "updatedAt": row.get("updated_at"),
+                    }
+                })
+            except Exception as e:
+                return jsonify({"success": False, "error": str(e)}), 500
