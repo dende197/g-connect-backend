@@ -144,11 +144,16 @@ def looks_like_subject(text: str) -> bool:
     s = text.strip().upper()
     return any(tok in s for tok in SUBJECT_TOKENS)
 
-def extract_identity_from_profile(profile: dict):
+def extract_student_identity_from_profile(profile: dict):
     """
     Robust identity extractor from Argo 'profile' objects.
     Returns (name_upper, class_upper) or (None, None) if not found.
     Only uses API profile data; does not touch dashboard.
+    
+    Looks for name/cognome in multiple key variants:
+    - profile['alunno'] dict: desNome/nome, desCognome/cognome
+    - Direct fields on profile: desNome/nome, desCognome/cognome
+    - Single string field (desAlunno) with "COGNOME NOME" format
     """
     if not isinstance(profile, dict):
         return None, None
@@ -165,14 +170,33 @@ def extract_identity_from_profile(profile: dict):
     if not isinstance(alunno_obj, dict):
         alunno_obj = {}
 
+    # Try extracting from alunno object first
     nome = (alunno_obj.get('desNome') or alunno_obj.get('nome') or '').strip()
     cognome = (alunno_obj.get('desCognome') or alunno_obj.get('cognome') or '').strip()
+    
+    # Fallback: try direct fields on profile
+    if not nome:
+        nome = (profile.get('desNome') or profile.get('nome') or '').strip()
+    if not cognome:
+        cognome = (profile.get('desCognome') or profile.get('cognome') or '').strip()
 
     name_upper = None
     if nome or cognome:
         name_upper = f"{(cognome or '').strip()} {(nome or '').strip()}".strip().upper()
+        # Remove extra spaces
+        name_upper = ' '.join(name_upper.split()) if name_upper else None
+    
+    # If still no name, try parsing a single string field (e.g., desAlunno)
+    if not name_upper:
+        single_name = (profile.get('desAlunno') or profile.get('alunnoNome') or '').strip()
+        if single_name:
+            # Only parse if it looks like "COGNOME NOME" (uppercase, two alpha tokens)
+            if single_name.isupper() and not looks_like_subject(single_name):
+                parts = single_name.split()
+                if len(parts) == 2 and all(p.isalpha() and len(p) >= 2 for p in parts):
+                    name_upper = single_name.upper()
 
-    # Class may live at profile root in Argo
+    # Class extraction: prefer desClasse, fallback to other variants
     cls_raw = (
         profile.get('desClasse')
         or profile.get('classe')
@@ -183,10 +207,76 @@ def extract_identity_from_profile(profile: dict):
         or ''
     )
     cls_upper = str(cls_raw).strip().upper()
+    # Validate with regex ^[1-5][A-Z]$
     if not CLASS_REGEX.match(cls_upper):
         cls_upper = None
 
     return name_upper, cls_upper
+
+def extract_student_identity_from_dashboard_alunno(dashboard_data: dict):
+    """
+    Safe fallback: extracts student identity from dashboard alunno block only.
+    Returns (name_upper, class_upper) or (None, None) if not found.
+    
+    Visits data.dati[*] and reads block['alunno'] dict only; never parses arbitrary strings.
+    Extracts name/cognome (desNome/nome, desCognome/cognome) and class (desClasse/classe).
+    """
+    if not isinstance(dashboard_data, dict):
+        return None, None
+    
+    try:
+        # Navigate to dati list
+        data_obj = dashboard_data.get('data', {})
+        dati_list = data_obj.get('dati', []) if isinstance(data_obj, dict) else []
+        
+        # Fallback: check if 'dati' is at root
+        if not dati_list and 'dati' in dashboard_data:
+            dati_list = dashboard_data.get('dati', [])
+        
+        if not dati_list:
+            return None, None
+        
+        # Iterate through dati blocks looking for alunno
+        for block in dati_list:
+            if not isinstance(block, dict):
+                continue
+            
+            alunno = block.get('alunno')
+            if not isinstance(alunno, dict):
+                continue
+            
+            # Extract name from alunno dict
+            nome = (alunno.get('desNome') or alunno.get('nome') or '').strip()
+            cognome = (alunno.get('desCognome') or alunno.get('cognome') or '').strip()
+            
+            name_upper = None
+            if nome or cognome:
+                name_upper = f"{(cognome or '').strip()} {(nome or '').strip()}".strip().upper()
+                # Remove extra spaces
+                name_upper = ' '.join(name_upper.split()) if name_upper else None
+            
+            # Extract class
+            cls_raw = (alunno.get('desClasse') or alunno.get('classe') or '').strip()
+            cls_upper = str(cls_raw).strip().upper() if cls_raw else None
+            
+            # Validate class with regex
+            if cls_upper and not CLASS_REGEX.match(cls_upper):
+                cls_upper = None
+            
+            # If we found a name, return it
+            if name_upper:
+                return name_upper, cls_upper
+        
+        return None, None
+        
+    except Exception as e:
+        debug_log("⚠️ Error extracting identity from dashboard alunno", str(e))
+        return None, None
+
+# Keep the old function name as an alias for backward compatibility
+def extract_identity_from_profile(profile: dict):
+    """Legacy function name, calls the new robust extractor."""
+    return extract_student_identity_from_profile(profile)
 
 def parse_display_name(text: str):
     """
@@ -1212,16 +1302,20 @@ def login():
             login_result = AdvancedArgo.raw_login(school, username, password)
             access_token = login_result['access_token']
             profiles = login_result['profiles']
+            debug_log("✅ Raw Login Success", {
+                "profiles_count": len(profiles),
+                "profile_keys": [list(p.keys())[:5] for p in profiles[:2]] if profiles else []
+            })
         except Exception as e:
             debug_log(f"⚠️ Advanced Login Fallito: {str(e)}")
             fallback_mode = True
 
-        # 2. Gestione Profili (SOLO PROFILO API) (Bug #9)
+        # 2. Gestione Profili - usando robust identity extraction
         profiles_payload = []
         if not fallback_mode and profiles:
-            # Build selection list strictly from profile API
+            # Build selection list strictly from profile API using robust extractor
             for idx, p in enumerate(profiles):
-                n, c = extract_identity_from_profile(p)
+                n, c = extract_student_identity_from_profile(p)
                 # Name fallback (rare): if alunno is missing in this profile
                 nome_completo = n or f"Studente {idx + 1}"
                 profiles_payload.append({
@@ -1244,6 +1338,14 @@ def login():
                  target_index = 0
                  target_profile = profiles[0]
                  auth_token = target_profile.get('token')
+        
+        # Log selected profile and tokens for debugging
+        if target_profile:
+            debug_log("🎯 Target Profile Selected", {
+                "index": target_index,
+                "has_token": bool(auth_token),
+                "token_preview": auth_token[:20] + "..." if auth_token else None
+            })
         
         if fallback_mode or not access_token or not auth_token:
             temp_argo = argofamiglia.ArgoFamiglia(school, username, password)
@@ -1270,11 +1372,12 @@ def login():
         except: pass
             
         # ============================================================
-        # 4) DETERMINAZIONE NOME STUDENTE - SOLO PROFILO API
+        # 4) DETERMINAZIONE NOME STUDENTE - ROBUST EXTRACTION
         # ============================================================
         student_name = None
         student_class = None
 
+        # Step 1: Try extracting from target_profile first (primary source)
         if target_profile:
             debug_log("🔍 TARGET PROFILE (raw):", {
                 "keys": list(target_profile.keys()),
@@ -1282,25 +1385,52 @@ def login():
                 "desClasse": target_profile.get("desClasse"),
                 "desScuola": target_profile.get("desScuola"),
             })
-            name_upper, class_upper = extract_identity_from_profile(target_profile)
+            name_upper, class_upper = extract_student_identity_from_profile(target_profile)
+            
             if name_upper:
                 student_name = name_upper
-                debug_log("✅ Nome studente (profilo API):", student_name)
+                debug_log("✅ Nome studente estratto dal profilo API:", student_name)
             else:
-                debug_log("⚠️ Nome non trovato nel profilo API; verrà usato fallback")
+                debug_log("⚠️ Nome non trovato nel profilo API; tentativo fallback dashboard")
 
             if class_upper:
                 student_class = class_upper
-                debug_log("✅ Classe studente (profilo API):", student_class)
+                debug_log("✅ Classe studente estratta dal profilo API:", student_class)
             else:
                 debug_log("⚠️ Classe non trovata/valida nel profilo API")
 
-        # Fallback se non c'è profilo (es. fallback_mode) o dati mancanti
+        # Step 2: Dashboard fallback if name or class still missing
+        if (not student_name or not student_class) and auth_token and access_token:
+            debug_log("🔄 Attempting dashboard fallback for missing identity")
+            try:
+                # Create a session with the correct auth token for the selected profile
+                argo_identity = create_session(school, username, password, access_token, auth_token)
+                dashboard_identity = argo_identity.get_full_dashboard()
+                
+                if dashboard_identity:
+                    debug_log("📊 Dashboard data retrieved for identity fallback")
+                    fallback_name, fallback_class = extract_student_identity_from_dashboard_alunno(dashboard_identity)
+                    
+                    if fallback_name and not student_name:
+                        student_name = fallback_name
+                        debug_log("✅ Nome studente estratto da dashboard alunno:", student_name)
+                    
+                    if fallback_class and not student_class:
+                        student_class = fallback_class
+                        debug_log("✅ Classe studente estratta da dashboard alunno:", student_class)
+            except Exception as e:
+                debug_log("⚠️ Dashboard fallback failed", str(e))
+
+        # Step 3: Final fallback to safe defaults
         if not student_name:
             student_name = "Studente"
+            debug_log("⚠️ Using final fallback name: Studente")
         if not student_class:
             student_class = "N/D"
+            debug_log("⚠️ Using final fallback class: N/D")
 
+        debug_log("📝 Final Identity", {"name": student_name, "class": student_class})
+        
         # ============================================================
         # Fine determinazione nome studente
         # ============================================================
