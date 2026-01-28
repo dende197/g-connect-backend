@@ -144,49 +144,42 @@ def looks_like_subject(text: str) -> bool:
     s = text.strip().upper()
     return any(tok in s for tok in SUBJECT_TOKENS)
 
-def extract_identity_from_profile(profile: dict):
+def extract_student_identity_from_profile(profile: dict):
     """
-    Robust identity extractor from Argo 'profile' objects.
-    Returns (name_upper, class_upper) or (None, None) if not found.
-    Only uses API profile data; does not touch dashboard.
+    Robust identity extraction from a DidUP 'Famiglia' profile dict.
+    Returns (name, class) if found, else (None, None).
+    - Name: uses alunno.desCognome + alunno.desNome (or cognome/nome), normalized 'COGNOME NOME'
+    - Class: uses desClasse (or classe), validated ^[1-5][A-Z]$
     """
-    if not isinstance(profile, dict):
+    try:
+        if not isinstance(profile, dict):
+            return None, None
+
+        # Prefer nested 'alunno'
+        al = profile.get('alunno', {}) if isinstance(profile.get('alunno'), dict) else {}
+        nome = (al.get('desNome') or al.get('nome') or '').strip()
+        cognome = (al.get('desCognome') or al.get('cognome') or '').strip()
+
+        # Fallback direct fields on profile if somehow alunno is missing
+        if not (nome and cognome):
+            nome = (profile.get('desNome') or profile.get('nome') or nome).strip()
+            cognome = (profile.get('desCognome') or profile.get('cognome') or cognome).strip()
+
+        name = None
+        if nome and cognome:
+            name = f"{cognome} {nome}".strip().upper()
+
+        # Class extraction (prefer desClasse)
+        cls_raw = profile.get('desClasse') or profile.get('classe') or ''
+        cls = None
+        if isinstance(cls_raw, str):
+            c = cls_raw.strip().upper()
+            if CLASS_REGEX.match(c):
+                cls = c
+
+        return name, cls
+    except Exception:
         return None, None
-
-    # Find the anagraphic object (dict or first element in a list)
-    alunno_obj = (
-        profile.get('alunno')
-        or profile.get('anagrafe')
-        or profile.get('anagrafica')
-        or None
-    )
-    if isinstance(alunno_obj, list) and alunno_obj:
-        alunno_obj = alunno_obj[0]
-    if not isinstance(alunno_obj, dict):
-        alunno_obj = {}
-
-    nome = (alunno_obj.get('desNome') or alunno_obj.get('nome') or '').strip()
-    cognome = (alunno_obj.get('desCognome') or alunno_obj.get('cognome') or '').strip()
-
-    name_upper = None
-    if nome or cognome:
-        name_upper = f"{(cognome or '').strip()} {(nome or '').strip()}".strip().upper()
-
-    # Class may live at profile root in Argo
-    cls_raw = (
-        profile.get('desClasse')
-        or profile.get('classe')
-        or profile.get('class')
-        or profile.get('className')
-        or profile.get('desDenominazione')
-        or profile.get('denominazione')
-        or ''
-    )
-    cls_upper = str(cls_raw).strip().upper()
-    if not CLASS_REGEX.match(cls_upper):
-        cls_upper = None
-
-    return name_upper, cls_upper
 
 def parse_display_name(text: str):
     """
@@ -1221,14 +1214,12 @@ def login():
         if not fallback_mode and profiles:
             # Build selection list strictly from profile API
             for idx, p in enumerate(profiles):
-                n, c = extract_identity_from_profile(p)
-                # Name fallback (rare): if alunno is missing in this profile
-                nome_completo = n or f"Studente {idx + 1}"
+                p_name, p_class = extract_student_identity_from_profile(p)
                 profiles_payload.append({
                     "index": idx,
-                    "name": nome_completo,
+                    "name": p_name or f"Studente {idx+1}",
                     "school": p.get('desScuola', 'Scuola'),
-                    "class": c or (p.get('desClasse') or '')
+                    "class": p_class or ""
                 })
                 debug_log(f"📋 Profilo {idx} costruito:", profiles_payload[-1])
 
@@ -1270,42 +1261,28 @@ def login():
         except: pass
             
         # ============================================================
-        # 4) DETERMINAZIONE NOME STUDENTE - SOLO PROFILO API
+        # 4. DETERMINAZIONE NOME STUDENTE - SOLO PROFILO API
         # ============================================================
         student_name = None
         student_class = None
 
+        # ✅ Use selected target_profile as the single source of truth
         if target_profile:
-            debug_log("🔍 TARGET PROFILE (raw):", {
-                "keys": list(target_profile.keys()),
-                "has_alunno": isinstance(target_profile.get("alunno"), (dict, list)),
-                "desClasse": target_profile.get("desClasse"),
-                "desScuola": target_profile.get("desScuola"),
-            })
-            name_upper, class_upper = extract_identity_from_profile(target_profile)
-            if name_upper:
-                student_name = name_upper
-                debug_log("✅ Nome studente (profilo API):", student_name)
-            else:
-                debug_log("⚠️ Nome non trovato nel profilo API; verrà usato fallback")
+            student_name, student_class = extract_student_identity_from_profile(target_profile)
+            debug_log("✅ Identità (profilo API):", {"name": student_name, "class": student_class})
+        else:
+            debug_log("⚠️ Nessun target_profile selezionato")
 
-            if class_upper:
-                student_class = class_upper
-                debug_log("✅ Classe studente (profilo API):", student_class)
-            else:
-                debug_log("⚠️ Classe non trovata/valida nel profilo API")
-
-        # Fallback se non c'è profilo (es. fallback_mode) o dati mancanti
+        # ✅ Safe fallback ONLY if profile lacks data
         if not student_name:
             student_name = "Studente"
-        if not student_class:
-            student_class = "N/D"
+            debug_log("⚠️ Fallback: nome generico usato (mancano dati nel profilo)")
 
-        # ============================================================
-        # Fine determinazione nome studente
-        # ============================================================
-        
-        # Sync Supabase (ID normalizzato e coerente)
+        # If class is missing, keep None or a safe default; do not guess from dashboard
+        if not student_class:
+            debug_log("ℹ️ Classe non disponibile nel profilo (lasciata vuota)")
+
+        # Sync Supabase (normalized id)
         if supabase:
             try:
                 pid = f"{school.strip().upper()}:{username.strip().lower()}:{target_index}"
@@ -1315,20 +1292,30 @@ def login():
                     "class": student_class,
                     "last_active": datetime.now().isoformat()
                 }, on_conflict="id").execute()
-                debug_log("✅ Profilo Supabase aggiornato:", pid)
-            except Exception as e_prof:
-                debug_log("⚠️ Supabase profile upsert error (non-fatal)", str(e_prof))
+                debug_log("👤 Supabase profile upserted", {"id": pid, "name": student_name, "class": student_class})
+            except Exception as e:
+                debug_log("⚠️ Supabase upsert profile failed", str(e))
 
         resp = {
             "success": True,
-            "session": {"schoolCode": school, "authToken": auth_token, "accessToken": access_token, "userName": username, "profileIndex": target_index},
-            "student": {"name": student_name, "class": student_class, "school": school},
+            "session": {
+                "schoolCode": school,
+                "authToken": auth_token,
+                "accessToken": access_token,
+                "userName": username,
+                "profileIndex": target_index
+            },
+            "student": {
+                "name": student_name,
+                "class": student_class,
+                "school": school
+            },
             "tasks": tasks_data,
             "voti": grades_data,
             "promemoria": announcements_data
         }
-        
-        # ✅ Include profilo selezionato per la PWA
+
+        # Provide selectedProfile details (optional, helpful for PWA)
         if target_profile:
             resp["selectedProfile"] = {
                 "index": target_index,
@@ -1338,8 +1325,9 @@ def login():
                 "name": student_name,
                 "raw": target_profile
             }
-            
-        if profiles_payload and selected_profile_index is None:
+
+        # If multiple profiles and no index chosen, build an accurate selection list
+        if profiles and selected_profile_index is None:
             resp["status"] = "MULTIPLE_PROFILES"
             resp["profiles"] = profiles_payload
         
