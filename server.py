@@ -9,23 +9,17 @@ import secrets
 import re
 import base64
 from hashlib import sha256
-from datetime import datetime
-
+from urllib.parse import unquote
 from planner_routes import register_planner_routes
 
 # CREA UNA SOLA ISTANZA DI FLASK
 app = Flask(__name__)
 
 # CORS: configura una sola volta con i domini corretti
-CORS(app, origins=[
-    "https://*.netlify.app",
-    "http://127.0.0.1:*",
-    "http://localhost:*",
-    "*"
-])
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # REGISTRA LE ROUTE DEL PLANNER SULL'ISTANZA 'app'
-register_planner_routes(app)
+# register_planner_routes(app)
 
 # ✅ NEW: Supabase
 from supabase import create_client, Client
@@ -1490,6 +1484,69 @@ def debug_dashboard():
         }), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/planner/<profile_id>", methods=["GET", "POST", "OPTIONS"])
+def planner(profile_id):
+    # --- CORS preflight ---
+    if request.method == "OPTIONS":
+        return jsonify({"success": True}), 200
+
+    # decode SG20925%3Acinqueanna%3A0 -> SG20925:cinqueanna:0
+    profile_id = unquote(profile_id)
+
+    if not supabase:
+        return jsonify({"success": False, "error": "Supabase non inizializzato"}), 500
+
+    # =========================
+    # GET → carica planner
+    # =========================
+    if request.method == "GET":
+        try:
+            res = supabase.table("planner").select("*").eq("profile_id", profile_id).execute()
+            if res.data and len(res.data) > 0:
+                return jsonify({
+                    "success": True,
+                    "tasks": res.data[0].get("tasks", []),
+                    "updated_at": res.data[0].get("updated_at")
+                }), 200
+            else:
+                return jsonify({
+                    "success": True,
+                    "tasks": [],
+                    "updated_at": None
+                }), 200
+        except Exception as e:
+            debug_log("❌ Planner GET error", str(e))
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    # =========================
+    # POST → salva planner
+    # =========================
+    if request.method == "POST":
+        try:
+            payload = request.json or {}
+            tasks = payload.get("tasks", [])
+
+            supabase.table("planner").upsert({
+                "profile_id": profile_id,
+                "tasks": tasks,
+                "updated_at": datetime.now().isoformat()
+            }, on_conflict="profile_id").execute()
+
+            debug_log("✅ Planner salvato su Supabase", {
+                "profile_id": profile_id,
+                "tasks_count": len(tasks)
+            })
+
+            return jsonify({
+                "success": True,
+                "tasksCount": len(tasks)
+            }), 200
+
+        except Exception as e:
+            debug_log("❌ Planner POST error", str(e))
+            return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/')
