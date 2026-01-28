@@ -100,10 +100,23 @@ CLASS_REGEX = re.compile(r"^[1-5][A-Z]$")
 
 # Materie e parole scolastiche comuni: evita di trattarle come "COGNOME NOME" (Bug #1)
 SUBJECT_TOKENS = {
+    # Materie principali
     "ITALIANO","INGLESE","STORIA","GEOGRAFIA","FILOSOFIA","MATEMATICA","SCIENZE","BIOLOGIA",
     "FISICA","ARTE","DISEGNO","RELIGIONE","RELIGIOSA","EDUCAZIONE","MUSICA","TECNOLOGIE",
-    "TECNOLOGIA","TRIENNIO","BIENNIO","SCIENZE NATURALI","SCIENZE UMANE","STORIA E GEOGRAFIA",
-    "DISEGNO E STORIA DELL'ARTE","INFORMATICA","CHIMICA"
+    "TECNOLOGIA","INFORMATICA","CHIMICA","LATINO","GRECO","FRANCESE","SPAGNOLO","TEDESCO",
+    
+    # Livelli scolastici
+    "TRIENNIO","BIENNIO","PRIMO","SECONDO","TERZO","QUARTO","QUINTO",
+    
+    # Periodi scolastici (CRITICO: evita "PRIMO QUADRIMESTRE", "SECONDO TRIMESTRE", etc)
+    "QUADRIMESTRE","TRIMESTRE","PENTAMESTRE","SCRUTINIO","SCRUTINI","PERIODO",
+    
+    # Materie composite
+    "SCIENZE NATURALI","SCIENZE UMANE","STORIA E GEOGRAFIA",
+    "DISEGNO E STORIA DELL'ARTE","EDUCAZIONE FISICA","EDUCAZIONE CIVICA",
+    
+    # Altro contesto scolastico
+    "VALUTAZIONE","VALUTAZIONI","ASSENZE","ASSENZA","VOTI","VOTO"
 }
 
 SCHOOL_TOKENS = {
@@ -117,6 +130,9 @@ def is_valid_name(name):
     Deve avere almeno 2 parole, tutte alfabetiche, min 2 caratteri ciascuna.
     """
     if not name or not isinstance(name, str):
+        return False
+    # ✅ Escludi stringhe che sembrano materie/periodi scolastici (Hotfix "PRIMO QUADRIMESTRE")
+    if looks_like_subject(name):
         return False
     parts = name.strip().upper().split()
     return len(parts) >= 2 and all(p.isalpha() and len(p) >= 2 for p in parts)
@@ -736,12 +752,25 @@ def extract_student_from_dashboard(dashboard_data):
     """
     import re
 
-    # Materie e parole scolastiche comuni: evita di trattarle come "COGNOME NOME"
+    # ✅ Estende SUBJECT_TOKENS con livelli e periodi (Hotfix "PRIMO QUADRIMESTRE")
     SUBJECT_TOKENS = {
+        # Materie principali
         "ITALIANO","INGLESE","STORIA","GEOGRAFIA","FILOSOFIA","MATEMATICA","SCIENZE","BIOLOGIA",
         "FISICA","ARTE","DISEGNO","RELIGIONE","RELIGIOSA","EDUCAZIONE","MUSICA","TECNOLOGIE",
-        "TECNOLOGIA","TRIENNIO","BIENNIO","SCIENZE NATURALI","SCIENZE UMANE","STORIA E GEOGRAFIA",
-        "DISEGNO E STORIA DELL'ARTE","INFORMATICA","CHIMICA"
+        "TECNOLOGIA","INFORMATICA","CHIMICA","LATINO","GRECO","FRANCESE","SPAGNOLO","TEDESCO",
+        
+        # Livelli scolastici
+        "TRIENNIO","BIENNIO","PRIMO","SECONDO","TERZO","QUARTO","QUINTO",
+        
+        # Periodi scolastici
+        "QUADRIMESTRE","TRIMESTRE","PENTAMESTRE","SCRUTINIO","SCRUTINI","PERIODO",
+        
+        # Materie composite
+        "SCIENZE NATURALI","SCIENZE UMANE","STORIA E GEOGRAFIA",
+        "DISEGNO E STORIA DELL'ARTE","EDUCAZIONE FISICA","EDUCAZIONE CIVICA",
+        
+        # Altro contesto scolastico
+        "VALUTAZIONE","VALUTAZIONI","ASSENZE","ASSENZA","VOTI","VOTO"
     }
 
     SCHOOL_TOKENS = {
