@@ -16,7 +16,8 @@ from planner_routes import register_planner_routes
 app = Flask(__name__)
 
 # CORS: configura una sola volta con i domini corretti
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# ✅ FIX 1: CORS PER TUTTE LE ROTTE (Non solo /api/*)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # REGISTRA LE ROUTE DEL PLANNER SULL'ISTANZA 'app'
 register_planner_routes(app)
@@ -430,6 +431,21 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
             return res.json()
         except Exception as e:
             debug_log("⚠️ Errore Full Dashboard", str(e))
+            return {}
+
+    # ✅ FIX 2: SCHEDA ALUNNO API
+    # Questa è l'unica chiamata che garantisce i dati corretti per il profilo selezionato
+    def get_scheda(self):
+        try:
+            # Endpoint ufficiale per i dettagli anagrafici
+            res = requests.post(
+                argofamiglia.CONSTANTS.ENDPOINT + "scheda", 
+                headers=self._ArgoFamiglia__headers, 
+                json={"opzioni": "{}"}
+            )
+            return res.json()
+        except Exception as e:
+            debug_log("❌ Errore get_scheda", str(e))
             return {}
 
 # ============= STRATEGIE ESTRAZIONE VOTI =============
@@ -1255,26 +1271,50 @@ def login():
         except: pass
             
         # ============================================================
-        # 4. DETERMINAZIONE NOME STUDENTE - SOLO PROFILO API
+        # 4. DETERMINAZIONE NOME STUDENTE - FONTE AUTORITATIVA /scheda
         # ============================================================
         student_name = None
         student_class = None
 
-        # ✅ Use selected target_profile as the single source of truth
-        if target_profile:
-            student_name, student_class = extract_student_identity_from_profile(target_profile)
-            debug_log("✅ Identità (profilo API):", {"name": student_name, "class": student_class})
-        else:
-            debug_log("⚠️ Nessun target_profile selezionato")
+        # ✅ FIX 3: IDENTITY VIA /scheda
+        # Chiamiamo la scheda dettagliata (fonte più affidabile della lista profili)
+        try:
+            # Usiamo la sessione appena creata (argo_voti) per recuperare la scheda
+            scheda_data = argo_voti.get_scheda()
+            if scheda_data and 'dati' in scheda_data and len(scheda_data['dati']) > 0:
+                dati_alunno = scheda_data['dati'][0].get('alunno', {})
+                dati_generali = scheda_data['dati'][0]
+                
+                cognome_s = dati_alunno.get('desCognome', '').strip()
+                nome_s = dati_alunno.get('desNome', '').strip()
+                if cognome_s and nome_s:
+                    student_name = f"{cognome_s} {nome_s}".strip().upper()
+                
+                # Classe: cerca in vari campi della scheda
+                cls_s = dati_generali.get('desClasse') or dati_generali.get('desDenominazioneClasse')
+                if cls_s:
+                    student_class = str(cls_s).strip().upper()
+                
+                debug_log(f"✅ IDENTITÀ ESTRATTA DA SCHEDA: {student_name} - {student_class}")
+        except Exception as e:
+            debug_log("⚠️ Errore estrazione scheda", str(e))
 
-        # ✅ Safe fallback ONLY if profile lacks data
+        # ✅ FALLBACK: Se la scheda fallisce, usa i dati del profilo dalla lista login
+        if not student_name and target_profile:
+            p_name, p_class = extract_student_identity_from_profile(target_profile)
+            student_name = p_name
+            if not student_class:
+                student_class = p_class
+            debug_log("⚠️ Fallback: identità recuperata da profilo API (scheda fallita)")
+
+        # ✅ Placeholder finale se nulla ha funzionato
         if not student_name:
             student_name = "Studente"
-            debug_log("⚠️ Fallback: nome generico usato (mancano dati nel profilo)")
-
-        # If class is missing, keep None or a safe default; do not guess from dashboard
+            debug_log("⚠️ Fallback Estremo: nome generico usato")
+        
         if not student_class:
-            debug_log("ℹ️ Classe non disponibile nel profilo (lasciata vuota)")
+            student_class = "N/D"
+            debug_log("ℹ️ Classe non trovata (lasciata N/D)")
 
         # Sync Supabase (normalized id)
         if supabase:
@@ -1430,12 +1470,28 @@ def sync_data():
         except:
              pass
 
-        # ✅ NEW: Update Profile Activity in Supabase during Sync
+        # ✅ NEW: Update Profile Identity via /scheda during Sync
         if supabase:
             try:
+                scheda_s = argo_voti.get_scheda()
+                s_name = None
+                s_class = None
+                if scheda_s and 'dati' in scheda_s and len(scheda_s['dati']) > 0:
+                    al_s = scheda_s['dati'][0].get('alunno', {})
+                    cog_s = al_s.get('desCognome', '').strip()
+                    nom_s = al_s.get('desNome', '').strip()
+                    if cog_s and nom_s: 
+                        s_name = f"{cog_s} {nom_s}".upper()
+                    
+                    s_class = scheda_s['dati'][0].get('desClasse') or scheda_s['dati'][0].get('desDenominazioneClasse')
+
                 profile_id = f"{school.strip().upper()}:{user.strip().lower()}:{profile_index}"
-                supabase.table("profiles").update({"last_active": datetime.now().isoformat()}).eq("id", profile_id).execute()
-                debug_log(f"👤 Profile activity updated: {profile_id}")
+                update_payload = {"last_active": datetime.now().isoformat()}
+                if s_name: update_payload["name"] = s_name
+                if s_class: update_payload["class"] = s_class
+                
+                supabase.table("profiles").update(update_payload).eq("id", profile_id).execute()
+                debug_log(f"👤 Profile sync updated: {profile_id}", update_payload)
             except Exception as e_sync_prof:
                 debug_log("⚠️ Profile sync update failed (non-fatal)", str(e_sync_prof))
         
