@@ -1486,13 +1486,11 @@ def debug_dashboard():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route("/api/planner/<profile_id>", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/planner/<profile_id>", methods=["GET", "PUT", "OPTIONS"])
 def planner(profile_id):
-    # --- CORS preflight ---
     if request.method == "OPTIONS":
         return jsonify({"success": True}), 200
 
-    # decode SG20925%3Acinqueanna%3A0 -> SG20925:cinqueanna:0
     profile_id = unquote(profile_id)
 
     if not supabase:
@@ -1521,9 +1519,9 @@ def planner(profile_id):
             return jsonify({"success": False, "error": str(e)}), 500
 
     # =========================
-    # POST → salva planner
+    # PUT → salva planner
     # =========================
-    if request.method == "POST":
+    if request.method == "PUT":
         try:
             payload = request.json or {}
             tasks = payload.get("tasks", [])
@@ -1545,7 +1543,7 @@ def planner(profile_id):
             }), 200
 
         except Exception as e:
-            debug_log("❌ Planner POST error", str(e))
+            debug_log("❌ Planner PUT error", str(e))
             return jsonify({"success": False, "error": str(e)}), 500
 
 
