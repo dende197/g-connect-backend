@@ -1175,8 +1175,17 @@ def login():
         # 2. Gestione Profili CON VALIDAZIONE (Bug #9)
         profiles_payload = []
         if not fallback_mode and profiles:
+            debug_log(f"📋 Building profiles_payload from {len(profiles)} profiles")
             for idx, p in enumerate(profiles):
                 alunno = p.get('alunno', {}) or {}
+                
+                # Debug: log raw profile data for this profile
+                debug_log(f"Profile {idx} raw data:", {
+                    "alunno.desNome": alunno.get('desNome'),
+                    "alunno.desCognome": alunno.get('desCognome'),
+                    "desClasse": p.get('desClasse'),
+                    "desScuola": p.get('desScuola')
+                })
                 
                 # Estrai nome/cognome
                 nome = (alunno.get('desNome') or '').strip()
@@ -1214,7 +1223,7 @@ def login():
                     "school": p.get('desScuola', 'Scuola'),
                     "class": classe_valida
                 })
-                debug_log(f"📋 Profilo {idx} costruito:", profiles_payload[-1])
+                debug_log(f"✅ Profilo {idx} costruito:", profiles_payload[-1])
 
         # Selezione Profilo
         target_index = int(selected_profile_index) if selected_profile_index is not None else 0
@@ -1228,6 +1237,14 @@ def login():
                  target_index = 0
                  target_profile = profiles[0]
                  auth_token = target_profile.get('token')
+            
+            # Debug: Log raw target_profile content
+            debug_log(f"🎯 Target Profile (index={target_index}):", {
+                "alunno": target_profile.get('alunno', {}),
+                "desClasse": target_profile.get('desClasse'),
+                "desScuola": target_profile.get('desScuola'),
+                "all_keys": list(target_profile.keys()) if target_profile else []
+            })
         
         if fallback_mode or not access_token or not auth_token:
             temp_argo = argofamiglia.ArgoFamiglia(school, username, password)
@@ -1264,18 +1281,32 @@ def login():
         
         if target_profile:
             # Estrai nome/cognome dall'oggetto alunno del profilo
-            alunno_obj = target_profile.get('alunno', {})
+            alunno_obj = target_profile.get('alunno', {}) or {}
+            
+            debug_log("📝 Extracting identity from target_profile.alunno:", alunno_obj)
             
             nome = (alunno_obj.get('desNome') or '').strip()
             cognome = (alunno_obj.get('desCognome') or '').strip()
             
             if nome and cognome:
-                student_name = f"{cognome} {nome}".strip().upper()
-                debug_log("✅ Nome studente (profilo API):", student_name)
+                # Format: "COGNOME NOME" in uppercase
+                candidate_name = f"{cognome} {nome}".strip().upper()
+                
+                # Validate that it's not a subject or professor name
+                if is_valid_name(candidate_name) and not looks_like_subject(candidate_name):
+                    student_name = candidate_name
+                    debug_log("✅ Nome studente estratto (profilo API):", student_name)
+                else:
+                    debug_log("⚠️ Nome candidato non valido (sembra materia/professore):", {
+                        "candidate": candidate_name,
+                        "is_valid_name": is_valid_name(candidate_name),
+                        "looks_like_subject": looks_like_subject(candidate_name)
+                    })
             else:
                 debug_log("⚠️ Nome/cognome mancanti nel profilo API", {
                     "nome": nome, "cognome": cognome, 
-                    "alunno_keys": list(alunno_obj.keys()) if alunno_obj else []
+                    "alunno_keys": list(alunno_obj.keys()) if alunno_obj else [],
+                    "alunno_obj": alunno_obj
                 })
             
             # Estrai classe dal profilo
@@ -1284,16 +1315,22 @@ def login():
                 classe_normalized = str(classe_raw).strip().upper()
                 if CLASS_REGEX.match(classe_normalized):
                     student_class = classe_normalized
-                    debug_log("✅ Classe studente (profilo API):", student_class)
+                    debug_log("✅ Classe studente estratta (profilo API):", student_class)
                 else:
-                    debug_log("⚠️ Classe non valida ignorata:", classe_raw)
+                    debug_log("⚠️ Classe non valida ignorata:", {
+                        "raw": classe_raw,
+                        "normalized": classe_normalized,
+                        "regex_pattern": "^[1-5][A-Z]$"
+                    })
+            else:
+                debug_log("⚠️ desClasse non presente in target_profile")
         else:
             debug_log("⚠️ target_profile non disponibile (fallback mode attivo?)")
         
         # Fallback generico se proprio non c'è nulla
         if not student_name:
             student_name = "Studente"
-            debug_log("⚠️ Fallback: nome generico usato")
+            debug_log("⚠️ Fallback: nome generico 'Studente' usato")
         
         # ✅ IMPORTANTE: NON cercare nella dashboard!
         # La dashboard contiene voti/compiti con nomi dei PROFESSORI,
@@ -1317,6 +1354,14 @@ def login():
                 debug_log("✅ Profilo Supabase aggiornato:", profile_update)
             except Exception as e:
                 debug_log("⚠️ Supabase profile update failed (non-fatal)", str(e))
+        
+        # Log final extracted identity before sending response
+        debug_log("📤 Final Student Identity:", {
+            "student_name": student_name,
+            "student_class": student_class,
+            "school": school,
+            "target_index": target_index
+        })
 
         resp = {
             "success": True,
