@@ -1292,15 +1292,14 @@ def login():
                 # Format: "COGNOME NOME" in uppercase
                 candidate_name = f"{cognome} {nome}".strip().upper()
                 
-                # Validate that it's not a subject or professor name
-                if is_valid_name(candidate_name) and not looks_like_subject(candidate_name):
+                # Validate that it's a real student name (not subject/professor/username)
+                if is_valid_name(candidate_name):
                     student_name = candidate_name
                     debug_log("✅ Nome studente estratto (profilo API):", student_name)
                 else:
-                    debug_log("⚠️ Nome candidato non valido (sembra materia/professore):", {
+                    debug_log("⚠️ Nome candidato non valido (sembra materia/professore o formato errato):", {
                         "candidate": candidate_name,
-                        "is_valid_name": is_valid_name(candidate_name),
-                        "looks_like_subject": looks_like_subject(candidate_name)
+                        "is_valid_name": is_valid_name(candidate_name)
                     })
             else:
                 debug_log("⚠️ Nome/cognome mancanti nel profilo API", {
