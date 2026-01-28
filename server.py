@@ -194,7 +194,7 @@ def extract_student_identity_from_profile(profile: dict):
             if single_name.isupper() and not looks_like_subject(single_name):
                 parts = single_name.split()
                 if len(parts) == 2 and all(p.isalpha() and len(p) >= 2 for p in parts):
-                    name_upper = single_name.upper()
+                    name_upper = single_name  # Already uppercase, no need to call .upper()
 
     # Class extraction: prefer desClasse, fallback to other variants
     cls_raw = (
@@ -1322,7 +1322,7 @@ def login():
                     "index": idx,
                     "name": nome_completo,
                     "school": p.get('desScuola', 'Scuola'),
-                    "class": c or (p.get('desClasse') or '')
+                    "class": c or ''  # Use validated class from extractor or empty string
                 })
                 debug_log(f"📋 Profilo {idx} costruito:", profiles_payload[-1])
 
@@ -1419,7 +1419,8 @@ def login():
                         student_class = fallback_class
                         debug_log("✅ Classe studente estratta da dashboard alunno:", student_class)
             except Exception as e:
-                debug_log("⚠️ Dashboard fallback failed", str(e))
+                import traceback
+                debug_log("⚠️ Dashboard fallback failed", {"error": str(e), "traceback": traceback.format_exc()[:500]})
 
         # Step 3: Final fallback to safe defaults
         if not student_name:
