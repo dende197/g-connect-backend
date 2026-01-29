@@ -799,13 +799,6 @@ def fetch_student_identity(argo_instance):
         headers = getattr(argo_instance, "_ArgoFamiglia__headers", {}) or {}
         base = argofamiglia.CONSTANTS.ENDPOINT  # e.g. https://www.portaleargo.it/appfamiglia/api/rest/
 
-        # Candidate endpoints: different schools sometimes expose different paths
-        candidates = [
-            "anagrafe",             # most common
-            "alunno",               # some schools
-            "alunno/anagrafe",      # rarer variant
-        ]
-
         def normalize_obj(data):
             # Accept dict or list, sometimes wrapped in {"data": {...}} or {"data": [...]}
             obj = data
@@ -815,6 +808,57 @@ def fetch_student_identity(argo_instance):
                 obj = obj[0]
             return obj if isinstance(obj, dict) else {}
 
+        def extract_from_obj(obj, endpoint_name):
+            """Extract name and class from a response object"""
+            # Prefer direct fields, but also check nested structures
+            al = obj.get("alunno") if isinstance(obj.get("alunno"), dict) else {}
+            nome = (obj.get("desNome") or obj.get("nome") or al.get("desNome") or al.get("nome") or "").strip()
+            cognome = (obj.get("desCognome") or obj.get("cognome") or al.get("desCognome") or al.get("cognome") or "").strip()
+            classe = (obj.get("desClasse") or obj.get("classe") or obj.get("class") or obj.get("desDenominazione") or "").strip()
+
+            name = None
+            cls = None
+
+            # Require both nome AND cognome for a valid name (consistent with extract_student_identity_from_profile)
+            if nome and cognome:
+                name = f"{cognome} {nome}".strip().upper()
+
+            if isinstance(classe, str):
+                c = classe.strip().upper()
+                if CLASS_REGEX.match(c):
+                    cls = c
+
+            if name or cls:
+                debug_log("✅ Student identity resolved", {"name": name, "class": cls, "endpoint": endpoint_name})
+                return name, cls
+            return None, None
+
+        # Strategy 1: Try "scheda" POST endpoint first
+        # The "scheda" endpoint is the official anagrafe endpoint that returns consistent 
+        # student data across all school configurations, unlike the GET endpoints which 
+        # may return 404 or empty data depending on the school's Argo setup.
+        try:
+            url = base + "scheda"
+            # Note: The API expects "opzioni" as a JSON string, not a dict object
+            r = requests.post(url, headers=headers, json={"opzioni": "{}"}, timeout=12)
+            debug_log(f"🔎 fetch_identity POST {url}", {"status": r.status_code})
+            if r.ok:
+                data = r.json()
+                debug_log("📋 scheda response keys", list(data.keys()) if isinstance(data, dict) else "not a dict")
+                obj = normalize_obj(data)
+                name, cls = extract_from_obj(obj, "scheda")
+                if name or cls:
+                    return name, cls
+        except Exception as e:
+            debug_log("⚠️ fetch_identity scheda error", str(e))
+
+        # Strategy 2: Try GET endpoints as fallback
+        candidates = [
+            "anagrafe",             # most common
+            "alunno",               # some schools
+            "alunno/anagrafe",      # rarer variant
+        ]
+
         for path in candidates:
             try:
                 url = base + path
@@ -823,26 +867,8 @@ def fetch_student_identity(argo_instance):
                 if not r.ok:
                     continue
                 obj = normalize_obj(r.json())
-
-                # Prefer direct fields, but also check nested structures
-                al = obj.get("alunno") if isinstance(obj.get("alunno"), dict) else {}
-                nome = (obj.get("desNome") or obj.get("nome") or al.get("desNome") or al.get("nome") or "").strip()
-                cognome = (obj.get("desCognome") or obj.get("cognome") or al.get("desCognome") or al.get("cognome") or "").strip()
-                classe = (obj.get("desClasse") or obj.get("classe") or obj.get("class") or obj.get("desDenominazione") or "").strip()
-
-                name = None
-                cls = None
-
-                if nome or cognome:
-                    name = f"{cognome} {nome}".strip().upper()
-
-                if isinstance(classe, str):
-                    c = classe.strip().upper()
-                    if CLASS_REGEX.match(c):
-                        cls = c
-
+                name, cls = extract_from_obj(obj, path)
                 if name or cls:
-                    debug_log("✅ Student identity resolved via anagrafe", {"name": name, "class": cls, "endpoint": path})
                     return name, cls
             except Exception as e:
                 debug_log("⚠️ fetch_identity endpoint error", str(e))
@@ -1293,6 +1319,21 @@ def login():
         profiles_payload = []
 
         if not fallback_mode and profiles:
+            # Debug: log profile structure only when DEBUG_MODE is enabled (contains PII)
+            debug_log("📋 Profiles received from Argo", {"count": len(profiles)})
+            if DEBUG_MODE:
+                for idx, p in enumerate(profiles):
+                    al = p.get('alunno', {}) or {}
+                    debug_log(f"📋 Profile {idx} raw data", {
+                        "alunno.desNome": al.get('desNome'),
+                        "alunno.desCognome": al.get('desCognome'),
+                        "alunno.nome": al.get('nome'),
+                        "alunno.cognome": al.get('cognome'),
+                        "desClasse": p.get('desClasse'),
+                        "desScuola": p.get('desScuola'),
+                        "profile_keys": list(p.keys())[:10]  # First 10 keys for debugging
+                    })
+            
             # Costruisci payload profili per UI selezione profilo con nome/classe reali
             for idx, p in enumerate(profiles):
                 n, c = extract_student_identity_from_profile(p)
