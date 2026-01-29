@@ -20,7 +20,11 @@ app = Flask(__name__)
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "")
 _allowed = [o.strip() for o in ALLOWED_ORIGINS.split(",") if o.strip()]
 # Se non settato, consenti solo la tua PWA (modifica se necessario)
-CORS(app, resources={r"/*": {"origins": _allowed or ["https://dende197.github.io"]}})
+CORS(app,
+     resources={r"/*": {"origins": _allowed or ["https://dende197.github.io"]}},
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # REGISTRA LE ROUTE DEL PLANNER SULL'ISTANZA 'app'
 register_planner_routes(app)
@@ -1478,6 +1482,114 @@ def test_profile_structure():
             "traceback": traceback.format_exc()
         })
         return jsonify(result), 500
+
+@app.route('/sync', methods=['POST', 'OPTIONS'])
+def sync_data():
+    # Preflight CORS
+    if request.method == 'OPTIONS':
+        return ('', 204)
+
+    data = request.json or {}
+    school = (data.get('schoolCode') or '').strip().upper()
+    stored_user = data.get('storedUser')
+    stored_pass = data.get('storedPass')
+    profile_index = int(data.get('profileIndex', 0))
+
+    try:
+        debug_log("SYNC REQUEST", {"school": school, "profileIndex": profile_index})
+
+        if not all([school, stored_user, stored_pass]):
+            return jsonify({"success": False, "error": "Credenziali mancanti"}), 401
+
+        # Decodifica credenziali
+        import base64, urllib.parse
+        def decode_cred(encoded):
+            try:
+                return urllib.parse.unquote(base64.b64decode(encoded).decode('utf-8'))
+            except:
+                return encoded
+        user = decode_cred(stored_user).strip().lower()
+        pwd  = decode_cred(stored_pass)
+
+        # Login avanzato (profili minimi)
+        access_token = None
+        auth_token = None
+        profiles = []
+        try:
+            login_result = AdvancedArgo.raw_login(school, user, pwd)
+            access_token = login_result['access_token']
+            profiles = login_result.get('profiles', []) or []
+            if profiles:
+                if profile_index < 0 or profile_index >= len(profiles):
+                    profile_index = 0
+                auth_token = profiles[profile_index].get('token', '')
+        except Exception as e:
+            debug_log("⚠️ Sync Advanced Fail -> Fallback Standard", str(e))
+            tmp = argofamiglia.ArgoFamiglia(school, user, pwd)
+            headers = tmp._ArgoFamiglia__headers
+            auth_token = headers.get('x-auth-token', '')
+            access_token = headers.get('Authorization', '').replace('Bearer ', '')
+
+        # Sessioni isolate per estrazione dati
+        grades = []
+        tasks = []
+        promemoria = []
+
+        try:
+            argo_voti = create_session(school, user, pwd, access_token, auth_token)
+            grades = extract_grades_multi_strategy(argo_voti)
+        except Exception as e:
+            debug_log("⚠️ Sync voti error", str(e))
+
+        try:
+            argo_tasks = create_session(school, user, pwd, access_token, auth_token)
+            tasks = extract_homework_safe(argo_tasks)
+        except Exception as e:
+            debug_log("⚠️ Sync compiti error", str(e))
+
+        try:
+            argo_dash = create_session(school, user, pwd, access_token, auth_token)
+            dash = argo_dash.dashboard()
+            promemoria = extract_promemoria(dash)
+        except Exception as e:
+            debug_log("⚠️ Sync dashboard error", str(e))
+
+        # Aggiorna Supabase last_active (e identità se recuperabile)
+        if supabase:
+            try:
+                s_name = None
+                s_class = None
+                if profiles and 0 <= profile_index < len(profiles):
+                    # opzionale: prova a risolvere identità per il profilo selezionato
+                    s_name, s_class = resolve_identity_for_profile(
+                        school, user, pwd, access_token, auth_token,
+                        profiles[profile_index].get('name'), profiles[profile_index].get('class')
+                    )
+                pid = f"{school}:{user}:{profile_index}"
+                update_payload = {"last_active": datetime.now().isoformat()}
+                if s_name: update_payload["name"] = s_name
+                if s_class and CLASS_REGEX.match(s_class): update_payload["class"] = s_class
+                supabase.table("profiles").upsert({"id": pid, **update_payload}, on_conflict="id").execute()
+                debug_log("👤 Profile sync upsert", {"id": pid, **update_payload})
+            except Exception as e:
+                debug_log("⚠️ Profile sync supabase error", str(e))
+
+        return jsonify({
+            "success": True,
+            "tasks": tasks,
+            "voti": grades,
+            "promemoria": promemoria,
+            "new_tokens": {
+                "authToken": auth_token,
+                "accessToken": access_token
+            }
+        }), 200
+
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        debug_log("❌ SYNC FAILED", error_trace)
+        return jsonify({"success": False, "error": str(e), "traceback": error_trace if DEBUG_MODE else None}), 401
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
