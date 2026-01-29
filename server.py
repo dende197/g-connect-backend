@@ -315,24 +315,87 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
                 "sample": soggetti[0] if soggetti else None
             })
             
-            # 7. ✅ COSTRUISCI PROFILI CON NOMI VERI
+            # 7. ✅ COSTRUISCI PROFILI - CHIAMA /scheda PER OGNI PROFILO
             profiles = []
             for idx, sog in enumerate(soggetti):
+                auth_token = sog.get('token', '')
+                cod_min = sog.get('codMin', school)
+                
+                # Prova prima i campi diretti (alcune scuole li hanno)
+                name = sog.get('desNominativo', '').strip().upper()
+                cls = sog.get('classe', '').strip().upper()
+                
+                # Se mancano, chiama /scheda per questo profilo
+                if not name:
+                    try:
+                        scheda_headers = {
+                            "User-Agent": USER_AGENT,
+                            "Content-Type": "application/json",
+                            "Authorization": "Bearer " + access_token,
+                            "Accept": "application/json",
+                            "x-cod-min": cod_min,
+                            "x-auth-token": auth_token
+                        }
+                        
+                        scheda_resp = requests.post(
+                            ENDPOINT + "scheda",
+                            headers=scheda_headers,
+                            json={"opzioni": "{}"},
+                            timeout=10
+                        ).json()
+                        
+                        debug_log(f"📄 /scheda per profilo {idx}", {
+                            "keys": list(scheda_resp.keys()) if isinstance(scheda_resp, dict) else "NOT_DICT"
+                        })
+                        
+                        # Cerca il nome in vari campi possibili
+                        data = scheda_resp.get('data', scheda_resp)
+                        if isinstance(data, dict):
+                            # Prova campi comuni
+                            name = (
+                                data.get('desNominativo', '') or
+                                data.get('nominativo', '') or
+                                data.get('desCognome', '') + ' ' + data.get('desNome', '') or
+                                data.get('cognome', '') + ' ' + data.get('nome', '') or
+                                ''
+                            ).strip().upper()
+                            
+                            cls = (
+                                data.get('desClasse', '') or
+                                data.get('classe', '') or
+                                data.get('desDenominazione', '') or
+                                ''
+                            ).strip().upper()
+                            
+                            # Valida classe con regex
+                            if cls and not CLASS_REGEX.match(cls):
+                                # Cerca pattern classe nel testo
+                                cls_match = re.search(r'\b([1-5][A-Z])\b', cls)
+                                cls = cls_match.group(1) if cls_match else ''
+                            
+                            debug_log(f"✅ Identità da /scheda {idx}", {
+                                "name": name,
+                                "class": cls
+                            })
+                            
+                    except Exception as e:
+                        debug_log(f"⚠️ Errore /scheda profilo {idx}", str(e))
+                
                 profile = {
                     "index": idx,
-                    "name": sog.get('desNominativo', '').strip().upper(),  # ✅ NOME VERO
-                    "class": sog.get('classe', '').strip().upper(),        # ✅ CLASSE VERA
-                    "school": sog.get('codiceScuola', school).strip().upper(),
-                    "token": sog.get('token'),
+                    "name": name,
+                    "class": cls,
+                    "school": cod_min.upper(),
+                    "token": auth_token,
                     "idSoggetto": sog.get('idSoggetto'),
-                    "raw": sog  # Mantieni tutto per debug
+                    "raw": sog
                 }
                 
                 profiles.append(profile)
                 
                 debug_log(f"👤 Profilo {idx}", {
-                    "name": profile['name'],
-                    "class": profile['class'],
+                    "name": profile['name'] or "(vuoto)",
+                    "class": profile['class'] or "(vuoto)",
                     "has_token": bool(profile['token'])
                 })
             
