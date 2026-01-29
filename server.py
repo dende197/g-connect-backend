@@ -91,6 +91,32 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 # ============= CONFIGURAZIONE DEBUG =============
 DEBUG_MODE = os.environ.get("DEBUG_MODE", "false").lower() == "true" or True # Default as True for local dev if not set
 
+def debug_log(message, data=None):
+    """Helper per logging strutturato"""
+    if DEBUG_MODE:
+        print(f"\n{'='*60}")
+        print(f"🔍 {message}")
+        if data:
+            if isinstance(data, (dict, list)):
+                print(json.dumps(data, indent=2, ensure_ascii=False, default=str)[:2000])
+            else:
+                print(str(data)[:2000])
+        print(f"{'='*60}\n")
+
+# ============= SUPABASE CLIENT =============
+supabase: Client = None
+try:
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if supabase_url and supabase_key:
+        supabase = create_client(supabase_url, supabase_key)
+        debug_log("✅ Supabase client inizializzato")
+    else:
+        debug_log("⚠️ Supabase non configurato (variabili mancanti)")
+except Exception as e:
+    debug_log("❌ Errore inizializzazione Supabase", str(e))
+    supabase = None
+
 # Regex per validazione classe (1A-5Z)
 CLASS_REGEX = re.compile(r"^[1-5][A-Z]$")
 
@@ -1405,3 +1431,8 @@ def test_profile_structure():
             "traceback": traceback.format_exc()
         })
         return jsonify(result), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("DEBUG_MODE", "True").lower() == "true"
+    app.run(host='0.0.0.0', port=port, debug=debug)
