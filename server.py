@@ -164,6 +164,15 @@ def extract_student_identity_from_profile(profile: dict):
         if nome and cognome:
             name = f"{cognome} {nome}".strip().upper()
 
+        if not name and isinstance(profile.get("desAlunno"), str):
+            name = parse_display_name(profile.get("desAlunno"))
+
+        if not name and isinstance(profile.get("desDenominazione"), str):
+            name = parse_display_name(profile.get("desDenominazione"))
+
+        if not name and isinstance(profile.get("desAnagrafica"), str):
+            name = parse_display_name(profile.get("desAnagrafica"))
+
         # Class extraction (prefer desClasse)
         cls_raw = profile.get('desClasse') or profile.get('classe') or ''
         cls = None
@@ -184,13 +193,14 @@ def parse_display_name(text: str):
         return None
     
     s = text.strip()
-    if not s or not s.isupper() or len(s) < 5:
+    if not s or len(s) < 5:
         return None
     
-    if looks_like_subject(s):
+    s_upper = s.upper()
+    if looks_like_subject(s_upper):
         return None
     
-    parts = [p for p in s.split() if p]
+    parts = [p for p in s_upper.split() if p]
     if len(parts) < 2:
         return None
     
@@ -835,6 +845,12 @@ def fetch_student_identity(argo_instance):
 
                 if nome or cognome:
                     name = f"{cognome} {nome}".strip().upper()
+                elif isinstance(obj.get("desAlunno"), str):
+                    name = parse_display_name(obj.get("desAlunno"))
+                elif isinstance(obj.get("desDenominazione"), str):
+                    name = parse_display_name(obj.get("desDenominazione"))
+                elif isinstance(obj.get("desAnagrafica"), str):
+                    name = parse_display_name(obj.get("desAnagrafica"))
 
                 if isinstance(classe, str):
                     c = classe.strip().upper()
@@ -1343,18 +1359,11 @@ def login():
 
         # 4B: Fallback to profile object if anagrafe missing for this school
         if (not student_name or not student_class) and target_profile:
-            al = target_profile.get("alunno") or {}
-            n = (al.get("desNome") or al.get("nome") or "").strip()
-            c = (al.get("desCognome") or al.get("cognome") or "").strip()
-            cls_raw = target_profile.get("desClasse") or target_profile.get("classe") or ""
-
-            if not student_name and (n or c):
-                student_name = f"{c} {n}".strip().upper()
-
-            if not student_class and isinstance(cls_raw, str):
-                cls_normalized = cls_raw.strip().upper()
-                if CLASS_REGEX.match(cls_normalized):
-                    student_class = cls_normalized
+            n, c = extract_student_identity_from_profile(target_profile)
+            if not student_name and n:
+                student_name = n
+            if not student_class and c:
+                student_class = c
 
         # 4C: Final minimal fallback
         if not student_name:
