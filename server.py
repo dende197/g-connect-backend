@@ -10,6 +10,7 @@ import re
 import base64
 from hashlib import sha256
 from urllib.parse import unquote
+from datetime import datetime  # ✅ ADDED IMPORT
 from planner_routes import register_planner_routes
 
 # CREA UNA SOLA ISTANZA DI FLASK
@@ -139,13 +140,6 @@ def looks_like_subject(text: str) -> bool:
     s = text.strip().upper()
     return any(tok in s for tok in SUBJECT_TOKENS)
 
-        self._ArgoFamiglia__token = auth_token
-
-    @staticmethod
-    def raw_login(school, username, password):
-        """
-        ✅ VERSIONE AGGIORNATA
-        Esegue il flow OAuth completo e restituisce i profili con desNominativo.
         
         Returns:
             {
@@ -243,9 +237,9 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
     def set_headers(self, auth_token, access_token):
         """Imposta gli header manualmente"""
         self._ArgoFamiglia__headers = {
-            "Content-Type": "Application/json",
+            "Content-Type": "application/json",
             "Authorization": "Bearer " + access_token,
-            "Accept": "Application/json",
+            "Accept": "application/json",
             "x-cod-min": self._ArgoFamiglia__school,
             "x-auth-token": auth_token,
             "User-Agent": USER_AGENT
