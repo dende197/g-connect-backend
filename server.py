@@ -819,7 +819,8 @@ def fetch_student_identity(argo_instance):
             name = None
             cls = None
 
-            if nome or cognome:
+            # Require both nome AND cognome for a valid name (consistent with extract_student_identity_from_profile)
+            if nome and cognome:
                 name = f"{cognome} {nome}".strip().upper()
 
             if isinstance(classe, str):
@@ -832,9 +833,13 @@ def fetch_student_identity(argo_instance):
                 return name, cls
             return None, None
 
-        # Strategy 1: Try "scheda" POST endpoint first (most reliable per comments)
+        # Strategy 1: Try "scheda" POST endpoint first
+        # The "scheda" endpoint is the official anagrafe endpoint that returns consistent 
+        # student data across all school configurations, unlike the GET endpoints which 
+        # may return 404 or empty data depending on the school's Argo setup.
         try:
             url = base + "scheda"
+            # Note: The API expects "opzioni" as a JSON string, not a dict object
             r = requests.post(url, headers=headers, json={"opzioni": "{}"}, timeout=12)
             debug_log(f"🔎 fetch_identity POST {url}", {"status": r.status_code})
             if r.ok:
@@ -1314,19 +1319,20 @@ def login():
         profiles_payload = []
 
         if not fallback_mode and profiles:
-            # Debug: log profile structure to understand what we receive
+            # Debug: log profile structure only when DEBUG_MODE is enabled (contains PII)
             debug_log("📋 Profiles received from Argo", {"count": len(profiles)})
-            for idx, p in enumerate(profiles):
-                al = p.get('alunno', {}) or {}
-                debug_log(f"📋 Profile {idx} raw data", {
-                    "alunno.desNome": al.get('desNome'),
-                    "alunno.desCognome": al.get('desCognome'),
-                    "alunno.nome": al.get('nome'),
-                    "alunno.cognome": al.get('cognome'),
-                    "desClasse": p.get('desClasse'),
-                    "desScuola": p.get('desScuola'),
-                    "profile_keys": list(p.keys())[:10]  # First 10 keys for debugging
-                })
+            if DEBUG_MODE:
+                for idx, p in enumerate(profiles):
+                    al = p.get('alunno', {}) or {}
+                    debug_log(f"📋 Profile {idx} raw data", {
+                        "alunno.desNome": al.get('desNome'),
+                        "alunno.desCognome": al.get('desCognome'),
+                        "alunno.nome": al.get('nome'),
+                        "alunno.cognome": al.get('cognome'),
+                        "desClasse": p.get('desClasse'),
+                        "desScuola": p.get('desScuola'),
+                        "profile_keys": list(p.keys())[:10]  # First 10 keys for debugging
+                    })
             
             # Costruisci payload profili per UI selezione profilo con nome/classe reali
             for idx, p in enumerate(profiles):
