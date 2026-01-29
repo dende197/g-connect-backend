@@ -140,25 +140,6 @@ def looks_like_subject(text: str) -> bool:
     return any(tok in s for tok in SUBJECT_TOKENS)
 
         self._ArgoFamiglia__token = auth_token
-        self._ArgoFamiglia__login_data = {"access_token": access_token} if access_token else None
-        self._ArgoFamiglia__headers = {}
-        
-        if auth_token and access_token:
-            self.set_headers(auth_token, access_token)
-        elif not skip_connect:
-            self.connect()
-
-    def set_headers(self, auth_token, access_token):
-        """Imposta gli header manualmente"""
-        self._ArgoFamiglia__headers = {
-            "Content-Type": "Application/json",
-            "Authorization": "Bearer " + access_token,
-            "Accept": "Application/json",
-            "x-cod-min": self._ArgoFamiglia__school,
-            "x-auth-token": auth_token,
-            "User-Agent": USER_AGENT
-        }
-        self._ArgoFamiglia__token = auth_token
 
     @staticmethod
     def raw_login(school, username, password):
