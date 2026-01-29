@@ -139,6 +139,16 @@ def looks_like_subject(text: str) -> bool:
     s = text.strip().upper()
     return any(tok in s for tok in SUBJECT_TOKENS)
 
+def extract_name_from_descriptive_fields(source: dict):
+    if not isinstance(source, dict):
+        return None
+    for key in ("desAlunno", "desDenominazione", "desAnagrafica"):
+        if isinstance(source.get(key), str):
+            name = parse_display_name(source.get(key))
+            if name:
+                return name
+    return None
+
 def extract_student_identity_from_profile(profile: dict):
     """
     Robust identity extraction from a DidUP 'Famiglia' profile dict.
@@ -164,6 +174,9 @@ def extract_student_identity_from_profile(profile: dict):
         if nome and cognome:
             name = f"{cognome} {nome}".strip().upper()
 
+        if not name:
+            name = extract_name_from_descriptive_fields(profile)
+
         # Class extraction (prefer desClasse)
         cls_raw = profile.get('desClasse') or profile.get('classe') or ''
         cls = None
@@ -184,13 +197,14 @@ def parse_display_name(text: str):
         return None
     
     s = text.strip()
-    if not s or not s.isupper() or len(s) < 5:
+    if not s or len(s) < 5:
         return None
     
-    if looks_like_subject(s):
+    s_upper = s.upper()
+    if looks_like_subject(s_upper):
         return None
     
-    parts = [p for p in s.split() if p]
+    parts = [p for p in s_upper.split() if p]
     if len(parts) < 2:
         return None
     
@@ -200,7 +214,9 @@ def parse_display_name(text: str):
         if tok in SCHOOL_TOKENS:
             idx_stop = i
             break
-    if idx_stop is not None and idx_stop >= 2:
+    if idx_stop is not None:
+        if idx_stop < 2:
+            return None
         parts = parts[:idx_stop]
     
     # Prendi primi 2 token come COGNOME NOME
@@ -835,6 +851,8 @@ def fetch_student_identity(argo_instance):
 
                 if nome or cognome:
                     name = f"{cognome} {nome}".strip().upper()
+                if not name:
+                    name = extract_name_from_descriptive_fields(obj)
 
                 if isinstance(classe, str):
                     c = classe.strip().upper()
@@ -1343,18 +1361,11 @@ def login():
 
         # 4B: Fallback to profile object if anagrafe missing for this school
         if (not student_name or not student_class) and target_profile:
-            al = target_profile.get("alunno") or {}
-            n = (al.get("desNome") or al.get("nome") or "").strip()
-            c = (al.get("desCognome") or al.get("cognome") or "").strip()
-            cls_raw = target_profile.get("desClasse") or target_profile.get("classe") or ""
-
-            if not student_name and (n or c):
-                student_name = f"{c} {n}".strip().upper()
-
-            if not student_class and isinstance(cls_raw, str):
-                cls_normalized = cls_raw.strip().upper()
-                if CLASS_REGEX.match(cls_normalized):
-                    student_class = cls_normalized
+            n, c = extract_student_identity_from_profile(target_profile)
+            if not student_name and n:
+                student_name = n
+            if not student_class and c:
+                student_class = c
 
         # 4C: Final minimal fallback
         if not student_name:
