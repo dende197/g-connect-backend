@@ -309,24 +309,23 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
             # 6. ✅ PARSING SOGGETTI
             soggetti = argo_resp.get("data", [])
             
-            debug_log("🔍 SOGGETTI RICEVUTI DALL'API", {
+            debug_log("🔍 SOGGETTI RICEVUtI DALL'API", {
                 "count": len(soggetti),
-                "first_keys": list(soggetti[0].keys()) if soggetti else [],
-                "sample": soggetti[0] if soggetti else None
+                "first_keys": list(soggetti[0].keys()) if soggetti else []
             })
             
-            # 7. ✅ COSTRUISCI PROFILI - CHIAMA /scheda PER OGNI PROFILO
+            # 7. ✅ COSTRUISCI PROFILI - FETCH IDENTITÀ ROBUSTO
             profiles = []
             for idx, sog in enumerate(soggetti):
                 auth_token = sog.get('token', '')
                 cod_min = sog.get('codMin', school)
                 
-                # Prova prima i campi diretti (alcune scuole li hanno)
-                name = sog.get('desNominativo', '').strip().upper()
-                cls = sog.get('classe', '').strip().upper()
+                # Prova prima i campi diretti
+                name = (sog.get('desNominativo') or '').strip().upper()
+                cls = (sog.get('classe') or '').strip().upper()
                 
-                # Se mancano, chiama /scheda per questo profilo
-                if not name:
+                # Se mancano, chiama /scheda
+                if not name or not cls:
                     try:
                         scheda_headers = {
                             "User-Agent": USER_AGENT,
@@ -344,44 +343,52 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
                             timeout=10
                         ).json()
                         
-                        debug_log(f"📄 /scheda per profilo {idx}", {
-                            "keys": list(scheda_resp.keys()) if isinstance(scheda_resp, dict) else "NOT_DICT"
-                        })
+                        # Estrattore intelligente
+                        def deep_get(d, keys):
+                            for key in keys:
+                                if isinstance(d, dict):
+                                    d = d.get(key)
+                                else:
+                                    return None
+                            return d
+
+                        # Punti dove cercare l'alunno
+                        roots = [
+                            scheda_resp.get('data', {}),
+                            scheda_resp.get('data', {}).get('scheda', {}),
+                            scheda_resp
+                        ]
                         
-                        # Cerca il nome in vari campi possibili
-                        data = scheda_resp.get('data', scheda_resp)
-                        if isinstance(data, dict):
-                            # Prova campi comuni
-                            name = (
-                                data.get('desNominativo', '') or
-                                data.get('nominativo', '') or
-                                data.get('desCognome', '') + ' ' + data.get('desNome', '') or
-                                data.get('cognome', '') + ' ' + data.get('nome', '') or
-                                ''
-                            ).strip().upper()
+                        for root in roots:
+                            if not isinstance(root, dict): continue
                             
-                            cls = (
-                                data.get('desClasse', '') or
-                                data.get('classe', '') or
-                                data.get('desDenominazione', '') or
-                                ''
-                            ).strip().upper()
+                            # Cerca nome/cognome
+                            al = root.get('alunno', {}) if isinstance(root.get('alunno'), dict) else root
+                            n = (al.get('desNome') or al.get('nome') or '')
+                            c = (al.get('desCognome') or al.get('cognome') or '')
+                            full = (al.get('desNominativo') or al.get('nominativo') or '')
                             
-                            # Valida classe con regex
-                            if cls and not CLASS_REGEX.match(cls):
-                                # Cerca pattern classe nel testo
-                                cls_match = re.search(r'\b([1-5][A-Z])\b', cls)
-                                cls = cls_match.group(1) if cls_match else ''
+                            if not name:
+                                if full: name = str(full).strip().upper()
+                                elif n or c: name = f"{str(c or '').strip()} {str(n or '').strip()}".strip().upper()
                             
-                            debug_log(f"✅ Identità da /scheda {idx}", {
-                                "name": name,
-                                "class": cls
-                            })
+                            if not cls:
+                                cls = (al.get('desClasse') or al.get('classe') or root.get('desDenominazione') or '')
+                                if cls:
+                                    cls = str(cls).strip().upper()
+                                    # Fallback se è una descrizione lunga
+                                    if not CLASS_REGEX.match(cls):
+                                        m = re.search(r'\b([1-5][A-Z])\b', cls)
+                                        cls = m.group(1) if m else cls[:5] # Prendi i primi 5 se non match regex
+                            
+                            if name and cls: break
+
+                        debug_log(f"✅ Identità Profilo {idx}", {"name": name, "class": cls})
                             
                     except Exception as e:
-                        debug_log(f"⚠️ Errore /scheda profilo {idx}", str(e))
+                        debug_log(f"⚠️ Errore fetch identità profilo {idx}", str(e))
                 
-                profile = {
+                profiles.append({
                     "index": idx,
                     "name": name,
                     "class": cls,
@@ -389,16 +396,8 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
                     "token": auth_token,
                     "idSoggetto": sog.get('idSoggetto'),
                     "raw": sog
-                }
-                
-                profiles.append(profile)
-                
-                debug_log(f"👤 Profilo {idx}", {
-                    "name": profile['name'] or "(vuoto)",
-                    "class": profile['class'] or "(vuoto)",
-                    "has_token": bool(profile['token'])
                 })
-            
+                
             return {
                 "access_token": access_token,
                 "profiles": profiles
@@ -441,9 +440,6 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
             )
             return res.json()
         except Exception as e:
-            debug_log("❌ Errore get_scheda", str(e))
-            return {}
-
             debug_log("❌ Errore get_scheda", str(e))
             return {}
 
