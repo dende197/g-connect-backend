@@ -1193,130 +1193,120 @@ def post_message():
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.json
-    school = (data.get('schoolCode') or '').strip()
-    username = (data.get('username') or '').strip()
-    password = data.get('password')
-    selected_profile_index = data.get('profileIndex') 
+    """
+    Login DidUP Famiglia con multi-profilo.
+    Identità studente estratta SOLO dal profilo API selezionato (no dashboard).
+    """
+    body = request.json or {}
+    school = (body.get('schoolCode') or body.get('school') or '').strip().upper()
+    username = (body.get('username') or '').strip().lower()
+    password = body.get('password')
+    selected_profile_index = body.get('profileIndex', None)
 
     if not all([school, username, password]):
         return jsonify({"success": False, "error": "Dati mancanti"}), 400
 
     try:
         debug_log("LOGIN REQUEST", {"school": school, "username": username, "idx": selected_profile_index})
-        
+
         access_token = None
         auth_token = None
         profiles = []
         fallback_mode = False
-        
-        # 1. Login Avanzato
+
+        # 1) Login avanzato: ottieni tutti i profili
         try:
             login_result = AdvancedArgo.raw_login(school, username, password)
             access_token = login_result['access_token']
-            profiles = login_result['profiles']
+            profiles = login_result.get('profiles', []) or []
         except Exception as e:
-            debug_log(f"⚠️ Advanced Login Fallito: {str(e)}")
+            debug_log("⚠️ Advanced Login Fallito", str(e))
             fallback_mode = True
 
-        # 2. Gestione Profili (SOLO PROFILO API) (Bug #9)
+        # 2) Selezione profilo
+        target_index = 0
+        target_profile = None
         profiles_payload = []
+
         if not fallback_mode and profiles:
-            # Build selection list strictly from profile API
+            # Costruisci payload profili per UI selezione profilo con nome/classe reali
             for idx, p in enumerate(profiles):
-                p_name, p_class = extract_student_identity_from_profile(p)
+                n, c = extract_student_identity_from_profile(p)
                 profiles_payload.append({
                     "index": idx,
-                    "name": p_name or f"Studente {idx+1}",
-                    "school": p.get('desScuola', 'Scuola'),
-                    "class": p_class or ""
+                    "name": n or f"Studente {idx+1}",
+                    "class": c or (p.get('desClasse') or ""),
+                    "school": p.get('desScuola') or school
                 })
-                debug_log(f"📋 Profilo {idx} costruito:", profiles_payload[-1])
 
-        # Selezione Profilo
-        target_index = int(selected_profile_index) if selected_profile_index is not None else 0
-        target_profile = None
-        
-        if not fallback_mode and profiles:
-            if target_index < len(profiles):
-                target_profile = profiles[target_index]
-                auth_token = target_profile.get('token')
-            else:
-                 target_index = 0
-                 target_profile = profiles[0]
-                 auth_token = target_profile.get('token')
-        
+            # Usa indice richiesto (se valido), altrimenti 0
+            try:
+                if selected_profile_index is not None:
+                    i = int(selected_profile_index)
+                    if 0 <= i < len(profiles):
+                        target_index = i
+            except Exception:
+                pass
+
+            target_profile = profiles[target_index]
+            auth_token = target_profile.get('token')
+
+        # 3) Fallback totale se profili/token non disponibili
         if fallback_mode or not access_token or not auth_token:
-            temp_argo = argofamiglia.ArgoFamiglia(school, username, password)
-            headers = temp_argo._ArgoFamiglia__headers
+            tmp = argofamiglia.ArgoFamiglia(school, username, password)
+            headers = tmp._ArgoFamiglia__headers
             auth_token = headers.get('x-auth-token', '')
-            access_token = headers.get('Authorization', '').replace("Bearer ", "")
+            access_token = headers.get('Authorization', '').replace('Bearer ', '')
 
-        # 3. Sessioni dati
-        argo_voti = create_session(school, username, password, access_token, auth_token)
-        grades_data = extract_grades_multi_strategy(argo_voti)
-        
-        tasks_data = []
-        try:
-            argo_tasks = create_session(school, username, password, access_token, auth_token)
-            tasks_data = extract_homework_safe(argo_tasks)
-        except: pass
+        # 4) CREA SESSIONE ESTRAI DATI
+        session = create_session(school, username, password, access_token, auth_token)
 
-        announcements_data = []
-        dashboard_data = {}
-        try:
-            argo_dash = create_session(school, username, password, access_token, auth_token)
-            dashboard_data = argo_dash.get_full_dashboard()
-            announcements_data = extract_promemoria(dashboard_data)
-        except: pass
-            
-        # ============================================================
-        # 4. DETERMINAZIONE NOME STUDENTE - FONTE AUTORITATIVA /scheda
-        # ============================================================
+        # 5) Estrai identità studente SOLO dal profilo selezionato
         student_name = None
         student_class = None
 
-        # ✅ FIX 3: IDENTITY VIA /scheda
-        # Chiamiamo la scheda dettagliata (fonte più affidabile della lista profili)
-        try:
-            # Usiamo la sessione appena creata (argo_voti) per recuperare la scheda
-            scheda_data = argo_voti.get_scheda()
-            if scheda_data and 'dati' in scheda_data and len(scheda_data['dati']) > 0:
-                dati_alunno = scheda_data['dati'][0].get('alunno', {})
-                dati_generali = scheda_data['dati'][0]
-                
-                cognome_s = dati_alunno.get('desCognome', '').strip()
-                nome_s = dati_alunno.get('desNome', '').strip()
-                if cognome_s and nome_s:
-                    student_name = f"{cognome_s} {nome_s}".strip().upper()
-                
-                # Classe: cerca in vari campi della scheda
-                cls_s = dati_generali.get('desClasse') or dati_generali.get('desDenominazioneClasse')
-                if cls_s:
-                    student_class = str(cls_s).strip().upper()
-                
-                debug_log(f"✅ IDENTITÀ ESTRATTA DA SCHEDA: {student_name} - {student_class}")
-        except Exception as e:
-            debug_log("⚠️ Errore estrazione scheda", str(e))
+        if target_profile:
+            name_from_profile, class_from_profile = extract_student_identity_from_profile(target_profile)
+            if name_from_profile:
+                student_name = name_from_profile
+                debug_log("✅ Nome studente (profilo API)", student_name)
+            else:
+                debug_log("⚠️ Nome mancante nel profilo API, userò fallback")
 
-        # ✅ FALLBACK: Se la scheda fallisce, usa i dati del profilo dalla lista login
-        if not student_name and target_profile:
-            p_name, p_class = extract_student_identity_from_profile(target_profile)
-            student_name = p_name
-            if not student_class:
-                student_class = p_class
-            debug_log("⚠️ Fallback: identità recuperata da profilo API (scheda fallita)")
+            if class_from_profile:
+                student_class = class_from_profile
+                debug_log("✅ Classe studente (profilo API)", student_class)
+            else:
+                debug_log("⚠️ Classe mancante/invalid nel profilo API, userò fallback")
 
-        # ✅ Placeholder finale se nulla ha funzionato
+        # Fallback estremi
         if not student_name:
-            student_name = "Studente"
-            debug_log("⚠️ Fallback Estremo: nome generico usato")
-        
+            student_name = f"Studente {target_index+1}" if profiles else username.upper()
         if not student_class:
-            student_class = "N/D"
-            debug_log("ℹ️ Classe non trovata (lasciata N/D)")
+            # prova un ultimo recupero diretto dal profilo se c’è (desClasse)
+            if target_profile and isinstance(target_profile.get('desClasse'), str):
+                cls = target_profile['desClasse'].strip().upper()
+                if CLASS_REGEX.match(cls):
+                    student_class = cls
+            student_class = student_class or "N/D"
 
-        # Sync Supabase (normalized id)
+        # 6) Dati principali
+        grades_data = extract_grades_multi_strategy(session)
+
+        tasks_data = []
+        try:
+            tasks_data = extract_homework_safe(session)
+        except Exception:
+            pass
+
+        announcements_data = []
+        try:
+            dash = session.dashboard()  # usata solo per promemoria, non per nome
+            announcements_data = extract_promemoria(dash)
+        except Exception:
+            pass
+
+        # 7) Sync profilo su Supabase (id normalizzato)
         if supabase:
             try:
                 pid = f"{school.strip().upper()}:{username.strip().lower()}:{target_index}"
@@ -1326,10 +1316,11 @@ def login():
                     "class": student_class,
                     "last_active": datetime.now().isoformat()
                 }, on_conflict="id").execute()
-                debug_log("👤 Supabase profile upserted", {"id": pid, "name": student_name, "class": student_class})
+                debug_log("👤 Profili Supabase upsert", {"id": pid})
             except Exception as e:
-                debug_log("⚠️ Supabase upsert profile failed", str(e))
+                debug_log("⚠️ Supabase upsert profilo error (non fatale)", str(e))
 
+        # 8) Costruisci risposta
         resp = {
             "success": True,
             "session": {
@@ -1349,46 +1340,58 @@ def login():
             "promemoria": announcements_data
         }
 
-        # Provide selectedProfile details (optional, helpful for PWA)
+        # Includi profilo selezionato per la PWA (comodo per debug/telemetria)
         if target_profile:
             resp["selectedProfile"] = {
                 "index": target_index,
-                "alunno": target_profile.get("alunno", {}),
-                "class": target_profile.get("desClasse"),
-                "school": target_profile.get("desScuola"),
                 "name": student_name,
+                "class": student_class,
+                "school": target_profile.get("desScuola") or school,
+                "alunno": target_profile.get("alunno", {}),
                 "raw": target_profile
             }
 
-        # If multiple profiles and no index chosen, build an accurate selection list
-        if profiles and selected_profile_index is None:
+        # Se più profili e l’utente non ne ha scelto uno, esponi la lista per la UI
+        if profiles_payload and (selected_profile_index is None):
             resp["status"] = "MULTIPLE_PROFILES"
             resp["profiles"] = profiles_payload
-        
+
         debug_log("RISPOSTA FINALE", resp)
         return jsonify(resp), 200
 
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        debug_log(f"❌ LOGIN FAILED (Fatal)", error_trace)
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "traceback": error_trace if DEBUG_MODE else None
-        }), 401
+        debug_log("❌ LOGIN FAILED", error_trace)
+        return jsonify({"success": False, "error": str(e), "traceback": error_trace if DEBUG_MODE else None}), 401
 
 
 @app.route('/debug/profiles', methods=['POST'])
 def debug_profiles():
     """Endpoint per ispezionare i profili raw ritornati da Argo"""
     data = request.json or {}
-    school = data.get('schoolCode')
-    user = data.get('username')
+    school = (data.get('schoolCode') or '').strip()
+    user = (data.get('username') or '').strip()
     pwd = data.get('password')
+
     try:
-        login_result = AdvancedArgo.raw_login(school, user, pwd)
-        return jsonify({"success": True, "profiles": login_result.get("profiles", [])}), 200
+        r = AdvancedArgo.raw_login(school, user, pwd)
+        profiles = r.get('profiles', []) or []
+        # Minimizza output sensibile
+        sanitized = []
+        for i, p in enumerate(profiles):
+            al = p.get('alunno', {}) or {}
+            n, c = extract_student_identity_from_profile(p)
+            sanitized.append({
+                "index": i,
+                "estratto_name": n,
+                "estratto_class": c,
+                "alunno.desNome": al.get('desNome'),
+                "alunno.desCognome": al.get('desCognome'),
+                "desClasse": p.get('desClasse'),
+                "desScuola": p.get('desScuola')
+            })
+        return jsonify({"success": True, "profiles": sanitized}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -1470,20 +1473,16 @@ def sync_data():
         except:
              pass
 
-        # ✅ NEW: Update Profile Identity via /scheda during Sync
+        # ✅ SYNC: Aggiorna identità dal profilo API rinfrescato
         if supabase:
             try:
-                scheda_s = argo_voti.get_scheda()
                 s_name = None
                 s_class = None
-                if scheda_s and 'dati' in scheda_s and len(scheda_s['dati']) > 0:
-                    al_s = scheda_s['dati'][0].get('alunno', {})
-                    cog_s = al_s.get('desCognome', '').strip()
-                    nom_s = al_s.get('desNome', '').strip()
-                    if cog_s and nom_s: 
-                        s_name = f"{cog_s} {nom_s}".upper()
-                    
-                    s_class = scheda_s['dati'][0].get('desClasse') or scheda_s['dati'][0].get('desDenominazioneClasse')
+                
+                # Se abbiamo i profili rinfrescati, estraiamo l'identità
+                if not fallback_mode and 'profiles' in locals() and int(profile_index) < len(profiles):
+                    target_p = profiles[int(profile_index)]
+                    s_name, s_class = extract_student_identity_from_profile(target_p)
 
                 profile_id = f"{school.strip().upper()}:{user.strip().lower()}:{profile_index}"
                 update_payload = {"last_active": datetime.now().isoformat()}
