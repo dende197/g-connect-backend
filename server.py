@@ -139,6 +139,16 @@ def looks_like_subject(text: str) -> bool:
     s = text.strip().upper()
     return any(tok in s for tok in SUBJECT_TOKENS)
 
+def extract_name_from_descriptive_fields(source: dict):
+    if not isinstance(source, dict):
+        return None
+    for key in ("desAlunno", "desDenominazione", "desAnagrafica"):
+        if isinstance(source.get(key), str):
+            name = parse_display_name(source.get(key))
+            if name:
+                return name
+    return None
+
 def extract_student_identity_from_profile(profile: dict):
     """
     Robust identity extraction from a DidUP 'Famiglia' profile dict.
@@ -164,14 +174,8 @@ def extract_student_identity_from_profile(profile: dict):
         if nome and cognome:
             name = f"{cognome} {nome}".strip().upper()
 
-        if not name and isinstance(profile.get("desAlunno"), str):
-            name = parse_display_name(profile.get("desAlunno"))
-
-        if not name and isinstance(profile.get("desDenominazione"), str):
-            name = parse_display_name(profile.get("desDenominazione"))
-
-        if not name and isinstance(profile.get("desAnagrafica"), str):
-            name = parse_display_name(profile.get("desAnagrafica"))
+        if not name:
+            name = extract_name_from_descriptive_fields(profile)
 
         # Class extraction (prefer desClasse)
         cls_raw = profile.get('desClasse') or profile.get('classe') or ''
@@ -210,7 +214,9 @@ def parse_display_name(text: str):
         if tok in SCHOOL_TOKENS:
             idx_stop = i
             break
-    if idx_stop is not None and idx_stop >= 2:
+    if idx_stop is not None:
+        if idx_stop < 2:
+            return None
         parts = parts[:idx_stop]
     
     # Prendi primi 2 token come COGNOME NOME
@@ -845,12 +851,8 @@ def fetch_student_identity(argo_instance):
 
                 if nome or cognome:
                     name = f"{cognome} {nome}".strip().upper()
-                elif isinstance(obj.get("desAlunno"), str):
-                    name = parse_display_name(obj.get("desAlunno"))
-                elif isinstance(obj.get("desDenominazione"), str):
-                    name = parse_display_name(obj.get("desDenominazione"))
-                elif isinstance(obj.get("desAnagrafica"), str):
-                    name = parse_display_name(obj.get("desAnagrafica"))
+                if not name:
+                    name = extract_name_from_descriptive_fields(obj)
 
                 if isinstance(classe, str):
                     c = classe.strip().upper()
