@@ -787,7 +787,71 @@ def extract_promemoria(dashboard_data):
     
     return promemoria
 
-# ✅ HELPERS SESSIONI (Rimossa estrazione dashboard per evitare falsi positivi)
+# --- Student identity via official Argo endpoints ---
+def fetch_student_identity(argo_instance):
+    """
+    Fetch student's identity (name, class) using official Argo REST endpoints
+    for the currently selected profile (via argo_instance headers).
+    Tries multiple endpoints for robustness across schools.
+    Returns (NAME_UPPER, CLASS_UPPER) or (None, None).
+    """
+    try:
+        headers = getattr(argo_instance, "_ArgoFamiglia__headers", {}) or {}
+        base = argofamiglia.CONSTANTS.ENDPOINT  # e.g. https://www.portaleargo.it/appfamiglia/api/rest/
+
+        # Candidate endpoints: different schools sometimes expose different paths
+        candidates = [
+            "anagrafe",             # most common
+            "alunno",               # some schools
+            "alunno/anagrafe",      # rarer variant
+        ]
+
+        def normalize_obj(data):
+            # Accept dict or list, sometimes wrapped in {"data": {...}} or {"data": [...]}
+            obj = data
+            if isinstance(obj, dict) and "data" in obj:
+                obj = obj["data"]
+            if isinstance(obj, list) and obj:
+                obj = obj[0]
+            return obj if isinstance(obj, dict) else {}
+
+        for path in candidates:
+            try:
+                url = base + path
+                r = requests.get(url, headers=headers, timeout=12)
+                debug_log(f"🔎 fetch_identity GET {url}", {"status": r.status_code})
+                if not r.ok:
+                    continue
+                obj = normalize_obj(r.json())
+
+                # Prefer direct fields, but also check nested structures
+                al = obj.get("alunno") if isinstance(obj.get("alunno"), dict) else {}
+                nome = (obj.get("desNome") or obj.get("nome") or al.get("desNome") or al.get("nome") or "").strip()
+                cognome = (obj.get("desCognome") or obj.get("cognome") or al.get("desCognome") or al.get("cognome") or "").strip()
+                classe = (obj.get("desClasse") or obj.get("classe") or obj.get("class") or obj.get("desDenominazione") or "").strip()
+
+                name = None
+                cls = None
+
+                if nome or cognome:
+                    name = f"{cognome} {nome}".strip().upper()
+
+                if isinstance(classe, str):
+                    c = classe.strip().upper()
+                    if CLASS_REGEX.match(c):
+                        cls = c
+
+                if name or cls:
+                    debug_log("✅ Student identity resolved via anagrafe", {"name": name, "class": cls, "endpoint": path})
+                    return name, cls
+            except Exception as e:
+                debug_log("⚠️ fetch_identity endpoint error", str(e))
+                continue
+
+    except Exception as e:
+        debug_log("⚠️ fetch_student_identity error", str(e))
+
+    return None, None
 
 
 
@@ -1261,34 +1325,44 @@ def login():
         # 4) CREA SESSIONE ESTRAI DATI
         session = create_session(school, username, password, access_token, auth_token)
 
-        # 5) Estrai identità studente SOLO dal profilo selezionato
+        # ============================================================
+        # 4. RECUPERO IDENTITÀ STUDENTE (ANAGRAFE UFFICIALE)
+        # ============================================================
         student_name = None
         student_class = None
 
-        if target_profile:
-            name_from_profile, class_from_profile = extract_student_identity_from_profile(target_profile)
-            if name_from_profile:
-                student_name = name_from_profile
-                debug_log("✅ Nome studente (profilo API)", student_name)
-            else:
-                debug_log("⚠️ Nome mancante nel profilo API, userò fallback")
+        # Build a session bound to the selected profile tokens
+        argo_identity = create_session(school, username, password, access_token, auth_token)
 
-            if class_from_profile:
-                student_class = class_from_profile
-                debug_log("✅ Classe studente (profilo API)", student_class)
-            else:
-                debug_log("⚠️ Classe mancante/invalid nel profilo API, userò fallback")
+        # 4A: Try official anagrafe endpoints first (single source of truth)
+        an_name, an_class = fetch_student_identity(argo_identity)
+        if an_name:
+            student_name = an_name
+        if an_class:
+            student_class = an_class
 
-        # Fallback estremi
+        # 4B: Fallback to profile object if anagrafe missing for this school
+        if (not student_name or not student_class) and target_profile:
+            al = target_profile.get("alunno") or {}
+            n = (al.get("desNome") or al.get("nome") or "").strip()
+            c = (al.get("desCognome") or al.get("cognome") or "").strip()
+            cls_raw = target_profile.get("desClasse") or target_profile.get("classe") or ""
+
+            if not student_name and (n or c):
+                student_name = f"{c} {n}".strip().upper()
+
+            if not student_class and isinstance(cls_raw, str):
+                cls_normalized = cls_raw.strip().upper()
+                if CLASS_REGEX.match(cls_normalized):
+                    student_class = cls_normalized
+
+        # 4C: Final minimal fallback
         if not student_name:
-            student_name = f"Studente {target_index+1}" if profiles else username.upper()
+            student_name = f"Studente {target_index + 1}"
         if not student_class:
-            # prova un ultimo recupero diretto dal profilo se c’è (desClasse)
-            if target_profile and isinstance(target_profile.get('desClasse'), str):
-                cls = target_profile['desClasse'].strip().upper()
-                if CLASS_REGEX.match(cls):
-                    student_class = cls
-            student_class = student_class or "N/D"
+            student_class = "N/D"
+
+        debug_log("👤 Final student identity", {"name": student_name, "class": student_class})
 
         # 6) Dati principali
         grades_data = extract_grades_multi_strategy(session)
