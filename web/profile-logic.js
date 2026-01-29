@@ -78,9 +78,9 @@ function showProfileSelector(profili) {
                             ${getInitials(profile.nome)}
                         </div>
                         <div class="profile-info">
-                            <h3>${profile.nome}</h3>
-                            <p class="profile-class">Classe: ${profile.classe}</p>
-                            <p class="profile-year">${profile.annoScolastico}</p>
+                            <h3>${profile.name || 'Studente ' + (profile.index + 1)}</h3>
+                            <p class="profile-class">Classe: ${profile.class || ''}</p>
+                            <p class="profile-school">${profile.school || ''}</p>
                         </div>
                         <div class="profile-arrow">→</div>
                     </div>

@@ -2189,9 +2189,11 @@
         // ✅ Funzioni di validazione nome/classe (Bug #5)
         function isValidName(name) {
             if (!name || typeof name !== 'string') return false;
-            const parts = name.trim().toUpperCase().split(/\s+/);
-            // Almeno 2 parole, tutte alfabetiche, min 2 caratteri
-            return parts.length >= 2 && parts.every(p => /^[A-Z]{2,}$/i.test(p));
+            const trimmed = name.trim();
+            if (trimmed.length < 2) return false;
+            // Allow alphanumeric, spaces, and common name characters. 
+            // Relaxed to accept "Studente 1" or single names if necessary.
+            return /^[a-zA-Z0-9\s'.]+$/.test(trimmed);
         }
 
         function isValidClass(cls) {
@@ -3991,43 +3993,39 @@
             state.user = state.user || {};
             if (data.student) {
                 // Nome: valida che non sia username
-                const receivedName = data.student.name;
-                if (isValidName(receivedName)) {
-                    state.user.name = receivedName;
-                    console.log("✅ Nome valido ricevuto:", receivedName);
-                } else {
-                    console.warn("⚠️ Nome non valido ricevuto dal backend:", receivedName);
+                // Nome: Priorità a selectedProfile se disponibile (contiene dati più ricchi se student è fallback)
+                const profileName = data.selectedProfile?.name;
+                const studentName = data.student.name;
 
-                    // Fallback 1: cerca in selectedProfile
-                    if (data.selectedProfile?.name && isValidName(data.selectedProfile.name)) {
-                        state.user.name = data.selectedProfile.name;
-                        console.log("✅ Nome da selectedProfile:", state.user.name);
-                    } else {
-                        // Fallback 2: mantieni esistente o usa placeholder
-                        if (!state.user.name || !isValidName(state.user.name)) {
-                            state.user.name = "Studente";
-                            console.log("⚠️ Uso placeholder: Studente");
-                        }
+                if (profileName && isValidName(profileName)) {
+                    state.user.name = profileName;
+                    console.log("✅ Nome da selectedProfile:", profileName);
+                } else if (isValidName(studentName)) {
+                    state.user.name = studentName;
+                    console.log("✅ Nome da student object:", studentName);
+                } else {
+                    console.warn("⚠️ Nome non valido o assente:", profileName || studentName);
+                    // Fallback finale
+                    if (!state.user.name || !isValidName(state.user.name)) {
+                        state.user.name = "Studente";
                     }
                 }
 
-                // Classe: valida formato
-                const receivedClass = data.student.class;
-                if (isValidClass(receivedClass)) {
-                    state.user.class = receivedClass;
-                    console.log("✅ Classe valida ricevuta:", receivedClass);
-                } else {
-                    console.warn("⚠️ Classe non valida ricevuta:", receivedClass);
+                // Classe: Simile priorità
+                const profileClass = data.selectedProfile?.class;
+                const studentClass = data.student.class;
 
-                    // Cerca alternative
-                    if (data.selectedProfile?.class && isValidClass(data.selectedProfile.class)) {
-                        state.user.class = data.selectedProfile.class;
-                        console.log("✅ Classe da selectedProfile:", state.user.class);
-                    } else {
-                        // Ometti se non valida (isValidClass nel rendering gestirà)
-                        state.user.class = null;
-                    }
+                if (profileClass && isValidClass(profileClass)) {
+                    state.user.class = profileClass;
+                    console.log("✅ Classe da selectedProfile:", profileClass);
+                } else if (isValidClass(studentClass)) {
+                    state.user.class = studentClass;
+                    console.log("✅ Classe da student object:", studentClass);
+                } else {
+                    console.warn("⚠️ Classe non valida o assente");
+                    state.user.class = null;
                 }
+
 
                 // Salva con dati validati
                 localStorage.setItem(lsKey('user'), JSON.stringify(state.user));

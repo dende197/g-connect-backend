@@ -141,39 +141,160 @@ def looks_like_subject(text: str) -> bool:
 
 def extract_student_identity_from_profile(profile: dict):
     """
-    Robust identity extraction from a DidUP 'Famiglia' profile dict.
-    Returns (name, class) if found, else (None, None).
-    - Name: uses alunno.desCognome + alunno.desNome (or cognome/nome), normalized 'COGNOME NOME'
-    - Class: uses desClasse (or classe), validated ^[1-5][A-Z]$
+    VERSIONE ULTRA-ROBUSTA con logging dettagliato.
+    Cerca il nome in TUTTI i possibili campi e logga cosa trova.
     """
     try:
         if not isinstance(profile, dict):
+            debug_log("⚠️ Profile non è un dict", type(profile))
             return None, None
 
-        # Prefer nested 'alunno'
+        # LOG: Stampa TUTTI i campi del profilo per debug
+        debug_log("🔍 PROFILE KEYS RICEVUTI", {
+            "keys": list(profile.keys()),
+            "alunno_type": type(profile.get('alunno')),
+            "alunno_keys": list(profile['alunno'].keys()) if isinstance(profile.get('alunno'), dict) else "NOT_DICT"
+        })
+
+        nome = None
+        cognome = None
+
+        # STRATEGIA 1: Campo 'alunno' nested (standard API Famiglia)
         al = profile.get('alunno', {}) if isinstance(profile.get('alunno'), dict) else {}
-        nome = (al.get('desNome') or al.get('nome') or '').strip()
-        cognome = (al.get('desCognome') or al.get('cognome') or '').strip()
+        if al:
+            nome = (al.get('desNome') or al.get('nome') or '').strip()
+            cognome = (al.get('desCognome') or al.get('cognome') or '').strip()
+            debug_log("📋 Strategia 1 (alunno.*)", {"nome": nome, "cognome": cognome})
 
-        # Fallback direct fields on profile if somehow alunno is missing
+        # STRATEGIA 2: Campi diretti sul profilo
         if not (nome and cognome):
-            nome = (profile.get('desNome') or profile.get('nome') or nome).strip()
-            cognome = (profile.get('desCognome') or profile.get('cognome') or cognome).strip()
+            nome_direct = (profile.get('desNome') or profile.get('nome') or '').strip()
+            cognome_direct = (profile.get('desCognome') or profile.get('cognome') or '').strip()
+            
+            if nome_direct or cognome_direct:
+                nome = nome_direct or nome
+                cognome = cognome_direct or cognome
+                debug_log("📋 Strategia 2 (direct fields)", {"nome": nome, "cognome": cognome})
 
+        # STRATEGIA 3: Campo 'nominativo' / 'descrizione' (parsing)
+        if not (nome and cognome):
+            nominativo = (profile.get('nominativo') or profile.get('descrizione') or 
+                         profile.get('displayName') or profile.get('nomeCompleto') or '').strip()
+            
+            debug_log("📋 Strategia 3 (nominativo/descrizione)", {"value": nominativo})
+            
+            if nominativo:
+                # Formato "ROSSI MARIO" (tutto maiuscolo)
+                if nominativo.isupper() and ' ' in nominativo:
+                    parts = nominativo.split(maxsplit=1)
+                    if len(parts) == 2:
+                        cognome, nome = parts[0], parts[1]
+                        debug_log("✅ Parsed MAIUSCOLO", {"cognome": cognome, "nome": nome})
+                # Formato "Mario Rossi" o "Rossi Mario"
+                elif ' ' in nominativo:
+                    parts = nominativo.split(maxsplit=1)
+                    if len(parts) == 2:
+                        # Euristica: nome di solito più corto
+                        if len(parts[0]) < len(parts[1]):
+                            nome, cognome = parts[0], parts[1]
+                        else:
+                            cognome, nome = parts[0], parts[1]
+                        debug_log("✅ Parsed misto", {"cognome": cognome, "nome": nome})
+
+        # STRATEGIA 4: Campo 'dati' o 'anagrafica' nested
+        if not (nome and cognome):
+            dati = profile.get('dati', {}) if isinstance(profile.get('dati'), dict) else {}
+            anagrafica = profile.get('anagrafica', {}) if isinstance(profile.get('anagrafica'), dict) else {}
+            
+            if dati or anagrafica:
+                nome = (dati.get('nome') or anagrafica.get('nome') or nome or '').strip()
+                cognome = (dati.get('cognome') or anagrafica.get('cognome') or cognome or '').strip()
+                debug_log("📋 Strategia 4 (dati/anagrafica)", {"nome": nome, "cognome": cognome})
+
+        # STRATEGIA 5: Estrai da campo 'token' (a volte contiene dati JWT)
+        if not (nome and cognome) and profile.get('token'):
+            try:
+                import base64
+                token = profile['token']
+                parts = token.split('.')
+                if len(parts) >= 2:
+                    payload_b64 = parts[1]
+                    payload_b64 += '=' * (4 - len(payload_b64) % 4)
+                    payload_json = base64.urlsafe_b64decode(payload_b64)
+                    payload = json.loads(payload_json)
+                    
+                    # Alcuni JWT contengono nome/cognome
+                    nome = payload.get('nome') or payload.get('given_name') or nome
+                    cognome = payload.get('cognome') or payload.get('family_name') or cognome
+                    debug_log("📋 Strategia 5 (JWT decode)", {"nome": nome, "cognome": cognome})
+            except Exception as e:
+                debug_log("⚠️ JWT decode failed", str(e))
+
+        # Costruisci nome finale
         name = None
         if nome and cognome:
-            name = f"{cognome} {nome}".strip().upper()
+            name = f"{cognome.upper()} {nome.upper()}".strip()
+            debug_log("✅ NOME ESTRATTO", name)
+        else:
+            debug_log("❌ NOME NON TROVATO", {"nome": nome, "cognome": cognome})
 
-        # Class extraction (prefer desClasse)
-        cls_raw = profile.get('desClasse') or profile.get('classe') or ''
+        # ESTRAZIONE CLASSE
+        cls_raw = (profile.get('desClasse') or profile.get('classe') or 
+                   profile.get('classeSezione') or '')
         cls = None
         if isinstance(cls_raw, str):
             c = cls_raw.strip().upper()
             if CLASS_REGEX.match(c):
                 cls = c
+                debug_log("✅ CLASSE ESTRATTA", cls)
+            else:
+                debug_log("⚠️ Classe non valida", cls_raw)
 
         return name, cls
-    except Exception:
+        
+    except Exception as e:
+        debug_log("❌ EXCEPTION in extract_student_identity_from_profile", str(e))
+        import traceback
+        debug_log("Traceback", traceback.format_exc())
+        return None, None
+
+
+def extract_student_from_scheda(scheda_data: dict):
+    """
+    Fallback: estrae nome dall'endpoint /scheda
+    """
+    try:
+        debug_log("🔍 SCHEDA DATA KEYS", {
+            "keys": list(scheda_data.keys()) if isinstance(scheda_data, dict) else "NOT_DICT",
+            "type": str(type(scheda_data))
+        })
+        
+        if not isinstance(scheda_data, dict):
+            return None, None
+        
+        # Alcuni sistemi wrappano in 'data'
+        data = scheda_data.get('data', {}) if isinstance(scheda_data.get('data'), dict) else scheda_data
+        
+        nome = (data.get('nome') or data.get('desNome') or '').strip()
+        cognome = (data.get('cognome') or data.get('desCognome') or '').strip()
+        
+        debug_log("📋 Scheda extraction", {"nome": nome, "cognome": cognome})
+        
+        name = None
+        if nome and cognome:
+            name = f"{cognome.upper()} {nome.upper()}".strip()
+        
+        # Classe
+        cls_raw = (data.get('classe') or data.get('desClasse') or '')
+        cls = None
+        if isinstance(cls_raw, str):
+            c = cls_raw.strip().upper()
+            if CLASS_REGEX.match(c):
+                cls = c
+        
+        return name, cls
+    except Exception as e:
+        debug_log("❌ EXCEPTION in extract_student_from_scheda", str(e))
         return None, None
 
 def parse_display_name(text: str):
@@ -1328,39 +1449,79 @@ def login():
         # ============================================================
         # 4. RECUPERO IDENTITÀ STUDENTE (ANAGRAFE UFFICIALE)
         # ============================================================
+        # 4) ESTRAZIONE IDENTITÀ CON FALLBACK MULTIPLI + LOGGING
         student_name = None
         student_class = None
 
-        # Build a session bound to the selected profile tokens
-        argo_identity = create_session(school, username, password, access_token, auth_token)
+        # TENTATIVO 1: Estrazione dal profilo API
+        if target_profile:
+            debug_log("🎯 Profilo target selezionato", {
+                "index": target_index,
+                "profile_keys": list(target_profile.keys()),
+                "alunno": target_profile.get('alunno')
+            })
+            
+            name_from_profile, class_from_profile = extract_student_identity_from_profile(target_profile)
+            
+            if name_from_profile:
+                student_name = name_from_profile
+                debug_log("✅ Nome studente (profilo API)", student_name)
+            else:
+                debug_log("⚠️ Nome NON trovato nel profilo API")
+            
+            if class_from_profile:
+                student_class = class_from_profile
+                debug_log("✅ Classe studente (profilo API)", student_class)
+            else:
+                debug_log("⚠️ Classe NON trovata nel profilo API")
 
-        # 4A: Try official anagrafe endpoints first (single source of truth)
-        an_name, an_class = fetch_student_identity(argo_identity)
-        if an_name:
-            student_name = an_name
-        if an_class:
-            student_class = an_class
-
-        # 4B: Fallback to profile object if anagrafe missing for this school
-        if (not student_name or not student_class) and target_profile:
-            al = target_profile.get("alunno") or {}
-            n = (al.get("desNome") or al.get("nome") or "").strip()
-            c = (al.get("desCognome") or al.get("cognome") or "").strip()
-            cls_raw = target_profile.get("desClasse") or target_profile.get("classe") or ""
-
-            if not student_name and (n or c):
-                student_name = f"{c} {n}".strip().upper()
-
-            if not student_class and isinstance(cls_raw, str):
-                cls_normalized = cls_raw.strip().upper()
-                if CLASS_REGEX.match(cls_normalized):
-                    student_class = cls_normalized
-
-        # 4C: Final minimal fallback
+        # TENTATIVO 2: Se il nome NON è stato trovato, usa endpoint /scheda
         if not student_name:
-            student_name = f"Studente {target_index + 1}"
+            debug_log("🔄 Provo fallback /scheda per recuperare nome")
+            try:
+                argo_scheda = create_session(school, username, password, access_token, auth_token)
+                scheda_data = argo_scheda.get_scheda()
+                
+                debug_log("📄 Risposta /scheda", {
+                    "type": str(type(scheda_data)),
+                    "keys": list(scheda_data.keys()) if isinstance(scheda_data, dict) else "NOT_DICT",
+                    "sample": str(scheda_data)[:500]
+                })
+                
+                name_from_scheda, class_from_scheda = extract_student_from_scheda(scheda_data)
+                
+                if name_from_scheda:
+                    student_name = name_from_scheda
+                    debug_log("✅ Nome studente (/scheda)", student_name)
+                else:
+                    debug_log("❌ Nome NON trovato in /scheda")
+                
+                if not student_class and class_from_scheda:
+                    student_class = class_from_scheda
+                    debug_log("✅ Classe studente (/scheda)", student_class)
+                    
+            except Exception as e:
+                debug_log("❌ Errore chiamata /scheda", str(e))
+                import traceback
+                debug_log("Traceback /scheda", traceback.format_exc())
+
+        # TENTATIVO 3: Fallback finale
+        if not student_name:
+            student_name = f"Studente {target_index+1}" if profiles else username.upper()
+            debug_log("⚠️ Usando fallback finale nome", student_name)
+        
         if not student_class:
-            student_class = "N/D"
+            if target_profile and isinstance(target_profile.get('desClasse'), str):
+                cls = target_profile['desClasse'].strip().upper()
+                if CLASS_REGEX.match(cls):
+                    student_class = cls
+            student_class = student_class or "N/D"
+            debug_log("⚠️ Usando fallback finale classe", student_class)
+
+        debug_log("📊 IDENTITÀ FINALE", {
+            "name": student_name,
+            "class": student_class
+        })
 
         debug_log("👤 Final student identity", {"name": student_name, "class": student_class})
 
@@ -1646,3 +1807,94 @@ if __name__ == '__main__':
     print(f"✅ Ordine corretto: COMPITI → VOTI")
     print(f"{'='*70}\n")
     app.run(host='0.0.0.0', port=port, debug=True)
+
+@app.route('/test/profile-structure', methods=['POST'])
+def test_profile_structure():
+    """
+    Endpoint di test per ispezionare la struttura COMPLETA dei profili
+    """
+    data = request.json or {}
+    school = (data.get('schoolCode') or '').strip().upper()
+    user = (data.get('username') or '').strip().lower()
+    pwd = data.get('password')
+    
+    if not all([school, user, pwd]):
+        return jsonify({"error": "Parametri mancanti"}), 400
+
+    result = {
+        "success": False,
+        "profiles": [],
+        "scheda": {},
+        "errors": []
+    }
+
+    try:
+        # 1. Test Raw Login
+        debug_log("�� TEST: Chiamata raw_login")
+        login_result = AdvancedArgo.raw_login(school, user, pwd)
+        access_token = login_result['access_token']
+        profiles = login_result.get('profiles', [])
+        
+        debug_log(f"✅ Ricevuti {len(profiles)} profili")
+        
+        # Analizza ogni profilo
+        for idx, prof in enumerate(profiles):
+            profile_info = {
+                "index": idx,
+                "all_keys": list(prof.keys()),
+                "raw_data": prof,  # Profilo completo
+                "extraction_test": {}
+            }
+            
+            # Test estrazione
+            name, cls = extract_student_identity_from_profile(prof)
+            profile_info["extraction_test"] = {
+                "name": name,
+                "class": cls,
+                "success": name is not None
+            }
+            
+            # Analizza campo alunno
+            if 'alunno' in prof:
+                profile_info["alunno_analysis"] = {
+                    "type": str(type(prof['alunno'])),
+                    "content": prof['alunno']
+                }
+            
+            result["profiles"].append(profile_info)
+        
+        # 2. Test endpoint /scheda per il primo profilo
+        if profiles:
+            try:
+                debug_log("🧪 TEST: Chiamata /scheda")
+                auth_token = profiles[0].get('token')
+                argo_scheda = create_session(school, user, pwd, access_token, auth_token)
+                scheda_data = argo_scheda.get_scheda()
+                
+                result["scheda"] = {
+                    "keys": list(scheda_data.keys()) if isinstance(scheda_data, dict) else [],
+                    "raw_data": scheda_data,
+                    "extraction_test": {}
+                }
+                
+                # Test estrazione da scheda
+                name_s, cls_s = extract_student_from_scheda(scheda_data)
+                result["scheda"]["extraction_test"] = {
+                    "name": name_s,
+                    "class": cls_s,
+                    "success": name_s is not None
+                }
+                
+            except Exception as e:
+                result["errors"].append(f"Errore /scheda: {str(e)}")
+        
+        result["success"] = True
+        return jsonify(result), 200
+        
+    except Exception as e:
+        import traceback
+        result["errors"].append({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+        return jsonify(result), 500
