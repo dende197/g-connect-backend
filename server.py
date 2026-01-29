@@ -1236,7 +1236,48 @@ def post_message():
         debug_log("⚠️ post_message error", str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/login', methods=['POST'])
+@app.route('/api/resolve-profile', methods=['POST'])
+def resolve_profile():
+    """
+    Risolve nome e classe per un profilo specifico usando /scheda.
+    Body: { "schoolCode": "...", "username": "...", "password": "...", "profileIndex": 0 }
+    Response: { "success": true, "name": "ROSSI MARIO", "class": "3A" }
+    """
+    data = request.json or {}
+    school = (data.get('schoolCode') or '').strip().upper()
+    user = (data.get('username') or '').strip().lower()
+    pwd = data.get('password')
+    idx = int(data.get('profileIndex', 0))
+
+    if not all([school, user, pwd]):
+        return jsonify({"success": False, "error": "Parametri mancanti"}), 400
+
+    try:
+        # Login leggero: profili minimi + access_token
+        login_result = AdvancedArgo.raw_login(school, user, pwd)
+        access_token = login_result['access_token']
+        profiles = login_result.get('profiles', []) or []
+        if not profiles:
+            return jsonify({"success": False, "error": "Nessun profilo"}), 404
+        if idx < 0 or idx >= len(profiles):
+            idx = 0
+        target = profiles[idx]
+        auth_token = target.get('token', '')
+
+        # Risolvi identità solo per questo profilo
+        name, cls = resolve_identity_for_profile(
+            school, user, pwd, access_token, auth_token,
+            target.get('name'), target.get('class')
+        )
+        # Fallback finali
+        if not name: name = f"STUDENTE {idx+1}"
+        if not cls or not CLASS_REGEX.match(cls): cls = "N/D"
+
+        return jsonify({"success": True, "name": name, "class": cls}), 200
+    except Exception as e:
+        debug_log("⚠️ resolve_profile error", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/login', methods=['POST'])
 def login():
     """

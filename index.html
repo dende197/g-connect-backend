@@ -3863,12 +3863,12 @@
                             <button class="btn-profile" 
                                     data-index="${p.index}"
                                     style="background: var(--surface-highlight); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 16px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s; width: 100%; text-align: left; -webkit-tap-highlight-color: transparent;">
-                                <div style="width: 44px; height: 44px; background: linear-gradient(135deg, var(--blue), var(--indigo)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; color: white; flex-shrink: 0;">
+                                <div class="profile-avatar" style="width: 44px; height: 44px; background: linear-gradient(135deg, var(--blue), var(--indigo)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; color: white; flex-shrink: 0;">
                                     ${(p.name || 'S')[0].toUpperCase()}
                                 </div>
                                 <div style="flex-grow: 1;">
-                                    <div style="font-weight: 700; font-size: 16px; color: white; margin-bottom: 4px;">${p.name || ('Studente ' + (p.index + 1))}</div>
-                                    <div style="font-size: 13px; color: var(--text-secondary);">${p.class || p.school || ''}</div>
+                                    <div class="profile-name" style="font-weight: 700; font-size: 16px; color: white; margin-bottom: 4px;">${p.name || ('Studente ' + (p.index + 1))}</div>
+                                    <div class="profile-class" style="font-size: 13px; color: var(--text-secondary);">${p.class || p.school || 'Caricamento...'}</div>
                                 </div>
                                 <i class="ph-bold ph-caret-right" style="color: var(--text-secondary);"></i>
                             </button>
@@ -3896,6 +3896,50 @@
 
                 await selectProfile(parseInt(btn.dataset.index, 10), credentials);
             }, { once: true });
+
+            // 🆕 Risolvi i nomi veri in background
+            resolveProfileNamesAsync(profiles, credentials, container);
+        }
+
+        // 🆕 Risoluzione nomi profili asincrona
+        async function resolveProfileNamesAsync(profiles, credentials, container) {
+            try {
+                await Promise.all(profiles.map(async (p) => {
+                    try {
+                        const resp = await fetch(`${API_BASE_URL}/api/resolve-profile`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                schoolCode: credentials.schoolCode,
+                                username: credentials.username,
+                                password: credentials.password,
+                                profileIndex: p.index
+                            })
+                        });
+                        const j = await resp.json();
+                        if (j.success) {
+                            // Aggiorna in memoria
+                            p.name = j.name;
+                            p.class = j.class;
+                            // Aggiorna UI
+                            const btn = container.querySelector(`.btn-profile[data-index="${p.index}"]`);
+                            if (btn) {
+                                const nameEl = btn.querySelector('.profile-name');
+                                const classEl = btn.querySelector('.profile-class');
+                                const avatarEl = btn.querySelector('.profile-avatar');
+                                if (nameEl) nameEl.textContent = j.name;
+                                if (classEl) classEl.textContent = j.class || 'N/D';
+                                if (avatarEl) avatarEl.textContent = (j.name || 'S')[0].toUpperCase();
+                            }
+                            console.log(`✅ Risolto profilo ${p.index}: ${j.name} - ${j.class}`);
+                        }
+                    } catch (e) {
+                        console.warn(`⚠️ Errore risoluzione profilo ${p.index}:`, e);
+                    }
+                }));
+            } catch (e) {
+                console.warn('⚠️ Impossibile risolvere nomi profili:', e);
+            }
         }
 
         async function selectProfile(profileIndex, credentials) {
