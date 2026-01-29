@@ -139,277 +139,114 @@ def looks_like_subject(text: str) -> bool:
     s = text.strip().upper()
     return any(tok in s for tok in SUBJECT_TOKENS)
 
-def extract_student_identity_from_profile(profile: dict):
-    """
-    VERSIONE ULTRA-ROBUSTA con logging dettagliato.
-    Cerca il nome in TUTTI i possibili campi e logga cosa trova.
-    """
-    try:
-        if not isinstance(profile, dict):
-            debug_log("⚠️ Profile non è un dict", type(profile))
-            return None, None
+        self._ArgoFamiglia__token = auth_token
+        self._ArgoFamiglia__login_data = {"access_token": access_token} if access_token else None
+        self._ArgoFamiglia__headers = {}
+        
+        if auth_token and access_token:
+            self.set_headers(auth_token, access_token)
+        elif not skip_connect:
+            self.connect()
 
-        # LOG: Stampa TUTTI i campi del profilo per debug
-        debug_log("🔍 PROFILE KEYS RICEVUTI", {
-            "keys": list(profile.keys()),
-            "alunno_type": type(profile.get('alunno')),
-            "alunno_keys": list(profile['alunno'].keys()) if isinstance(profile.get('alunno'), dict) else "NOT_DICT"
-        })
+    def set_headers(self, auth_token, access_token):
+        """Imposta gli header manualmente"""
+        self._ArgoFamiglia__headers = {
+            "Content-Type": "Application/json",
+            "Authorization": "Bearer " + access_token,
+            "Accept": "Application/json",
+            "x-cod-min": self._ArgoFamiglia__school,
+            "x-auth-token": auth_token,
+            "User-Agent": USER_AGENT
+        }
+        self._ArgoFamiglia__token = auth_token
 
-        nome = None
-        cognome = None
-
-        # STRATEGIA 1: Campo 'alunno' nested (standard API Famiglia)
-        al = profile.get('alunno', {}) if isinstance(profile.get('alunno'), dict) else {}
-        if al:
-            nome = (al.get('desNome') or al.get('nome') or '').strip()
-            cognome = (al.get('desCognome') or al.get('cognome') or '').strip()
-            debug_log("📋 Strategia 1 (alunno.*)", {"nome": nome, "cognome": cognome})
-
-        # STRATEGIA 2: Campi diretti sul profilo
-        if not (nome and cognome):
-            nome_direct = (profile.get('desNome') or profile.get('nome') or '').strip()
-            cognome_direct = (profile.get('desCognome') or profile.get('cognome') or '').strip()
+    @staticmethod
+    def raw_login(school, username, password):
+        """
+        ✅ VERSIONE AGGIORNATA
+        Esegue il flow OAuth completo e restituisce i profili con desNominativo.
+        
+        Returns:
+            {
+                "access_token": str,
+                "profiles": [
+                    {
+                        "index": int,
+                        "name": str,           # ← desNominativo
+                        "class": str,          # ← classe
+                        "school": str,         # ← codiceScuola
+                        "token": str,
+                        "idSoggetto": str,
+                        "raw": dict            # ← soggetto completo
+                    }
+                ]
+            }
+        """
+        try:
+            # 1. Challenge
+            CODE_VERIFIER = secrets.token_hex(64)
+            CODE_CHALLENGE = base64.urlsafe_b64encode(sha256(CODE_VERIFIER.encode()).digest()).decode().replace("=", "")
             
-            if nome_direct or cognome_direct:
-                nome = nome_direct or nome
-                cognome = cognome_direct or cognome
-                debug_log("📋 Strategia 2 (direct fields)", {"nome": nome, "cognome": cognome})
-
-        # STRATEGIA 3: Campo 'nominativo' / 'descrizione' (parsing)
-        if not (nome and cognome):
-            nominativo = (profile.get('nominativo') or profile.get('descrizione') or 
-                         profile.get('displayName') or profile.get('nomeCompleto') or '').strip()
+            session = requests.Session()
             
-            debug_log("📋 Strategia 3 (nominativo/descrizione)", {"value": nominativo})
+            params = {
+                "redirect_uri": REDIRECT_URI,
+                "client_id": CLIENT_ID,
+                "response_type": "code",
+                "prompt": "login",
+                "state": secrets.token_urlsafe(32),
+                "scope": "openid offline profile user.roles argo",
+                "code_challenge": CODE_CHALLENGE,
+                "code_challenge_method": "S256"
+            }
             
-            if nominativo:
-                # Formato "ROSSI MARIO" (tutto maiuscolo)
-                if nominativo.isupper() and ' ' in nominativo:
-                    parts = nominativo.split(maxsplit=1)
-                    if len(parts) == 2:
-                        cognome, nome = parts[0], parts[1]
-                        debug_log("✅ Parsed MAIUSCOLO", {"cognome": cognome, "nome": nome})
-                # Formato "Mario Rossi" o "Rossi Mario"
-                elif ' ' in nominativo:
-                    parts = nominativo.split(maxsplit=1)
-                    if len(parts) == 2:
-                        # Euristica: nome di solito più corto
-                        if len(parts[0]) < len(parts[1]):
-                            nome, cognome = parts[0], parts[1]
-                        else:
-                            cognome, nome = parts[0], parts[1]
-                        debug_log("✅ Parsed misto", {"cognome": cognome, "nome": nome})
-
-        # STRATEGIA 4: Campo 'dati' o 'anagrafica' nested
-        if not (nome and cognome):
-            dati = profile.get('dati', {}) if isinstance(profile.get('dati'), dict) else {}
-            anagrafica = profile.get('anagrafica', {}) if isinstance(profile.get('anagrafica'), dict) else {}
+            req = session.get(CHALLENGE_URL, params=params)
             
-            if dati or anagrafica:
-                nome = (dati.get('nome') or anagrafica.get('nome') or nome or '').strip()
-                cognome = (dati.get('cognome') or anagrafica.get('cognome') or cognome or '').strip()
-                debug_log("📋 Strategia 4 (dati/anagrafica)", {"nome": nome, "cognome": cognome})
-
-        # STRATEGIA 5: Estrai da campo 'token' (a volte contiene dati JWT)
-        if not (nome and cognome) and profile.get('token'):
-            try:
-                import base64
-                token = profile['token']
-                parts = token.split('.')
-                if len(parts) >= 2:
-                    payload_b64 = parts[1]
-                    payload_b64 += '=' * (4 - len(payload_b64) % 4)
-                    payload_json = base64.urlsafe_b64decode(payload_b64)
-                    payload = json.loads(payload_json)
-                    
-                    # Alcuni JWT contengono nome/cognome
-                    nome = payload.get('nome') or payload.get('given_name') or nome
-                    cognome = payload.get('cognome') or payload.get('family_name') or cognome
-                    debug_log("📋 Strategia 5 (JWT decode)", {"nome": nome, "cognome": cognome})
-            except Exception as e:
-                debug_log("⚠️ JWT decode failed", str(e))
-
-        # Costruisci nome finale
-        name = None
-        if nome and cognome:
-            name = f"{cognome.upper()} {nome.upper()}".strip()
-            debug_log("✅ NOME ESTRATTO", name)
-        else:
-            debug_log("❌ NOME NON TROVATO", {"nome": nome, "cognome": cognome})
-
-        # ESTRAZIONE CLASSE
-        cls_raw = (profile.get('desClasse') or profile.get('classe') or 
-                   profile.get('classeSezione') or '')
-        cls = None
-        if isinstance(cls_raw, str):
-            c = cls_raw.strip().upper()
-            if CLASS_REGEX.match(c):
-                cls = c
-                debug_log("✅ CLASSE ESTRATTA", cls)
-            else:
-                debug_log("⚠️ Classe non valida", cls_raw)
-
-        return name, cls
-        
-    except Exception as e:
-        debug_log("❌ EXCEPTION in extract_student_identity_from_profile", str(e))
-        import traceback
-        debug_log("Traceback", traceback.format_exc())
-        return None, None
-
-
-def extract_student_from_scheda(scheda_data: dict):
-    """
-    Fallback: estrae nome dall'endpoint /scheda
-    """
-    try:
-        debug_log("🔍 SCHEDA DATA KEYS", {
-            "keys": list(scheda_data.keys()) if isinstance(scheda_data, dict) else "NOT_DICT",
-            "type": str(type(scheda_data))
-        })
-        
-        if not isinstance(scheda_data, dict):
-            return None, None
-        
-        # Alcuni sistemi wrappano in 'data'
-        data = scheda_data.get('data', {}) if isinstance(scheda_data.get('data'), dict) else scheda_data
-        
-        nome = (data.get('nome') or data.get('desNome') or '').strip()
-        cognome = (data.get('cognome') or data.get('desCognome') or '').strip()
-        
-        debug_log("📋 Scheda extraction", {"nome": nome, "cognome": cognome})
-        
-        name = None
-        if nome and cognome:
-            name = f"{cognome.upper()} {nome.upper()}".strip()
-        
-        # Classe
-        cls_raw = (data.get('classe') or data.get('desClasse') or '')
-        cls = None
-        if isinstance(cls_raw, str):
-            c = cls_raw.strip().upper()
-            if CLASS_REGEX.match(c):
-                cls = c
-        
-        return name, cls
-    except Exception as e:
-        debug_log("❌ EXCEPTION in extract_student_from_scheda", str(e))
-        return None, None
-
-def parse_display_name(text: str):
-    """
-    Estrae 'COGNOME NOME' da una stringa, evitando materie e token scuola.
-    """
-    if not isinstance(text, str):
-        return None
-    
-    s = text.strip()
-    if not s or not s.isupper() or len(s) < 5:
-        return None
-    
-    if looks_like_subject(s):
-        return None
-    
-    parts = [p for p in s.split() if p]
-    if len(parts) < 2:
-        return None
-    
-    # Tronca prima dei token scuola
-    idx_stop = None
-    for i, tok in enumerate(parts):
-        if tok in SCHOOL_TOKENS:
-            idx_stop = i
-            break
-    if idx_stop is not None and idx_stop >= 2:
-        parts = parts[:idx_stop]
-    
-    # Prendi primi 2 token come COGNOME NOME
-    if len(parts) >= 2:
-        p0, p1 = parts[0], parts[1]
-        if looks_like_subject(p0) or looks_like_subject(p1):
-            return None
-        if p0.isalpha() and p1.isalpha() and len(p0) >= 2 and len(p1) >= 2:
-            return f"{p0} {p1}".strip().upper()
-    
-    return None
-
-import logging
-
-# Configure logging to file
-logging.basicConfig(
-    filename='server.log',
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filemode='w'  # Overwrite each time server restarts
-)
-
-def debug_log(message, data=None):
-    """Helper per logging strutturato su file e console"""
-    log_msg = f"{message}"
-    if data:
-        if isinstance(data, (dict, list)):
-            log_msg += f"\n{json.dumps(data, indent=2, ensure_ascii=False, default=str)[:2000]}"
-        else:
-            log_msg += f"\n{str(data)[:2000]}"
-    
-    # Write to file
-    logging.info(log_msg)
-    
-    # Print to console (existing behavior)
-    if DEBUG_MODE:
-        print(f"\n{'='*60}")
-        print(f"🔍 {message}")
-        if data:
-            if isinstance(data, (dict, list)):
-                print(json.dumps(data, indent=2, ensure_ascii=False, default=str)[:2000])
-            else:
-                print(str(data)[:2000])
-        print(f"{'='*60}\n")
-
-# ✅ NEW: Supabase client init
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-
-supabase: Client | None = None
-if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-        debug_log("✅ Supabase configured and connected")
-    except Exception as e:
-        debug_log("❌ Error initializing Supabase client", str(e))
-else:
-    debug_log("⚠️ Supabase NOT configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
-# ============= PERSISTENCE CONFIG =============
-POSTS_FILE = "posts.json"
-MARKET_FILE = "market.json"
-
-def load_json_file(filename, default=[]):
-    """Carica dati da file JSON locale"""
-    try:
-        if os.path.exists(filename):
-            with open(filename, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    except Exception as e:
-        debug_log(f"⚠️ Errore caricamento {filename}", str(e))
-    return default
-
-def save_json_file(filename, data):
-    """Salva dati su file JSON locale"""
-    try:
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        debug_log(f"⚠️ Errore salvataggio {filename}", str(e))
-
+            # Extract challenge
+            challenge_match = re.search(r"login_challenge=([0-9a-f]+)", req.url)
+            if not challenge_match:
+                raise Exception("Login challenge non trovata")
+            login_challenge = challenge_match.group(1)
+            
+            # 2. Login POST
+            login_data = {
+                "challenge": login_challenge,
+                "client_id": CLIENT_ID,
+                "prefill": "true",
+                "famiglia_customer_code": school,
+                "username": username,
+                "password": password,
+                "login": "true"
+            }
+            
+            req = session.post(LOGIN_URL, data=login_data, allow_redirects=False)
+            if "Location" not in req.headers:
+                raise ValueError("Credenziali errate o scuola non valida")
+            
+            # 3. Follow redirect to get code
+            while True:
+                location = req.headers["Location"]
+                if "code=" in location:
+                    break
+                req = session.get(location, allow_redirects=False)
+            
+            code_match = re.search(r"code=([0-9a-zA-Z-_.]+)", location)
+            if not code_match:
+                raise Exception("Auth code non trovato")
+            code = code_match.group(1)
+            
+            # 4. Exchange code for token
+            token_req_data = {
+                "code": code,
+                "grant_type": "authorization_code",
 # ============= ADVANCED ARGO CLASS (MULTI-PROFILE) =============
 
 class AdvancedArgo(argofamiglia.ArgoFamiglia):
     """
-    Estensione di ArgoFamiglia per supportare login manuale e selezione profilo.
+    Estensione di ArgoFamiglia con supporto COMPLETO per i profili.
+    NUOVO: Usa l'endpoint /login che restituisce l'array 'soggetti' con desNominativo
     """
     def __init__(self, school: str, username: str, password: str, auth_token=None, access_token=None, skip_connect=False):
-        # Bypass __init__ originale per evitare connect automatica se richiesto
         self._ArgoFamiglia__school = school
         self._ArgoFamiglia__username = username
         self._ArgoFamiglia__password = password
@@ -437,12 +274,31 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
     @staticmethod
     def raw_login(school, username, password):
         """
-        Esegue il flow OAuth e restituisce TUTTI i profili disponibili.
+        ✅ VERSIONE AGGIORNATA
+        Esegue il flow OAuth completo e restituisce i profili con desNominativo.
+        
+        Returns:
+            {
+                "access_token": str,
+                "profiles": [
+                    {
+                        "index": int,
+                        "name": str,           # ← desNominativo
+                        "class": str,          # ← classe
+                        "school": str,         # ← codiceScuola
+                        "token": str,
+                        "idSoggetto": str,
+                        "raw": dict            # ← soggetto completo
+                    }
+                ]
+            }
         """
         try:
             # 1. Challenge
             CODE_VERIFIER = secrets.token_hex(64)
-            CODE_CHALLENGE = base64.urlsafe_b64encode(sha256(CODE_VERIFIER.encode()).digest()).decode().replace("=", "")
+            CODE_CHALLENGE = base64.urlsafe_b64encode(
+                sha256(CODE_VERIFIER.encode()).digest()
+            ).decode().replace("=", "")
             
             session = requests.Session()
             
@@ -504,12 +360,12 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
             tokens = session.post(TOKEN_URL, data=token_req_data).json()
             access_token = tokens["access_token"]
             
-            # 5. Call Argo Login API to get Profiles
+            # 5. ✅ NUOVO: Chiama /login per ottenere l'array soggetti
             login_headers = {
                 "User-Agent": USER_AGENT,
-                "Content-Type": "Application/json",
+                "Content-Type": "application/json",
                 "Authorization": "Bearer " + access_token,
-                "Accept": "Application/json",
+                "Accept": "application/json",
             }
             
             payload = {
@@ -519,25 +375,56 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
                 "lista-opzioni-notifiche": "{}"
             }
             
-            argo_resp = requests.post(ENDPOINT + "login", headers=login_headers, json=payload).json()
-            profiles_data = argo_resp.get("data", [])
+            argo_resp = requests.post(
+                ENDPOINT + "login", 
+                headers=login_headers, 
+                json=payload
+            ).json()
+            
+            # 6. ✅ PARSING SOGGETTI
+            soggetti = argo_resp.get("data", [])
+            
+            debug_log("🔍 SOGGETTI RICEVUTI DALL'API", {
+                "count": len(soggetti),
+                "first_keys": list(soggetti[0].keys()) if soggetti else [],
+                "sample": soggetti[0] if soggetti else None
+            })
+            
+            # 7. ✅ COSTRUISCI PROFILI CON NOMI VERI
+            profiles = []
+            for idx, sog in enumerate(soggetti):
+                profile = {
+                    "index": idx,
+                    "name": sog.get('desNominativo', '').strip().upper(),  # ✅ NOME VERO
+                    "class": sog.get('classe', '').strip().upper(),        # ✅ CLASSE VERA
+                    "school": sog.get('codiceScuola', school).strip().upper(),
+                    "token": sog.get('token'),
+                    "idSoggetto": sog.get('idSoggetto'),
+                    "raw": sog  # Mantieni tutto per debug
+                }
+                
+                profiles.append(profile)
+                
+                debug_log(f"👤 Profilo {idx}", {
+                    "name": profile['name'],
+                    "class": profile['class'],
+                    "has_token": bool(profile['token'])
+                })
             
             return {
                 "access_token": access_token,
-                "profiles": profiles_data
+                "profiles": profiles
             }
             
         except Exception as e:
-            debug_log("Errore Raw Login", str(e))
+            debug_log("❌ Errore Raw Login", str(e))
+            import traceback
+            debug_log("Traceback", traceback.format_exc())
             raise e
 
     def get_full_dashboard(self):
-        """
-        Richiede la dashboard completa partendo dall'inizio dell'anno scolastico.
-        """
+        """Richiede la dashboard completa partendo dall'inizio dell'anno scolastico."""
         try:
-            # Data inizio anno scolastico (es. 1 Settembre 2024)
-            # Modificare l'anno dinamicamente se necessario
             start_date = "2024-09-01 00:00:00"
             
             payload = {
@@ -546,19 +433,19 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
             }
             
             debug_log("📅 Richiesta Full Dashboard dal:", start_date)
-            res = requests.post(argofamiglia.CONSTANTS.ENDPOINT + "dashboard/dashboard", 
-                              headers=self._ArgoFamiglia__headers,
-                              json=payload)
+            res = requests.post(
+                argofamiglia.CONSTANTS.ENDPOINT + "dashboard/dashboard", 
+                headers=self._ArgoFamiglia__headers,
+                json=payload
+            )
             return res.json()
         except Exception as e:
             debug_log("⚠️ Errore Full Dashboard", str(e))
             return {}
 
-    # ✅ FIX 2: SCHEDA ALUNNO API
-    # Questa è l'unica chiamata che garantisce i dati corretti per il profilo selezionato
     def get_scheda(self):
+        """Endpoint per i dettagli anagrafici (fallback)"""
         try:
-            # Endpoint ufficiale per i dettagli anagrafici
             res = requests.post(
                 argofamiglia.CONSTANTS.ENDPOINT + "scheda", 
                 headers=self._ArgoFamiglia__headers, 
@@ -566,6 +453,9 @@ class AdvancedArgo(argofamiglia.ArgoFamiglia):
             )
             return res.json()
         except Exception as e:
+            debug_log("❌ Errore get_scheda", str(e))
+            return {}
+
             debug_log("❌ Errore get_scheda", str(e))
             return {}
 
@@ -1486,76 +1376,139 @@ def login():
                     "type": str(type(scheda_data)),
                     "keys": list(scheda_data.keys()) if isinstance(scheda_data, dict) else "NOT_DICT",
                     "sample": str(scheda_data)[:500]
-                })
-                
-                name_from_scheda, class_from_scheda = extract_student_from_scheda(scheda_data)
-                
-                if name_from_scheda:
-                    student_name = name_from_scheda
-                    debug_log("✅ Nome studente (/scheda)", student_name)
-                else:
-                    debug_log("❌ Nome NON trovato in /scheda")
-                
-                if not student_class and class_from_scheda:
-                    student_class = class_from_scheda
-                    debug_log("✅ Classe studente (/scheda)", student_class)
-                    
-            except Exception as e:
-                debug_log("❌ Errore chiamata /scheda", str(e))
-                import traceback
-                debug_log("Traceback /scheda", traceback.format_exc())
 
-        # TENTATIVO 3: Fallback finale
-        if not student_name:
-            student_name = f"Studente {target_index+1}" if profiles else username.upper()
-            debug_log("⚠️ Usando fallback finale nome", student_name)
-        
-        if not student_class:
-            if target_profile and isinstance(target_profile.get('desClasse'), str):
-                cls = target_profile['desClasse'].strip().upper()
-                if CLASS_REGEX.match(cls):
-                    student_class = cls
-            student_class = student_class or "N/D"
-            debug_log("⚠️ Usando fallback finale classe", student_class)
+@app.route('/login', methods=['POST'])
+def login():
+    """
+    Login DidUP con profili COMPLETI (nome/classe dall'API).
+    NON serve più extract_student_identity_from_profile o fallback /scheda!
+    """
+    body = request.json or {}
+    school = (body.get('schoolCode') or body.get('school') or '').strip().upper()
+    username = (body.get('username') or '').strip().lower()
+    password = body.get('password')
+    selected_profile_index = body.get('profileIndex', None)
 
-        debug_log("📊 IDENTITÀ FINALE", {
-            "name": student_name,
-            "class": student_class
+    if not all([school, username, password]):
+        return jsonify({"success": False, "error": "Dati mancanti"}), 400
+
+    try:
+        debug_log("LOGIN REQUEST", {
+            "school": school, 
+            "username": username, 
+            "idx": selected_profile_index
         })
 
-        debug_log("👤 Final student identity", {"name": student_name, "class": student_class})
+        access_token = None
+        auth_token = None
+        profiles = []
+        fallback_mode = False
 
-        # 6) Dati principali
-        grades_data = extract_grades_multi_strategy(session)
+        # 1) Login con profili COMPLETI
+        try:
+            login_result = AdvancedArgo.raw_login(school, username, password)
+            access_token = login_result['access_token']
+            profiles = login_result.get('profiles', []) or []
+            
+            debug_log("✅ PROFILI RICEVUTI", {
+                "count": len(profiles),
+                "names": [p.get('name', 'N/A') for p in profiles]
+            })
+            
+        except Exception as e:
+            debug_log("⚠️ Advanced Login Fallito", str(e))
+            fallback_mode = True
+
+        # 2) Selezione profilo
+        target_index = 0
+        target_profile = None
+
+        if not fallback_mode and profiles:
+            # Usa indice richiesto (se valido), altrimenti 0
+            try:
+                if selected_profile_index is not None:
+                    i = int(selected_profile_index)
+                    if 0 <= i < len(profiles):
+                        target_index = i
+            except Exception:
+                pass
+
+            target_profile = profiles[target_index]
+            auth_token = target_profile.get('token')
+
+        # 3) Fallback totale se profili/token non disponibili
+        if fallback_mode or not access_token or not auth_token:
+            debug_log("⚠️ Usando fallback standard")
+            tmp = argofamiglia.ArgoFamiglia(school, username, password)
+            headers = tmp._ArgoFamiglia__headers
+            auth_token = headers.get('x-auth-token', '')
+            access_token = headers.get('Authorization', '').replace('Bearer ', '')
+            
+            # Crea un profilo fake per il fallback
+            target_profile = {
+                "index": 0,
+                "name": username.upper(),
+                "class": "N/D",
+                "school": school,
+                "token": auth_token
+            }
+
+        # 4) ✅ ESTRAZIONE IDENTITÀ (SEMPLIFICATA!)
+        # I profili arrivano già con name e class dall'API!
+        student_name = target_profile.get('name', '').strip()
+        student_class = target_profile.get('class', '').strip()
+
+        # Validazione e fallback
+        if not student_name or student_name == '':
+            student_name = f"Studente {target_index+1}"
+            debug_log("⚠️ Nome vuoto, usando fallback", student_name)
+        else:
+            debug_log("✅ Nome studente dall'API", student_name)
+
+        if not student_class or student_class == '':
+            student_class = "N/D"
+            debug_log("⚠️ Classe vuota, usando fallback", student_class)
+        else:
+            debug_log("✅ Classe studente dall'API", student_class)
+
+        # 5) Dati principali (voti/compiti/promemoria)
+        argo_voti = create_session(school, username, password, access_token, auth_token)
+        grades_data = extract_grades_multi_strategy(argo_voti)
 
         tasks_data = []
         try:
-            tasks_data = extract_homework_safe(session)
+            argo_tasks = create_session(school, username, password, access_token, auth_token)
+            tasks_data = extract_homework_safe(argo_tasks)
         except Exception:
             pass
 
         announcements_data = []
         try:
-            dash = session.dashboard()  # usata solo per promemoria, non per nome
+            argo_dash = create_session(school, username, password, access_token, auth_token)
+            dash = argo_dash.dashboard()
             announcements_data = extract_promemoria(dash)
         except Exception:
             pass
 
-        # 7) Sync profilo su Supabase (id normalizzato)
+        # 6) Sync profilo su Supabase
         if supabase:
             try:
-                pid = f"{school.strip().upper()}:{username.strip().lower()}:{target_index}"
+                pid = f"{school}:{username}:{target_index}"
                 supabase.table("profiles").upsert({
                     "id": pid,
                     "name": student_name,
                     "class": student_class,
                     "last_active": datetime.now().isoformat()
                 }, on_conflict="id").execute()
-                debug_log("👤 Profili Supabase upsert", {"id": pid})
+                debug_log("👤 Profilo Supabase upsert", {
+                    "id": pid,
+                    "name": student_name,
+                    "class": student_class
+                })
             except Exception as e:
-                debug_log("⚠️ Supabase upsert profilo error (non fatale)", str(e))
+                debug_log("⚠️ Supabase upsert error (non fatale)", str(e))
 
-        # 8) Costruisci risposta
+        # 7) Costruisci risposta
         resp = {
             "success": True,
             "session": {
@@ -1575,243 +1528,51 @@ def login():
             "promemoria": announcements_data
         }
 
-        # Includi profilo selezionato per la PWA (comodo per debug/telemetria)
+        # Includi profilo selezionato
         if target_profile:
             resp["selectedProfile"] = {
                 "index": target_index,
                 "name": student_name,
                 "class": student_class,
-                "school": target_profile.get("desScuola") or school,
-                "alunno": target_profile.get("alunno", {}),
-                "raw": target_profile
+                "school": target_profile.get("school") or school,
+                "idSoggetto": target_profile.get("idSoggetto"),
+                "raw": target_profile.get("raw", {})
             }
 
-        # Se più profili e l’utente non ne ha scelto uno, esponi la lista per la UI
-        if profiles_payload and (selected_profile_index is None):
+        # Se più profili e l'utente non ne ha scelto uno, esponi la lista
+        if profiles and len(profiles) > 1 and (selected_profile_index is None):
             resp["status"] = "MULTIPLE_PROFILES"
-            resp["profiles"] = profiles_payload
+            resp["profiles"] = [{
+                "index": p['index'],
+                "name": p['name'] or f"Studente {p['index']+1}",
+                "class": p['class'] or "N/D",
+                "school": p['school']
+            } for p in profiles]
 
-        debug_log("RISPOSTA FINALE", resp)
+        debug_log("📊 RISPOSTA FINALE", {
+            "success": True,
+            "student_name": student_name,
+            "student_class": student_class,
+            "profiles_count": len(profiles)
+        })
+        
         return jsonify(resp), 200
 
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
         debug_log("❌ LOGIN FAILED", error_trace)
-        return jsonify({"success": False, "error": str(e), "traceback": error_trace if DEBUG_MODE else None}), 401
-
-
-@app.route('/debug/profiles', methods=['POST'])
-def debug_profiles():
-    """Endpoint per ispezionare i profili raw ritornati da Argo"""
-    data = request.json or {}
-    school = (data.get('schoolCode') or '').strip()
-    user = (data.get('username') or '').strip()
-    pwd = data.get('password')
-
-    try:
-        r = AdvancedArgo.raw_login(school, user, pwd)
-        profiles = r.get('profiles', []) or []
-        # Minimizza output sensibile
-        sanitized = []
-        for i, p in enumerate(profiles):
-            al = p.get('alunno', {}) or {}
-            n, c = extract_student_identity_from_profile(p)
-            sanitized.append({
-                "index": i,
-                "estratto_name": n,
-                "estratto_class": c,
-                "alunno.desNome": al.get('desNome'),
-                "alunno.desCognome": al.get('desCognome'),
-                "desClasse": p.get('desClasse'),
-                "desScuola": p.get('desScuola')
-            })
-        return jsonify({"success": True, "profiles": sanitized}), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/sync', methods=['POST'])
-def sync_data():
-    """Sincronizzazione con credenziali salvate e supporto token refresh"""
-    data = request.json
-    school = data.get('schoolCode')
-    stored_user = data.get('storedUser')
-    stored_pass = data.get('storedPass')
-    # Se il client ha salvato un indice profilo, lo usiamo
-    profile_index = data.get('profileIndex', 0) 
-    
-    try:
-        debug_log("SYNC REQUEST", {"school": school, "profileIndex": profile_index})
-        
-        if not all([school, stored_user, stored_pass]):
-            return jsonify({"success": False, "error": "Credenziali mancanti"}), 401
-        
-        # Decodifica credenziali
-        import base64
-        import urllib.parse
-        
-        def decode_cred(encoded):
-            try:
-                return urllib.parse.unquote(base64.b64decode(encoded).decode('utf-8'))
-            except:
-                return encoded
-
-        user = decode_cred(stored_user)
-        pass_ = decode_cred(stored_pass)
-        
-        # --- LOGIN / REFRESH ---
-        access_token = None
-        auth_token = None
-        fallback_mode = False
-        
-        try:
-             # Tentativo A: Advanced Login
-            login_result = AdvancedArgo.raw_login(school, user, pass_)
-            access_token = login_result['access_token']
-            profiles = login_result['profiles']
-            
-            target_idx = int(profile_index)
-            if target_idx >= len(profiles): target_idx = 0
-            auth_token = profiles[target_idx]['token']
-            
-        except Exception:
-            # Tentativo B: Fallback Standard
-            fallback_mode = True
-            debug_log("⚠️ Sync Advanced Fail -> Fallback Standard")
-            temp_argo = argofamiglia.ArgoFamiglia(school, user, pass_)
-            headers = temp_argo._ArgoFamiglia__headers
-            auth_token = headers.get('x-auth-token', '')
-            access_token = headers.get('Authorization', '').replace("Bearer ", "")
-
-        
-        # --- SESSIONI ISOLATE (Ma veloci con token iniettati) ---
-        
-        # 1. VOTI
-        argo_voti = create_session(school, user, pass_, access_token, auth_token)
-        grades_data = extract_grades_multi_strategy(argo_voti)
-        
-        # 2. COMPITI
-        tasks_data = []
-        try:
-            argo_tasks = create_session(school, user, pass_, access_token, auth_token)
-            tasks_data = extract_homework_safe(argo_tasks)
-        except:
-            pass
-            
-        # 3. DASHBOARD
-        announcements_data = []
-        try:
-            argo_dash = create_session(school, user, pass_, access_token, auth_token)
-            dashboard_data = argo_dash.dashboard()
-            announcements_data = extract_promemoria(dashboard_data)
-        except:
-             pass
-
-        # ✅ SYNC: Aggiorna identità dal profilo API rinfrescato
-        if supabase:
-            try:
-                s_name = None
-                s_class = None
-                
-                # Se abbiamo i profili rinfrescati, estraiamo l'identità
-                if not fallback_mode and 'profiles' in locals() and int(profile_index) < len(profiles):
-                    target_p = profiles[int(profile_index)]
-                    s_name, s_class = extract_student_identity_from_profile(target_p)
-
-                profile_id = f"{school.strip().upper()}:{user.strip().lower()}:{profile_index}"
-                update_payload = {"last_active": datetime.now().isoformat()}
-                if s_name: update_payload["name"] = s_name
-                if s_class: update_payload["class"] = s_class
-                
-                supabase.table("profiles").update(update_payload).eq("id", profile_id).execute()
-                debug_log(f"👤 Profile sync updated: {profile_id}", update_payload)
-            except Exception as e_sync_prof:
-                debug_log("⚠️ Profile sync update failed (non-fatal)", str(e_sync_prof))
-        
-        # Return
         return jsonify({
-            "success": True,
-            "tasks": tasks_data,
-            "voti": grades_data,
-            "promemoria": announcements_data,
-            "new_tokens": {
-                "authToken": auth_token,
-                "accessToken": access_token
-            }
-        }), 200
-        
-    except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
-        debug_log(f"❌ SYNC FAILED", error_trace)
-        return jsonify({
-            "success": False,
-            "error": str(e),
+            "success": False, 
+            "error": str(e), 
             "traceback": error_trace if DEBUG_MODE else None
         }), 401
-
-
-@app.route('/debug/dashboard', methods=['POST'])
-def debug_dashboard():
-    """
-    ENDPOINT DI DEBUG: restituisce la dashboard RAW
-    """
-    data = request.json
-    school = data.get('schoolCode')
-    user = data.get('username')
-    pwd = data.get('password')
-    
-    try:
-        argo = argofamiglia.ArgoFamiglia(school, user, pwd)
-        dashboard = argo.dashboard()
-        
-        return jsonify({
-            "success": True,
-            "dashboard": dashboard,
-            "type": str(type(dashboard)),
-            "keys": list(dashboard.keys()) if isinstance(dashboard, dict) else "N/A"
-        }), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/')
-def index():
-    return """
-    <h1>G-Connect Backend - FIXED VERSION</h1>
-    <p>Endpoints disponibili:</p>
-    <ul>
-        <li>POST /login - Autenticazione e recupero dati</li>
-        <li>POST /sync - Sincronizzazione</li>
-        <li>GET /api/planner/&lt;user_id&gt; - Recupera dati planner personale</li>
-        <li>POST /api/messages - Invia messaggio chat</li>
-        <li>POST /debug/dashboard - Visualizza dashboard RAW (DEBUG)</li>
-        <li>GET /health - Health check</li>
-    </ul>
-    <p><strong>FIX APPLICATI:</strong></p>
-    <ul>
-        <li>✅ Ordine corretto: COMPITI → VOTI</li>
-        <li>✅ Campo datCompito aggiunto</li>
-        <li>✅ Campo materia aggiunto</li>
-    </ul>
-    """
-
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5002))
-    print(f"\n{'='*70}")
-    print(f"🚀 G-Connect Backend - FIXED VERSION")
-    print(f"📡 Running on port {port}")
-    print(f"🔍 Debug logging: ENABLED")
-    print(f"✅ Ordine corretto: COMPITI → VOTI")
-    print(f"{'='*70}\n")
-    app.run(host='0.0.0.0', port=port, debug=True)
 
 @app.route('/test/profile-structure', methods=['POST'])
 def test_profile_structure():
     """
-    Endpoint di test per ispezionare la struttura COMPLETA dei profili
+    Diagnostic endpoint per analizzare la struttura completa dei profili e di /scheda.
+    Utile per debuggare scuole con strutture API non standard.
     """
     data = request.json or {}
     school = (data.get('schoolCode') or '').strip().upper()
@@ -1819,74 +1580,32 @@ def test_profile_structure():
     pwd = data.get('password')
     
     if not all([school, user, pwd]):
-        return jsonify({"error": "Parametri mancanti"}), 400
-
+        return jsonify({"error": "Missing credentials"}), 400
+        
     result = {
-        "success": False,
         "profiles": [],
-        "scheda": {},
-        "errors": []
+        "scheda": None,
+        "errors": [],
+        "success": False
     }
-
+    
     try:
-        # 1. Test Raw Login
-        debug_log("�� TEST: Chiamata raw_login")
-        login_result = AdvancedArgo.raw_login(school, user, pwd)
-        access_token = login_result['access_token']
-        profiles = login_result.get('profiles', [])
+        # 1. Login Raw Avanzato
+        login_res = AdvancedArgo.raw_login(school, user, pwd)
+        access_token = login_res['access_token']
+        profiles = login_res.get('profiles', [])
         
-        debug_log(f"✅ Ricevuti {len(profiles)} profili")
-        
-        # Analizza ogni profilo
-        for idx, prof in enumerate(profiles):
+        for p in profiles:
+            # Analisi chiavi profilo
             profile_info = {
-                "index": idx,
-                "all_keys": list(prof.keys()),
-                "raw_data": prof,  # Profilo completo
-                "extraction_test": {}
-            }
-            
-            # Test estrazione
-            name, cls = extract_student_identity_from_profile(prof)
-            profile_info["extraction_test"] = {
-                "name": name,
-                "class": cls,
-                "success": name is not None
-            }
-            
-            # Analizza campo alunno
-            if 'alunno' in prof:
-                profile_info["alunno_analysis"] = {
-                    "type": str(type(prof['alunno'])),
-                    "content": prof['alunno']
+                "index": p.get('index'),
+                "raw_data": p.get('raw', {}),
+                "extraction_test": {
+                    "name": p.get('name'),
+                    "class": p.get('class')
                 }
-            
+            }
             result["profiles"].append(profile_info)
-        
-        # 2. Test endpoint /scheda per il primo profilo
-        if profiles:
-            try:
-                debug_log("🧪 TEST: Chiamata /scheda")
-                auth_token = profiles[0].get('token')
-                argo_scheda = create_session(school, user, pwd, access_token, auth_token)
-                scheda_data = argo_scheda.get_scheda()
-                
-                result["scheda"] = {
-                    "keys": list(scheda_data.keys()) if isinstance(scheda_data, dict) else [],
-                    "raw_data": scheda_data,
-                    "extraction_test": {}
-                }
-                
-                # Test estrazione da scheda
-                name_s, cls_s = extract_student_from_scheda(scheda_data)
-                result["scheda"]["extraction_test"] = {
-                    "name": name_s,
-                    "class": cls_s,
-                    "success": name_s is not None
-                }
-                
-            except Exception as e:
-                result["errors"].append(f"Errore /scheda: {str(e)}")
         
         result["success"] = True
         return jsonify(result), 200
