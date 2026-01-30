@@ -1294,9 +1294,10 @@ app.get('/api/planner/:user_id', async (req, res) => {
     if (!supabase) return res.status(500).json({ success: false, error: "Supabase not configured" });
 
     try {
+        const userId = decodeURIComponent(req.params.user_id);
         const { data, error } = await supabase.from("planners")
             .select("*")
-            .eq("user_id", req.params.user_id)
+            .eq("user_id", userId)
             .limit(1);
 
         if (error) throw error;
@@ -1343,7 +1344,7 @@ app.put('/api/planner/:user_id', async (req, res) => {
     if (supabase) {
         try {
             const { data, error } = await supabase
-                .from('planner')
+                .from('planners')
                 .upsert(payload, { onConflict: 'user_id' })
                 .select()
                 .single();
@@ -1368,7 +1369,7 @@ app.put('/api/planner/:user_id', async (req, res) => {
 
     // Fallback REST (come Python)
     try {
-        const url = `${sbTableUrl('planner')}?on_conflict=user_id`;
+        const url = `${sbTableUrl('planners')}?on_conflict=user_id`;
         const headers = sbHeaders();
         headers.Prefer = "resolution=merge-duplicates,return=representation";
 
