@@ -432,6 +432,27 @@ async function getAnagrafe(headers) {
     }
 }
 
+// Nuovi endpoint per identità (Strategia D)
+async function getAlunno(headers) {
+    try {
+        const res = await axios.get(ENDPOINT + "alunno", { headers, timeout: 12000 });
+        return res.data;
+    } catch (e) {
+        debugLog("⚠️ Errore Alunno", e.message);
+        return null;
+    }
+}
+
+async function getAlunnoAnagrafe(headers) {
+    try {
+        const res = await axios.get(ENDPOINT + "alunno/anagrafe", { headers, timeout: 12000 });
+        return res.data;
+    } catch (e) {
+        debugLog("⚠️ Errore Alunno/Anagrafe", e.message);
+        return null;
+    }
+}
+
 function createHeaders(school, accessToken, authToken) {
     return {
         "Content-Type": "application/json",
@@ -512,6 +533,30 @@ async function resolveIdentityForProfile(school, username, password, accessToken
             }
         } catch (e) {
             debugLog("⚠️ Fail Anagrafe", e.message);
+        }
+    }
+
+    // STRATEGIA D: /alunno e /alunno/anagrafe
+    if (!name || !cls || !CLASS_REGEX.test(cls)) {
+        try {
+            debugLog("🕵️ Identity: Tentativo 4 (Alunno)...");
+            const alunno = await getAlunno(headers) || await getAlunnoAnagrafe(headers);
+            const obj = Array.isArray(alunno) ? (alunno[0] || {}) : (alunno || {});
+            const an = obj.alunno || obj;
+
+            if (!name && (an.desNominativo || an.nominativo)) {
+                name = (an.desNominativo || an.nominativo).trim().toUpperCase();
+            }
+            if ((!cls || !CLASS_REGEX.test(cls)) && (an.desClasse || an.classe)) {
+                cls = (an.desClasse || an.classe).trim().toUpperCase();
+            }
+
+            if (name && cls && CLASS_REGEX.test(cls)) {
+                debugLog("✅ Identity risolta con ALUNNO");
+                return { name, cls };
+            }
+        } catch (e) {
+            debugLog("⚠️ Fail Alunno", e.message);
         }
     }
 
@@ -1096,27 +1141,84 @@ app.get('/api/planner/:user_id', async (req, res) => {
     }
 });
 
+// Supabase REST helpers for fallback
+function sbHeaders() {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars");
+    }
+    return {
+        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+        Accept: "application/json"
+    };
+}
+function sbTableUrl(table) {
+    return `${process.env.SUPABASE_URL}/rest/v1/${table}`;
+}
+
 app.put('/api/planner/:user_id', async (req, res) => {
-    if (!supabase) return res.status(500).json({ success: false, error: "Supabase not configured" });
+    const userId = decodeURIComponent(req.params.user_id);
+    const body = req.body || {};
 
+    const payload = {
+        user_id: userId,
+        planned_tasks: body.plannedTasks || body.planned_tasks || {},
+        stress_levels: body.stressLevels || body.stress_levels || {},
+        planned_details: body.plannedDetails || body.planned_details || {},
+        updated_at: new Date().toISOString()
+    };
+
+    // Prima prova supabase-js
+    if (supabase) {
+        try {
+            const { data, error } = await supabase
+                .from('planner')
+                .upsert(payload, { onConflict: 'user_id' })
+                .select()
+                .single();
+
+            if (!error && data) {
+                return res.json({
+                    success: true,
+                    data: {
+                        userId: data.user_id,
+                        plannedTasks: data.planned_tasks,
+                        stressLevels: data.stress_levels,
+                        plannedDetails: data.planned_details,
+                        updatedAt: data.updated_at
+                    }
+                });
+            }
+            debugLog("planner upsert supabase-js error", error?.message);
+        } catch (e) {
+            debugLog("planner upsert supabase-js exception", e.message);
+        }
+    }
+
+    // Fallback REST (come Python)
     try {
-        const userId = req.params.user_id;
-        const body = req.body;
+        const url = `${sbTableUrl('planner')}?on_conflict=user_id`;
+        const headers = sbHeaders();
+        headers.Prefer = "resolution=merge-duplicates,return=representation";
 
-        const payload = {
-            user_id: userId,
-            tasks: body.tasks || [],
-            manual_reminders: body.manual_reminders || [],
-            updated_at: new Date().toISOString()
-        };
+        const r = await axios.post(url, payload, { headers, timeout: 15000 });
+        const rows = Array.isArray(r.data) ? r.data : [r.data];
+        const row = rows[0] || payload;
 
-        const { error } = await supabase.from("planners").upsert(payload, { onConflict: "user_id" });
-        if (error) throw error;
-
-        debugLog(`✅ Planner saved: ${userId}`);
-        res.json({ success: true });
+        return res.json({
+            success: true,
+            data: {
+                userId: row.user_id,
+                plannedTasks: row.planned_tasks,
+                stressLevels: row.stress_levels,
+                plannedDetails: row.planned_details,
+                updatedAt: row.updated_at
+            }
+        });
     } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+        debugLog("planner upsert REST error", e.response?.data || e.message);
+        return res.status(e.response?.status || 500).json({ success: false, error: e.response?.data || e.message });
     }
 });
 
@@ -1406,7 +1508,7 @@ app.post('/sync', async (req, res) => {
 });
 
 // ============= START SERVER =============
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001; // ← Cambiata da 5000 a 5001 per macOS AirPlay conflict
 
 app.listen(PORT, () => {
     console.log(`\n${'='.repeat(70)}`);
