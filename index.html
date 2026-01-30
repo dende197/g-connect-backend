@@ -1250,9 +1250,8 @@
 
         // ---------------------------------------------
         // ⚙️ CONFIGURATION
-        // Lascia vuoto ("") se il server è locale o se index.html è servito da Flask.
-        // Inserisci l'URL di Render (es: "https://g-connect-backend.onrender.com") se deploy su Netlify.
-        const API_BASE_URL = "https://g-connect-backend.onrender.com";
+        const IS_LOCAL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+        const API_BASE_URL = IS_LOCAL ? "http://localhost:5001" : "https://g-connect-backend.onrender.com";
         // ---------------------------------------------
         // 🆕 MULTI-PROFILE NAMESPACING UTILS
         function getActiveProfileKey() {
