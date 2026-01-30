@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const cheerio = require('cheerio');
 
 // ============= SETUP APP =============
 const app = express();
@@ -299,7 +300,7 @@ class AdvancedArgo {
                 raw: sog
             }));
 
-            return { access_token: accessToken, profiles };
+            return { access_token: accessToken, profiles, jar };
 
         } catch (e) {
             debugLog("❌ Errore Raw Login", e.message);
@@ -702,6 +703,45 @@ async function resolveIdentityForProfile(school, username, password, accessToken
 
     debugLog("🏁 Identity finale", { name, cls });
     return { name: name || null, cls: cls || null };
+}
+
+async function resolveIdentityFromWebUI(jar) {
+    try {
+        if (!jar) return { name: null, cls: null };
+
+        const client = wrapper(axios.create({ jar, withCredentials: true, timeout: 15000 }));
+        const url = 'https://www.portaleargo.it/argoweb/famiglia/index.jsf';
+
+        debugLog("🌐 Identity: Fallback ULTIMA SPIAGGIA (HTML Scraping)...");
+        const res = await client.get(url, {
+            headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html' }
+        });
+
+        const $ = cheerio.load(res.data);
+
+        // Nome principale (toolbar "Alunno:")
+        let name = $('#_idJsp44').text().trim();
+
+        // Fallback su "Nominativo: ..." in statusbar
+        if (!name) {
+            const t = $('span:contains("Nominativo")').text();
+            const m = t && t.match(/Nominativo\s*:\s*(.+)/i);
+            if (m) name = m[1].trim();
+        }
+
+        // Classe (riga "Classe:")
+        let cls = $('#_idJsp56').text().trim();
+
+        // Pulizia/normalizzazione
+        name = name ? name.toUpperCase() : null;
+        cls = cls ? normalizeClass(cls) : null;
+
+        if (name) debugLog(`✅ Identity risolta da WEB UI: ${name} (${cls})`);
+        return { name, cls: cls || "N/D" };
+    } catch (e) {
+        debugLog("⚠️ resolveIdentityFromWebUI error", e.message);
+        return { name: null, cls: null };
+    }
 }
 
 // ============= GRADE EXTRACTION (3 STRATEGIE) =============
@@ -1449,6 +1489,14 @@ app.post('/login', async (req, res) => {
         // 5. Identità autoritativa
         let studentName = targetProfile.name;
         let studentClass = targetProfile.class;
+        const jar = loginRes.jar;
+
+        // Fallback HTML se i metodi JSON non hanno risolto il nome reale
+        if ((!studentName || studentName.startsWith('STUDENTE')) || studentClass === "N/D") {
+            const webId = await resolveIdentityFromWebUI(jar);
+            if (webId.name) studentName = webId.name;
+            if (webId.cls && webId.cls !== "N/D") studentClass = webId.cls;
+        }
 
         // 4. Dati Scolastici (Parallelo)
         const headers = createHeaders(school, accessToken, authToken);
