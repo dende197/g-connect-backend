@@ -308,37 +308,99 @@ class AdvancedArgo {
     }
 }
 
-// ============= PROFILE ENRICHMENT =============
+// ============= PROFILE ENRICHMENT (DEEP SCAN VERSION) =============
 
 async function enrichProfiles(school, accessToken, profiles) {
-    debugLog(`🔄 Arricchimento di ${profiles.length} profili in parallelo...`);
+    debugLog(`�️ AVVIO DEEP SCAN SU ${profiles.length} PROFILI...`);
 
-    // Eseguiamo le richieste in parallelo per velocità
+    // Eseguiamo le richieste in parallelo
     const promises = profiles.map(async (p, index) => {
         const authToken = p.token;
         if (!authToken) return p;
 
+        // Header specifici per questo token
         const headers = createHeaders(school, accessToken, authToken);
 
-        let name = p.name;
-        let cls = p.class;
+        let name = null;
+        let cls = null;
 
+        // --- TENTATIVO 1: CONNOTATI (Il più preciso) ---
         try {
-            // Tentativo: Endpoint SCHEDA (Il più affidabile per i nomi)
-            const res = await axios.post(ENDPOINT + "scheda", { opzioni: "{}" }, { headers, timeout: 10000 });
-            const extracted = extractStudentFromScheda(res);
+            const res = await axios.get(ENDPOINT + "connotati", { headers, timeout: 5000 });
+            if (res.data) {
+                const d = res.data;
+                if (d.desNominativo) name = d.desNominativo;
+                else if (d.nome && d.cognome) name = `${d.cognome} ${d.nome}`;
 
-            if (extracted.name) name = extracted.name;
-            if (extracted.cls) cls = extracted.cls;
+                if (d.desClasse) cls = d.desClasse;
 
-        } catch (e) {
-            debugLog(`⚠️ Errore recupero nome per profilo ${index}: ${e.message}`);
+                if (name) debugLog(`✅ Trovato CONNOTATI per profilo ${index}: ${name}`);
+            }
+        } catch (e) { /* Ignora */ }
+
+        // --- TENTATIVO 2: CURRICULUM (Contiene storico classi) ---
+        if (!name || !cls) {
+            try {
+                const res = await axios.post(ENDPOINT + "curriculum", {}, { headers, timeout: 5000 });
+                const dati = res.data;
+                const list = Array.isArray(dati) ? dati : (dati.dati || []);
+
+                if (list.length > 0) {
+                    const current = list[0];
+                    if (!name && current.nominativo) name = current.nominativo;
+                    if (!name && current.desNominativo) name = current.desNominativo;
+                    if (!cls && current.desClasse) cls = current.desClasse;
+                    if (!cls && current.classe) cls = current.classe;
+
+                    if (name) debugLog(`✅ Trovato CURRICULUM per profilo ${index}: ${name}`);
+                }
+            } catch (e) { /* Ignora */ }
+        }
+
+        // --- TENTATIVO 3: SCHEDA (Fallback standard) ---
+        if (!name || !cls) {
+            try {
+                const res = await axios.post(ENDPOINT + "scheda", { opzioni: "{}" }, { headers, timeout: 5000 });
+                const al = res.data.alunno || (res.data.scheda ? res.data.scheda.alunno : null);
+                if (al) {
+                    if (al.desNominativo || al.nominativo) name = al.desNominativo || al.nominativo;
+                    if (al.desClasse || al.classe) cls = al.desClasse || al.classe;
+                    if (name) debugLog(`✅ Trovato SCHEDA per profilo ${index}: ${name}`);
+                }
+            } catch (e) { /* Ignora */ }
+        }
+
+        // --- TENTATIVO 4: DASHBOARD INTESTAZIONE (Ultima spiaggia) ---
+        if (!name || !cls) {
+            try {
+                const res = await axios.post(ENDPOINT + "dashboard/dashboard", {
+                    opzioni: JSON.stringify({ "intestazione": true })
+                }, { headers, timeout: 5000 });
+
+                const intestazione = res.data.intestazione || {};
+                if (intestazione.alunno) name = intestazione.alunno;
+                if (intestazione.classe) cls = intestazione.classe;
+                if (name) debugLog(`✅ Trovato DASHBOARD per profilo ${index}: ${name}`);
+            } catch (e) { /* Ignora */ }
+        }
+
+        // --- PULIZIA DATI ---
+        if (name) name = name.trim().toUpperCase();
+        else name = `STUDENTE ${index + 1}`;
+
+        if (cls) {
+            cls = cls.trim().toUpperCase();
+            const match = cls.match(/([1-5])\s*([A-Z])/);
+            if (match) cls = match[1] + match[2];
+            else if (!CLASS_REGEX.test(cls)) cls = "N/D";
+        } else {
+            cls = "N/D";
         }
 
         return {
             ...p,
-            name: name ? name.trim().toUpperCase() : `STUDENTE ${index + 1}`,
-            class: (cls && CLASS_REGEX.test(cls.trim().toUpperCase())) ? cls.trim().toUpperCase() : "N/D"
+            name: name,
+            class: cls
         };
     });
 
