@@ -160,13 +160,14 @@ app.post('/login', async (req, res) => {
     // Supporto per il vecchio parametro 'school'
     const school = (schoolCode || req.body.school || '').trim().toUpperCase();
     const user = (username || '').trim();
+    const profileIndex = Number.isInteger(req.body?.profileIndex) ? Number(req.body.profileIndex) : 0;
 
     if (!school || !user || !password) {
         return res.status(400).json({ success: false, error: "Dati mancanti" });
     }
 
     try {
-        debugLog(`🔐 Login attempt for ${user} @ ${school}`);
+        debugLog(`🔐 Login attempt for ${user} @ ${school} (Idx: ${profileIndex})`);
 
         // ISTANZA LIBRERIA
         // Nota: dataProvider: null previene la cache su file system che potrebbe causare problemi di permessi o stato sporco
@@ -181,28 +182,59 @@ app.post('/login', async (req, res) => {
         await argo.login();
         debugLog("✅ Login libreria successo");
 
+        // SELEZIONE PROFILO (Multi-figlio)
+        try {
+            const candidates = ['selectProfile', 'selectSoggetto', 'setSoggetto', 'useProfile', 'useSoggetto'];
+            for (const m of candidates) {
+                if (typeof argo[m] === 'function') {
+                    await argo[m](profileIndex);
+                    debugLog(`Profile selected via ${m}(${profileIndex})`);
+                    break;
+                }
+            }
+        } catch (e) {
+            debugLog('Selezione profilo non supportata o fallita', e?.message);
+        }
+
         // RECUPERA DATI
         // La libreria popola automaticamente argo.dashboard
         const dashboard = argo.dashboard;
 
-        // TENTA RECUPERO IDENTITÀ
+        // TENTA RECUPERO IDENTITÀ MIGLIORATO
         let studentName = "STUDENTE";
         let studentClass = "N/D";
 
+        // 1) Dettagli profilo
         try {
-            // Proviamo a prendere i dettagli completi se disponibili
-            const dettagli = await argo.getDettagliProfilo();
-            if (dettagli && dettagli.alunno) {
-                studentName = (dettagli.alunno.desNominativo || dettagli.alunno.nominativo || studentName).toUpperCase();
-                studentClass = (dettagli.alunno.desClasse || dettagli.alunno.classe || studentClass).toUpperCase();
-            } else if (dashboard.intestazione) {
-                // Fallback sull'intestazione dashboard
-                studentName = (dashboard.intestazione.alunno || studentName).toUpperCase();
-                studentClass = (dashboard.intestazione.classe || studentClass).toUpperCase();
+            const dettagli = (typeof argo.getDettagliProfilo === 'function') ? await argo.getDettagliProfilo() : null;
+            const al = dettagli?.alunno || dettagli;
+            if (al) {
+                studentName = (al.desNominativo || al.nominativo || studentName).toUpperCase();
+                studentClass = (al.desClasse || al.classe || studentClass).toUpperCase();
             }
-        } catch (err) {
-            debugLog("⚠️ Warning identità:", err.message);
+        } catch (e) {
+            debugLog("getDettagliProfilo non disponibile o fallito", e.message);
         }
+
+        // 2) Fallback intestazione dashboard
+        if (argo.dashboard?.intestazione) {
+            if (studentName === "STUDENTE") {
+                studentName = (argo.dashboard.intestazione.alunno || studentName).toUpperCase();
+            }
+            if (studentClass === "N/D") {
+                studentClass = (argo.dashboard.intestazione.classe || studentClass).toUpperCase();
+            }
+        }
+
+        // 3) Pulizia classe "3A - descrizione lunga" o spazi
+        if (studentClass) {
+            studentClass = studentClass.trim();
+            if (!/^[1-5][A-Z]$/.test(studentClass)) {
+                const m = studentClass.match(/\b([1-5][A-Z])\b/);
+                if (m) studentClass = m[1];
+            }
+        }
+        if (studentName) studentName = studentName.trim();
 
         // FORMATTA I DATI PER IL FRONTEND
         const { grades, tasks, promemoria } = mapLibraryDataToAppFormat(dashboard);
@@ -230,7 +262,7 @@ app.post('/login', async (req, res) => {
                 authToken: "LIB_SESSION",
                 accessToken: "LIB_SESSION",
                 userName: user,
-                profileIndex: 0
+                profileIndex: profileIndex
             },
             student: {
                 name: studentName,
@@ -242,7 +274,7 @@ app.post('/login', async (req, res) => {
             promemoria: promemoria,
             // Per compatibilità se il frontend controlla selectedProfile
             selectedProfile: {
-                index: 0,
+                index: profileIndex,
                 name: studentName,
                 class: studentClass,
                 school: school
@@ -306,6 +338,8 @@ app.post('/sync', async (req, res) => {
 // Utile se il frontend chiama questo endpoint prima del login
 app.post('/api/resolve-profile', async (req, res) => {
     const { schoolCode, username, password } = req.body;
+    const profileIndex = Number.isInteger(req.body?.profileIndex) ? Number(req.body.profileIndex) : 0;
+
     try {
         const argo = new Client({
             schoolCode: schoolCode,
@@ -315,14 +349,46 @@ app.post('/api/resolve-profile', async (req, res) => {
         });
         await argo.login();
 
+        // SELEZIONE PROFILO (Multi-figlio)
+        try {
+            const candidates = ['selectProfile', 'selectSoggetto', 'setSoggetto', 'useProfile', 'useSoggetto'];
+            for (const m of candidates) {
+                if (typeof argo[m] === 'function') {
+                    await argo[m](profileIndex);
+                    break;
+                }
+            }
+        } catch (e) { }
+
         let name = "STUDENTE";
         let cls = "N/D";
 
-        // Tentativo rapido di prendere il nome
-        if (argo.dashboard?.intestazione?.alunno) {
-            name = argo.dashboard.intestazione.alunno;
-            cls = argo.dashboard.intestazione.classe || "N/D";
+        // RECUPERO IDENTITÀ MIGLIORATO
+        try {
+            // 1) Dettagli profilo
+            const dettagli = (typeof argo.getDettagliProfilo === 'function') ? await argo.getDettagliProfilo() : null;
+            const al = dettagli?.alunno || dettagli;
+            if (al) {
+                name = (al.desNominativo || al.nominativo || name).toUpperCase();
+                cls = (al.desClasse || al.classe || cls).toUpperCase();
+            }
+        } catch (e) { }
+
+        // 2) Fallback intestazione
+        if (argo.dashboard?.intestazione) {
+            if (name === "STUDENTE") name = (argo.dashboard.intestazione.alunno || name).toUpperCase();
+            if (cls === "N/D") cls = (argo.dashboard.intestazione.classe || cls).toUpperCase();
         }
+
+        // 3) Pulizia classe
+        if (cls) {
+            cls = cls.trim();
+            if (!/^[1-5][A-Z]$/.test(cls)) {
+                const m = cls.match(/\b([1-5][A-Z])\b/);
+                if (m) cls = m[1];
+            }
+        }
+        if (name) name = name.trim();
 
         res.json({ success: true, name, class: cls });
     } catch (e) {
@@ -548,21 +614,58 @@ app.put('/api/planner/:user_id', async (req, res) => {
             return res.json({ success: true, data: rows[0] });
         } else {
             const txt = await response.text();
-            debugLog("Planner REST failed", txt);
+            debugLog(`Planner REST failed [${response.status}]`, txt);
+            return res.status(response.status).json({ success: false, error: txt });
         }
     } catch (e) {
         debugLog("Planner REST error", e.message);
+        return res.status(500).json({ success: false, error: e.message });
     }
 
-    res.status(500).json({ success: false, error: "Save failed" });
 });
 
 app.get('/api/planner/:user_id', async (req, res) => {
+    const userId = decodeURIComponent(req.params.user_id);
+
     if (supabase) {
-        const { data } = await supabase.from("planner").select("*").eq("user_id", req.params.user_id).single();
-        if (data) return res.json({ success: true, data });
+        try {
+            const { data, error } = await supabase
+                .from("planner")
+                .select("user_id, planned_tasks, stress_levels, planned_details, updated_at")
+                .eq("user_id", userId)
+                .order("updated_at", { ascending: false })
+                .limit(1);
+
+            if (error) throw error;
+
+            const row = data?.[0] || null;
+            if (!row) {
+                return res.json({
+                    success: true,
+                    data: {
+                        userId,
+                        plannedTasks: {},
+                        stressLevels: {},
+                        plannedDetails: {},
+                        updatedAt: null
+                    }
+                });
+            }
+
+            return res.json({
+                success: true, data: {
+                    userId: row.user_id,
+                    plannedTasks: row.planned_tasks || {},
+                    stressLevels: row.stress_levels || {},
+                    plannedDetails: row.planned_details || {},
+                    updatedAt: row.updated_at
+                }
+            });
+        } catch (e) { debugLog("planner GET supabase error", e.message); }
     }
-    res.status(404).json({ success: false });
+
+    // Fallback REST (se vuoi replicare il Python 1:1) oppure 404
+    return res.status(404).json({ success: false });
 });
 
 // ============= START SERVER =============
