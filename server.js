@@ -66,73 +66,91 @@ if (supabaseUrl && supabaseKey) {
 }
 
 // ============= HELPER: MAPPING DATI ARGO -> APP FRONTEND =============
-// Questa funzione trasforma i dati della libreria nel formato che la tua App si aspetta
+// Versione robusta che cerca in più posizioni
 function mapLibraryDataToAppFormat(dashboard) {
     const grades = [];
     const tasks = [];
     const promemoria = [];
 
-    if (!dashboard) return { grades, tasks, promemoria };
+    if (!dashboard || typeof dashboard !== 'object') {
+        return { grades, tasks, promemoria };
+    }
 
-    // 1. MAPPING VOTI
-    // La libreria unifica i voti in dashboard.voti (o votiGiornalieri)
+    // 1) VOTI: unisci tutte le possibili fonti
     const rawVoti = [
-        ...(dashboard.votiGiornalieri || []),
-        ...(dashboard.votiScrutinio || []),
-        ...(dashboard.voti || [])
+        ...(Array.isArray(dashboard.voti) ? dashboard.voti : []),
+        ...(Array.isArray(dashboard.votiGiornalieri) ? dashboard.votiGiornalieri : []),
+        ...(Array.isArray(dashboard.votiScrutinio) ? dashboard.votiScrutinio : []), // Inclusi per completezza
+        ...(Array.isArray(dashboard.votiPeriodici) ? dashboard.votiPeriodici : []),
+        ...(Array.isArray(dashboard.valutazioni) ? dashboard.valutazioni : []),
+        ...(Array.isArray(dashboard?.dati?.[0]?.votiGiornalieri) ? dashboard.dati[0].votiGiornalieri : []),
+        ...(Array.isArray(dashboard?.dati?.[0]?.voti) ? dashboard.dati[0].voti : []),
     ];
 
-    rawVoti.forEach(v => {
+    for (const v of rawVoti) {
         grades.push({
             id: uuidv4().substring(0, 12),
             materia: v.desMateria || v.materia || 'N/D',
-            valore: v.codVoto || v.voto || '',
-            data: v.datGiorno || v.data || '',
+            valore: v.codVoto || v.voto || v.valore || '',
+            data: v.datGiorno || v.data || v.dataVoto || '',
             tipo: v.desVoto || v.tipo || 'N/D',
-            // Campi duplicati per compatibilità con vecchie versioni del frontend
             subject: v.desMateria || v.materia || 'N/D',
-            value: v.codVoto || v.voto || '',
-            date: v.datGiorno || v.data || ''
-        });
-    });
-
-    // 2. MAPPING COMPITI
-    // Cerchiamo i compiti nel registro o nella proprietà compiti
-    if (dashboard.registro && Array.isArray(dashboard.registro)) {
-        dashboard.registro.forEach(item => {
-            if (item.compiti && Array.isArray(item.compiti)) {
-                item.compiti.forEach(c => {
-                    tasks.push({
-                        id: uuidv4().substring(0, 12),
-                        text: c.desCompito || c.compito || '',
-                        subject: item.materia || 'Generico',
-                        due_date: c.datCompito || item.data || '', // Data consegna
-                        datCompito: c.datCompito || item.data || '',
-                        materia: item.materia || 'Generico',
-                        done: false
-                    });
-                });
-            }
+            value: v.codVoto || v.voto || v.valore || '',
+            date: v.datGiorno || v.data || v.dataVoto || ''
         });
     }
 
-    // 3. MAPPING PROMEMORIA / BACHECA
-    const rawBacheca = [
-        ...(dashboard.bachecaAlunno || []),
-        ...(dashboard.promemoria || [])
+    // 2) COMPITI: cerca sia in dashboard.compiti sia nel registro
+    const rawCompiti = [
+        ...(Array.isArray(dashboard.compiti) ? dashboard.compiti : []),
+        ...(Array.isArray(dashboard?.dati?.[0]?.compiti) ? dashboard.dati[0].compiti : []),
+        ...(Array.isArray(dashboard?.dati?.[0]?.registro) ? dashboard.dati[0].registro.flatMap(r => r.compiti || []) : []),
+        ...(Array.isArray(dashboard.registro) ? dashboard.registro.flatMap(r => r.compiti || []) : []),
     ];
 
-    rawBacheca.forEach(b => {
+    // Per collegare una materia ai compiti nel registro, servono gli elementi del registro
+    const registroItems = Array.isArray(dashboard.registro) ? dashboard.registro
+        : Array.isArray(dashboard?.dati?.[0]?.registro) ? dashboard.dati[0].registro
+            : [];
+
+    for (const c of rawCompiti) {
+        // prova ad associare la materia prendendo dall'item registro che contiene questo compito
+        let materia = 'Generico';
+        try {
+            const owner = registroItems.find(item => Array.isArray(item.compiti) && item.compiti.includes(c));
+            materia = (owner && (owner.materia || owner.desMateria)) || materia;
+        } catch { }
+
+        tasks.push({
+            id: uuidv4().substring(0, 12),
+            text: c.desCompito || c.compito || c.descrizione || '',
+            subject: materia || 'Generico',
+            due_date: c.dataConsegna || c.datCompito || c.data || '', // gestisci entrambe le varianti
+            datCompito: c.dataConsegna || c.datCompito || c.data || '',
+            materia: materia || 'Generico',
+            done: false
+        });
+    }
+
+    // 3) PROMEMORIA/BACHECA: unisci tutte le fonti
+    const rawPromemoria = [
+        ...(Array.isArray(dashboard.promemoria) ? dashboard.promemoria : []),
+        ...(Array.isArray(dashboard.bachecaAlunno) ? dashboard.bachecaAlunno : []),
+        ...(Array.isArray(dashboard?.dati?.[0]?.promemoria) ? dashboard.dati[0].promemoria : []),
+        ...(Array.isArray(dashboard?.dati?.[0]?.bachecaAlunno) ? dashboard.dati[0].bachecaAlunno : []),
+    ];
+
+    for (const b of rawPromemoria) {
         promemoria.push({
             id: uuidv4().substring(0, 12),
             titolo: b.desOggetto || b.titolo || 'Avviso',
-            testo: b.desMessaggio || b.testo || '',
+            testo: b.desMessaggio || b.testo || b.desAnnotazioni || '',
             autore: b.desMittente || 'Scuola',
             data: b.datGiorno || b.data || '',
             url: b.urlAllegato || '',
             oggetto: b.desOggetto || b.titolo || 'Avviso'
         });
-    });
+    }
 
     return { grades, tasks, promemoria };
 }
@@ -182,66 +200,100 @@ app.post('/login', async (req, res) => {
         await argo.login();
         debugLog("✅ Login libreria successo");
 
-        // SELEZIONE PROFILO (Multi-figlio)
+        // ENUMERAZIONE PROFILI (Multi-figlio)
+        let profiles = [];
         try {
-            const candidates = ['selectProfile', 'selectSoggetto', 'setSoggetto', 'useProfile', 'useSoggetto'];
-            for (const m of candidates) {
-                if (typeof argo[m] === 'function') {
-                    await argo[m](profileIndex);
-                    debugLog(`Profile selected via ${m}(${profileIndex})`);
-                    break;
+            // Se la libreria espone un array di profili/soggetti, usalo
+            const candidatesArr = argo.profiles || argo.soggetti || [];
+            // Se non lo espone, proviamo ad assumere che ci sia almeno 1, 
+            // ma se la libreria non espone la lista, potremmo non sapere quanti sono.
+            // fallback a 1 se length non disponibile
+            const count = Array.isArray(candidatesArr) ? candidatesArr.length : (argo.profilesCount || 1);
+
+            if (count > 0) {
+                // Cicliamo per provare a leggere i dati di ogni profilo
+                // N.B. Se sono tanti rallenta un po' il login, ma è necessario per la PWA
+                for (let i = 0; i < count; i++) {
+                    const selMethods = ['selectProfile', 'selectSoggetto', 'setSoggetto', 'useProfile', 'useSoggetto'];
+                    let selected = false;
+                    for (const m of selMethods) {
+                        if (typeof argo[m] === 'function') {
+                            await argo[m](i);
+                            selected = true;
+                            break;
+                        }
+                    }
+
+                    if (!selected && i > 0) break; // Se non riusciamo a selezionare, fermiamoci
+
+                    // Legge info identità
+                    let pName = "STUDENTE " + (i + 1);
+                    let pClass = "N/D";
+
+                    try {
+                        const dett = (typeof argo.getDettagliProfilo === 'function') ? await argo.getDettagliProfilo() : null;
+                        const al = dett?.alunno || dett;
+                        if (al) {
+                            pName = (al.desNominativo || al.nominativo || pName).toUpperCase();
+                            pClass = (al.desClasse || al.classe || pClass).toUpperCase();
+                        }
+                    } catch { }
+
+                    if (argo.dashboard?.intestazione) {
+                        if (pName.startsWith("STUDENTE")) pName = (argo.dashboard.intestazione.alunno || pName).toUpperCase();
+                        if (pClass === "N/D") pClass = (argo.dashboard.intestazione.classe || pClass).toUpperCase();
+                    }
+
+                    // pulizia classe
+                    const m = pClass.match(/\b([1-5][A-Z])\b/);
+                    if (m) pClass = m[1];
+
+                    profiles.push({ index: i, name: pName, class: pClass, school: school });
+                }
+
+                // RI-SELEZIONA il profilo richiesto dall'utente prima di ritornare i dati dashboard
+                const selMethods = ['selectProfile', 'selectSoggetto', 'setSoggetto', 'useProfile', 'useSoggetto'];
+                for (const m of selMethods) {
+                    if (typeof argo[m] === 'function') {
+                        await argo[m](profileIndex);
+                        break;
+                    }
                 }
             }
         } catch (e) {
-            debugLog('Selezione profilo non supportata o fallita', e?.message);
+            debugLog("Enumerazione profili non supportata o fallita", e.message);
         }
 
-        // RECUPERA DATI
-        // La libreria popola automaticamente argo.dashboard
+        // Se l'enumerazione fallisce, aggiungiamo almeno il corrente placeholder
+        if (profiles.length === 0) {
+            profiles.push({ index: 0, name: "STUDENTE", class: "N/D", school: school });
+        }
+
+        // RECUPERA DATI (del profilo ri-selezionato)
         const dashboard = argo.dashboard;
 
-        // TENTA RECUPERO IDENTITÀ MIGLIORATO
-        let studentName = "STUDENTE";
-        let studentClass = "N/D";
+        // Identità corrente (dovrebbe combaciare con l'index selezionato)
+        let studentName = profiles[profileIndex]?.name || "STUDENTE";
+        let studentClass = profiles[profileIndex]?.class || "N/D";
 
-        // 1) Dettagli profilo
-        try {
-            const dettagli = (typeof argo.getDettagliProfilo === 'function') ? await argo.getDettagliProfilo() : null;
-            const al = dettagli?.alunno || dettagli;
-            if (al) {
-                studentName = (al.desNominativo || al.nominativo || studentName).toUpperCase();
-                studentClass = (al.desClasse || al.classe || studentClass).toUpperCase();
-            }
-        } catch (e) {
-            debugLog("getDettagliProfilo non disponibile o fallito", e.message);
+        // Fallback ulteriore se profiles[profileIndex] fosse vuoto
+        if (studentName === "STUDENTE" && argo.dashboard?.intestazione?.alunno) {
+            studentName = argo.dashboard.intestazione.alunno.toUpperCase();
         }
-
-        // 2) Fallback intestazione dashboard
-        if (argo.dashboard?.intestazione) {
-            if (studentName === "STUDENTE") {
-                studentName = (argo.dashboard.intestazione.alunno || studentName).toUpperCase();
-            }
-            if (studentClass === "N/D") {
-                studentClass = (argo.dashboard.intestazione.classe || studentClass).toUpperCase();
-            }
+        if (studentClass === "N/D" && argo.dashboard?.intestazione?.classe) {
+            studentClass = argo.dashboard.intestazione.classe.toUpperCase();
+            // Clean class
+            const m = studentClass.match(/\b([1-5][A-Z])\b/);
+            if (m) studentClass = m[1];
         }
-
-        // 3) Pulizia classe "3A - descrizione lunga" o spazi
-        if (studentClass) {
-            studentClass = studentClass.trim();
-            if (!/^[1-5][A-Z]$/.test(studentClass)) {
-                const m = studentClass.match(/\b([1-5][A-Z])\b/);
-                if (m) studentClass = m[1];
-            }
-        }
-        if (studentName) studentName = studentName.trim();
 
         // FORMATTA I DATI PER IL FRONTEND
         const { grades, tasks, promemoria } = mapLibraryDataToAppFormat(dashboard);
 
         // SALVA PROFILO SU SUPABASE (OPZIONALE)
         if (supabase) {
-            const pid = `${school}:${user.toLowerCase()}:0`;
+            // Usa ID univoco per figlio: school:user:index
+            const pid = `${school}:${user.toLowerCase()}:${profileIndex}`;
             try {
                 await supabase.from("profiles").upsert({
                     id: pid,
@@ -252,13 +304,11 @@ app.post('/login', async (req, res) => {
             } catch (e) { debugLog("Supabase Upsert Ignored"); }
         }
 
-        // RISPOSTA
-        res.status(200).json({
+        // RISPOSTA COMPLETA
+        const resp = {
             success: true,
             session: {
                 schoolCode: school,
-                // Nota: Non esponiamo il token reale per sicurezza/semplicità,
-                // il frontend userà username/password per il sync
                 authToken: "LIB_SESSION",
                 accessToken: "LIB_SESSION",
                 userName: user,
@@ -272,14 +322,21 @@ app.post('/login', async (req, res) => {
             tasks: tasks,
             voti: grades,
             promemoria: promemoria,
-            // Per compatibilità se il frontend controlla selectedProfile
             selectedProfile: {
                 index: profileIndex,
                 name: studentName,
                 class: studentClass,
                 school: school
             }
-        });
+        };
+
+        // Se abbiamo rilevato più profili (o anche solo 1 ma vogliamo essere espliciti), li mandiamo
+        if (profiles.length > 0) {
+            resp.status = "MULTIPLE_PROFILES"; // Segnale per il frontend di mostrare modale se necessario (o se >1)
+            resp.profiles = profiles;
+        }
+
+        res.status(200).json(resp);
 
     } catch (e) {
         console.error("❌ LOGIN ERROR:", e.message);
@@ -295,6 +352,7 @@ app.post('/login', async (req, res) => {
 app.post('/sync', async (req, res) => {
     const { schoolCode, storedUser, storedPass } = req.body;
     const school = (schoolCode || '').trim().toUpperCase();
+    const syncIdx = Number.isInteger(req.body?.profileIndex) ? Number(req.body.profileIndex) : 0;
 
     if (!school || !storedUser || !storedPass) {
         return res.status(401).json({ success: false, error: "Credenziali sync mancanti" });
@@ -305,7 +363,7 @@ app.post('/sync', async (req, res) => {
         const user = decodeURIComponent(Buffer.from(storedUser, 'base64').toString('utf-8')).trim();
         const pwd = decodeURIComponent(Buffer.from(storedPass, 'base64').toString('utf-8'));
 
-        debugLog(`🔄 Sync attempt for ${user}`);
+        debugLog(`🔄 Sync attempt for ${user} (Idx: ${syncIdx})`);
 
         const argo = new Client({
             schoolCode: school,
@@ -315,6 +373,17 @@ app.post('/sync', async (req, res) => {
         });
 
         await argo.login();
+
+        // Seleziona profilo
+        try {
+            const selMethods = ['selectProfile', 'selectSoggetto', 'setSoggetto', 'useProfile', 'useSoggetto'];
+            for (const m of selMethods) {
+                if (typeof argo[m] === 'function') {
+                    await argo[m](syncIdx);
+                    break;
+                }
+            }
+        } catch { }
 
         // Estrai dati freschi
         const dashboard = argo.dashboard;
@@ -335,7 +404,6 @@ app.post('/sync', async (req, res) => {
 });
 
 // 3. RESOLVE PROFILE (Legacy compatibility)
-// Utile se il frontend chiama questo endpoint prima del login
 app.post('/api/resolve-profile', async (req, res) => {
     const { schoolCode, username, password } = req.body;
     const profileIndex = Number.isInteger(req.body?.profileIndex) ? Number(req.body.profileIndex) : 0;
@@ -349,10 +417,10 @@ app.post('/api/resolve-profile', async (req, res) => {
         });
         await argo.login();
 
-        // SELEZIONE PROFILO (Multi-figlio)
+        // SELEZIONE PROFILO
         try {
-            const candidates = ['selectProfile', 'selectSoggetto', 'setSoggetto', 'useProfile', 'useSoggetto'];
-            for (const m of candidates) {
+            const selMethods = ['selectProfile', 'selectSoggetto', 'setSoggetto', 'useProfile', 'useSoggetto'];
+            for (const m of selMethods) {
                 if (typeof argo[m] === 'function') {
                     await argo[m](profileIndex);
                     break;
@@ -363,7 +431,6 @@ app.post('/api/resolve-profile', async (req, res) => {
         let name = "STUDENTE";
         let cls = "N/D";
 
-        // RECUPERO IDENTITÀ MIGLIORATO
         try {
             // 1) Dettagli profilo
             const dettagli = (typeof argo.getDettagliProfilo === 'function') ? await argo.getDettagliProfilo() : null;
@@ -374,19 +441,15 @@ app.post('/api/resolve-profile', async (req, res) => {
             }
         } catch (e) { }
 
-        // 2) Fallback intestazione
         if (argo.dashboard?.intestazione) {
             if (name === "STUDENTE") name = (argo.dashboard.intestazione.alunno || name).toUpperCase();
             if (cls === "N/D") cls = (argo.dashboard.intestazione.classe || cls).toUpperCase();
         }
 
-        // 3) Pulizia classe
         if (cls) {
             cls = cls.trim();
-            if (!/^[1-5][A-Z]$/.test(cls)) {
-                const m = cls.match(/\b([1-5][A-Z])\b/);
-                if (m) cls = m[1];
-            }
+            const m = cls.match(/\b([1-5][A-Z])\b/);
+            if (m) cls = m[1];
         }
         if (name) name = name.trim();
 
@@ -397,10 +460,9 @@ app.post('/api/resolve-profile', async (req, res) => {
 });
 
 // ============= SOCIAL ROUTES (POSTS, MARKET, ETC.) =============
-// Queste rotte rimangono invariate per non rompere le funzionalità social
 
 // Health Check
-app.get('/health', (req, res) => res.status(200).json({ status: "ok", mode: "library_integrated_esm" }));
+app.get('/health', (req, res) => res.status(200).json({ status: "ok", mode: "library_integrated_esm_robust" }));
 
 // Avatar Upload
 app.post('/api/upload', async (req, res) => {
@@ -461,7 +523,7 @@ app.post('/api/posts', async (req, res) => {
     res.json({ success: true, data: posts });
 });
 
-// Market
+// Market (Nota: PWA cache issues citati sono client-side, qui serviamo solo i dati)
 app.get('/api/market', async (req, res) => {
     if (supabase) {
         const { data } = await supabase.from("market_items").select("*").order("created_at", { ascending: false }).limit(200);
@@ -570,6 +632,10 @@ app.put('/api/planner/:user_id', async (req, res) => {
     const userId = decodeURIComponent(req.params.user_id);
     const body = req.body || {};
 
+    // NOTA: Con il nuovo multi-profilo, userId potrebbe contenere ":", 
+    // assicurati che il DB accetti stringhe lunghe o che il client codifichi correttamente.
+    // Qui si salva tutto come stringa opaca.
+
     const payload = {
         user_id: userId,
         planned_tasks: body.plannedTasks || body.planned_tasks || {},
@@ -597,7 +663,7 @@ app.put('/api/planner/:user_id', async (req, res) => {
 
     if (success) return res.json({ success: true, data });
 
-    // 2. Fallback REST (import per fetch se necessario, o usa global fetch di node 18+)
+    // 2. Fallback REST
     try {
         const url = `${sbTableUrl('planner')}?on_conflict=user_id`;
         const headers = sbHeaders();
@@ -621,7 +687,6 @@ app.put('/api/planner/:user_id', async (req, res) => {
         debugLog("Planner REST error", e.message);
         return res.status(500).json({ success: false, error: e.message });
     }
-
 });
 
 app.get('/api/planner/:user_id', async (req, res) => {
@@ -663,13 +728,11 @@ app.get('/api/planner/:user_id', async (req, res) => {
             });
         } catch (e) { debugLog("planner GET supabase error", e.message); }
     }
-
-    // Fallback REST (se vuoi replicare il Python 1:1) oppure 404
     return res.status(404).json({ success: false });
 });
 
 // ============= START SERVER =============
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🚀 Server avviato su porta ${PORT} con 'portaleargo-api' integrata (ESM).`);
+    console.log(`\n🚀 Server avviato su porta ${PORT} con 'portaleargo-api' integrata (ESM + Robust).`);
 });
