@@ -10,13 +10,14 @@
     "engines": {
         "node": ">=18.0.0"
     },
-    "type": "module",
     "dependencies": {
         "@supabase/supabase-js": "^2.39.0",
+        "axios": "^1.6.2",
+        "axios-cookiejar-support": "^4.0.7",
         "cors": "^2.8.5",
         "dotenv": "^16.3.1",
         "express": "^4.18.2",
-        "portaleargo-api": "github:dtrombett/portaleargo-api",
+        "tough-cookie": "^4.1.3",
         "uuid": "^9.0.0"
     },
     "keywords": [
