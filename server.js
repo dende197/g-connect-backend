@@ -308,6 +308,43 @@ class AdvancedArgo {
     }
 }
 
+// ============= PROFILE ENRICHMENT =============
+
+async function enrichProfiles(school, accessToken, profiles) {
+    debugLog(`🔄 Arricchimento di ${profiles.length} profili in parallelo...`);
+
+    // Eseguiamo le richieste in parallelo per velocità
+    const promises = profiles.map(async (p, index) => {
+        const authToken = p.token;
+        if (!authToken) return p;
+
+        const headers = createHeaders(school, accessToken, authToken);
+
+        let name = p.name;
+        let cls = p.class;
+
+        try {
+            // Tentativo: Endpoint SCHEDA (Il più affidabile per i nomi)
+            const res = await axios.post(ENDPOINT + "scheda", { opzioni: "{}" }, { headers, timeout: 10000 });
+            const extracted = extractStudentFromScheda(res);
+
+            if (extracted.name) name = extracted.name;
+            if (extracted.cls) cls = extracted.cls;
+
+        } catch (e) {
+            debugLog(`⚠️ Errore recupero nome per profilo ${index}: ${e.message}`);
+        }
+
+        return {
+            ...p,
+            name: name ? name.trim().toUpperCase() : `STUDENTE ${index + 1}`,
+            class: (cls && CLASS_REGEX.test(cls.trim().toUpperCase())) ? cls.trim().toUpperCase() : "N/D"
+        };
+    });
+
+    return await Promise.all(promises);
+}
+
 // ============= DATA EXTRACTION (MULTI-STRATEGY) =============
 
 function extractStudentFromScheda(schedaResp) {
@@ -1278,38 +1315,47 @@ app.post('/login', async (req, res) => {
     try {
         debugLog("LOGIN REQUEST", { school, username, idx: selectedProfileIndex });
 
-        // 1. Raw Login
+        // 1. Raw Login (Ottiene i token)
         const loginRes = await AdvancedArgo.rawLogin(school, username, password);
         const accessToken = loginRes.access_token;
-        const profiles = loginRes.profiles || [];
+        let profiles = loginRes.profiles || [];
 
-        // 2. Selezione Profilo
-        let targetIndex = 0;
-        if (profiles.length > 0 && selectedProfileIndex !== null) {
-            const i = parseInt(selectedProfileIndex);
-            if (i >= 0 && i < profiles.length) targetIndex = i;
+        // 2. Arricchimento Profili (Recupero nomi reali se mancanti)
+        profiles = await enrichProfiles(school, accessToken, profiles);
+
+        // 3. Verifica Multi-Profilo
+        // Se ci sono più profili e l'utente non ne ha scelto uno, restituiamo la lista
+        if (profiles.length > 1 && selectedProfileIndex === null) {
+            debugLog("⚠️ Rilevati profili multipli, richiesta selezione al frontend.");
+            return res.status(200).json({
+                success: true,
+                status: "MULTIPLE_PROFILES",
+                profiles: profiles.map(p => ({
+                    index: p.index,
+                    name: p.name,
+                    class: p.class,
+                    school: school
+                }))
+            });
         }
 
-        let targetProfile = profiles[targetIndex] || null;
-        let authToken = targetProfile ? targetProfile.token : '';
+        // 4. Selezione Profilo Target
+        let targetIndex = 0;
+        if (selectedProfileIndex !== null) {
+            targetIndex = parseInt(selectedProfileIndex);
+        }
+        if (targetIndex < 0 || targetIndex >= profiles.length) targetIndex = 0;
+
+        const targetProfile = profiles[targetIndex];
+        const authToken = targetProfile.token;
 
         if (!accessToken || !authToken) {
             throw new Error("Impossibile recuperare i token di sessione");
         }
 
-        // 3. Identità
-        let studentName = (targetProfile.name || '').trim().toUpperCase();
-        let studentClass = (targetProfile.class || '').trim().toUpperCase();
-
-        const resolved = await resolveIdentityForProfile(
-            school, username, password, accessToken, authToken, studentName, studentClass
-        );
-
-        studentName = resolved.name;
-        studentClass = resolved.cls;
-
-        if (!studentName) studentName = `STUDENTE ${targetIndex + 1}`;
-        if (!studentClass || !CLASS_REGEX.test(studentClass)) studentClass = "N/D";
+        // 5. Identità autoritativa
+        let studentName = targetProfile.name;
+        let studentClass = targetProfile.class;
 
         // 4. Dati Scolastici (Parallelo)
         const headers = createHeaders(school, accessToken, authToken);
@@ -1361,12 +1407,11 @@ app.post('/login', async (req, res) => {
             };
         }
 
-        if (profiles.length > 1 && selectedProfileIndex === null) {
-            resp.status = "MULTIPLE_PROFILES";
+        if (profiles.length > 1) {
             resp.profiles = profiles.map(p => ({
                 index: p.index,
-                name: p.name || `STUDENTE ${p.index + 1}`,
-                class: p.class || "N/D",
+                name: p.name,
+                class: p.class,
                 school: p.school || school
             }));
         }
@@ -1401,12 +1446,17 @@ app.post('/test/profile-structure', async (req, res) => {
 
     try {
         const loginRes = await AdvancedArgo.rawLogin(schoolCode, username, password);
-        const profiles = loginRes.profiles || [];
+        let profiles = loginRes.profiles || [];
+
+        // Arricchimento test
+        profiles = await enrichProfiles(schoolCode, loginRes.access_token, profiles);
 
         result.profiles = profiles.map(p => ({
             index: p.index,
-            raw_data: p.raw,
-            extraction_test: { name: p.name, class: p.class }
+            token_start: p.token ? p.token.substring(0, 8) + "..." : "NONE",
+            name: p.name,
+            class: p.class,
+            raw_data_keys: Object.keys(p.raw || {})
         }));
 
         result.success = true;
