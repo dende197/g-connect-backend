@@ -1766,7 +1766,8 @@ app.post('/login', async (req, res) => {
     const school = (body.schoolCode || body.school || '').trim().toUpperCase();
     const username = (body.username || '').trim().toLowerCase();
     const password = body.password;
-    const selectedProfileIndex = body.profileIndex !== undefined ? body.profileIndex : null;
+    const selectedProfileIndex = (body.selectedProfileIndex !== undefined) ? body.selectedProfileIndex :
+        (body.profileIndex !== undefined ? body.profileIndex : null);
 
     if (!school || !username || !password) {
         return res.status(400).json({ success: false, error: "Dati mancanti" });

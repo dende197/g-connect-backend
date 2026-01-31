@@ -1,176 +1,352 @@
 // ============================================
-// GESTIONE LOGIN CON MULTI-PROFILO
+// GESTIONE LOGIN CON MULTI-PROFILO - VERSIONE CORRETTA
+// Allineata al backend reale (server.js)
 // ============================================
 
-// STEP 1: Login iniziale
+// Configurazione (definisci nel tuo main.js o config)
+// const API_BASE_URL = 'https://your-backend.onrender.com';
+
+// ============================================
+// STEP 1: Login Iniziale
+// ============================================
+
 async function performLogin(schoolCode, username, password) {
     try {
-        const response = await fetch(`${API_BASE_URL}/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ schoolCode, username, password })
-        });
+        console.log('🔐 Tentativo login...', { schoolCode, username });
+
+        // Setup timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secondi
+
+        let response;
+        try {
+            response = await fetch(`${API_BASE_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    schoolCode,
+                    username,
+                    password
+                }),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+        } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('⏱️ Timeout: il server non risponde. Controlla la connessione.');
+            }
+            throw new Error('🌐 Errore di rete: impossibile contattare il server.');
+        }
+
+        // Verifica HTTP status
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
 
         const data = await response.json();
 
         if (!data.success) {
-            throw new Error(data.error);
+            throw new Error(data.error || 'Login fallito');
         }
 
-        // Salva credenziali per usi futuri (sync/silent login)
+        console.log('✅ Login riuscito', data);
+
+        // Salva credenziali (solo per sync future)
+        // NOTA: Salvare password è un rischio di sicurezza
+        // Idealmente il backend dovrebbe fornire un refresh token
         localStorage.setItem('schoolCode', schoolCode);
-        localStorage.setItem('storedUser', btoa(unescape(encodeURIComponent(username))));
-        localStorage.setItem('storedPass', btoa(unescape(encodeURIComponent(password))));
+        localStorage.setItem('userName', username);
 
-        // CASO 1: Profilo singolo - procedi direttamente
-        if (!data.multiProfile) {
-            console.log("✅ Profilo singolo, salvo dati...");
+        // Password codificata (NON è sicuro, solo offuscamento)
+        // TODO: Sostituire con refresh token dal backend
+        localStorage.setItem('storedUser', btoa(encodeURIComponent(username)));
+        localStorage.setItem('storedPass', btoa(encodeURIComponent(password)));
 
-            // Salva sessione
-            localStorage.setItem('session', JSON.stringify(data.session));
+        // CASO 1: Multi-profilo - Backend ritorna status: "MULTIPLE_PROFILES"
+        if (data.status === "MULTIPLE_PROFILES" &&
+            data.profiles &&
+            data.profiles.length > 1) {
 
-            // Salva dati studente
-            localStorage.setItem('student', JSON.stringify(data.student));
-            localStorage.setItem('tasks', JSON.stringify(data.tasks));
-            localStorage.setItem('voti', JSON.stringify(data.voti));
-            localStorage.setItem('promemoria', JSON.stringify(data.promemoria));
+            console.log(`👥 Multi-profilo: ${data.profiles.length} studenti trovati`);
 
-            // Vai alla dashboard (reload o cambio vista)
-            window.location.reload();
-            return;
-        }
-
-        // CASO 2: Multi-profilo - mostra selezione
-        if (data.multiProfile && data.requiresSelection) {
-            console.log(`👥 Trovati ${data.profili.length} profili`);
-
-            // Salva temporaneamente la sessione
+            // Salva sessione e profili temporaneamente
             sessionStorage.setItem('tempSession', JSON.stringify(data.session));
+            sessionStorage.setItem('tempProfiles', JSON.stringify(data.profiles));
 
-            // Mostra UI di selezione profilo
-            showProfileSelector(data.profili);
+            // Salva anche i dati del primo profilo (default)
+            sessionStorage.setItem('tempStudent', JSON.stringify(data.student));
+            sessionStorage.setItem('tempTasks', JSON.stringify(data.tasks));
+            sessionStorage.setItem('tempVoti', JSON.stringify(data.voti));
+            sessionStorage.setItem('tempPromemoria', JSON.stringify(data.promemoria));
+
+            // Mostra UI selezione profilo
+            showProfileSelector(data.profiles);
             return;
         }
+
+        // CASO 2: Profilo singolo o già selezionato
+        console.log('✅ Profilo singolo - salvataggio dati...');
+
+        // Salva sessione permanentemente
+        localStorage.setItem('session', JSON.stringify(data.session));
+
+        // Salva dati studente
+        localStorage.setItem('student', JSON.stringify(data.student));
+        localStorage.setItem('tasks', JSON.stringify(data.tasks || []));
+        localStorage.setItem('voti', JSON.stringify(data.voti || []));
+        localStorage.setItem('promemoria', JSON.stringify(data.promemoria || []));
+
+        // Salva profileIndex (default: 0)
+        const session = data.session;
+        session.profileIndex = data.session.profileIndex || 0;
+        localStorage.setItem('session', JSON.stringify(session));
+
+        console.log('💾 Dati salvati - redirect a dashboard');
+
+        // Vai alla dashboard
+        navigateToDashboard();
 
     } catch (error) {
         console.error('❌ Errore login:', error);
-        alert('Errore durante il login: ' + error.message);
+
+        // Mostra errore user-friendly
+        showError('Errore di login', error.message);
     }
 }
 
 
-// STEP 2: Mostra UI selezione profilo
-function showProfileSelector(profili) {
+// ============================================
+// STEP 2: UI Selezione Profilo
+// ============================================
+
+function showProfileSelector(profiles) {
+    console.log('🎨 Mostrando UI selezione profilo', profiles);
+
     // Nascondi form login
-    document.getElementById('login-form-container').style.display = 'none';
+    const loginContainer = document.getElementById('login-form-container');
+    if (loginContainer) {
+        loginContainer.style.display = 'none';
+    }
 
-    // Crea UI selezione
+    // Container selezione profilo
     const container = document.getElementById('profile-selector-container');
-    container.innerHTML = `
-        <div class="profile-selector">
-            <h2>👨👩👧👦 Seleziona un profilo</h2>
-            <p>Questo account ha ${profili.length} studenti collegati:</p>
-            
-            <div class="profile-list">
-                ${profili.map(profile => `
-                    <div class="profile-card" onclick="selectProfile('${profile.id}')">
-                        <div class="profile-avatar">
-                            ${getInitials(profile.nome)}
-                        </div>
-                        <div class="profile-info">
-                            <h3>${profile.name || 'Studente ' + (profile.index + 1)}</h3>
-                            <p class="profile-class">Classe: ${profile.class || ''}</p>
-                            <p class="profile-school">${profile.school || ''}</p>
-                        </div>
-                        <div class="profile-arrow">→</div>
-                    </div>
-                `).join('')}
-            </div>
-            
-            <button onclick="cancelProfileSelection()" class="btn-cancel">
-                ← Annulla
-            </button>
-        </div>
-    `;
+    if (!container) {
+        console.error('❌ Elemento #profile-selector-container non trovato!');
+        return;
+    }
 
+    // Pulisci container
+    container.innerHTML = '';
+
+    // Crea wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'profile-selector';
+
+    // Titolo
+    const title = document.createElement('h2');
+    title.innerHTML = '👨👩👧👦 Seleziona un profilo';
+    wrapper.appendChild(title);
+
+    // Sottotitolo
+    const subtitle = document.createElement('p');
+    subtitle.textContent = `Questo account ha ${profiles.length} studenti collegati:`;
+    wrapper.appendChild(subtitle);
+
+    // Lista profili
+    const profileList = document.createElement('div');
+    profileList.className = 'profile-list';
+
+    profiles.forEach((profile, index) => {
+        const card = createProfileCard(profile, index);
+        profileList.appendChild(card);
+    });
+
+    wrapper.appendChild(profileList);
+
+    // Bottone annulla
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn-cancel';
+    cancelBtn.innerHTML = '← Annulla';
+    cancelBtn.onclick = cancelProfileSelection;
+    wrapper.appendChild(cancelBtn);
+
+    // Aggiungi al container
+    container.appendChild(wrapper);
     container.style.display = 'block';
 }
 
 
-// STEP 3: Selezione profilo
-async function selectProfile(profileId) {
+// Crea card profilo (DOM safety - no XSS)
+function createProfileCard(profile, index) {
+    const card = document.createElement('div');
+    card.className = 'profile-card';
+    card.onclick = () => selectProfile(index);
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+
+    // Avatar
+    const avatar = document.createElement('div');
+    avatar.className = 'profile-avatar';
+    avatar.textContent = getInitials(profile.name);
+    card.appendChild(avatar);
+
+    // Info
+    const info = document.createElement('div');
+    info.className = 'profile-info';
+
+    const nameEl = document.createElement('h3');
+    nameEl.textContent = profile.name || `Studente ${index + 1}`;
+    info.appendChild(nameEl);
+
+    const classEl = document.createElement('p');
+    classEl.className = 'profile-class';
+    classEl.textContent = `Classe: ${profile.class || 'N/D'}`;
+    info.appendChild(classEl);
+
+    if (profile.school) {
+        const schoolEl = document.createElement('p');
+        schoolEl.className = 'profile-school';
+        schoolEl.textContent = profile.school;
+        info.appendChild(schoolEl);
+    }
+
+    card.appendChild(info);
+
+    // Arrow
+    const arrow = document.createElement('div');
+    arrow.className = 'profile-arrow';
+    arrow.textContent = '→';
+    card.appendChild(arrow);
+
+    return card;
+}
+
+
+// ============================================
+// STEP 3: Selezione Profilo
+// ============================================
+
+async function selectProfile(profileIndex) {
     try {
-        console.log(`📌 Profilo selezionato: ${profileId}`);
+        console.log(`📌 Profilo selezionato: index ${profileIndex}`);
 
-        // Recupera sessione temporanea
-        const tempSession = JSON.parse(sessionStorage.getItem('tempSession'));
+        // Recupera credenziali e profili
+        const schoolCode = localStorage.getItem('schoolCode');
+        const storedUser = localStorage.getItem('storedUser');
+        const storedPass = localStorage.getItem('storedPass');
+        const tempProfiles = sessionStorage.getItem('tempProfiles');
 
-        if (!tempSession || !tempSession.sessionId) {
-            throw new Error('Sessione non trovata. Riprova il login.');
+        if (!schoolCode || !storedUser || !storedPass) {
+            throw new Error('Credenziali mancanti. Riprova il login.');
+        }
+
+        if (!tempProfiles) {
+            throw new Error('Profili non trovati. Riprova il login.');
+        }
+
+        const profiles = JSON.parse(tempProfiles);
+
+        if (profileIndex < 0 || profileIndex >= profiles.length) {
+            throw new Error(`Profilo index ${profileIndex} non valido`);
         }
 
         // Mostra loading
-        showLoadingOverlay('Caricamento dati studente...');
+        showLoadingOverlay(`Caricamento dati di ${profiles[profileIndex].name}...`);
 
-        // Richiesta al backend
-        const response = await fetch(`${API_BASE_URL}/select-profile`, {
+        // Decodifica credenziali
+        const username = decodeURIComponent(atob(storedUser));
+        const password = decodeURIComponent(atob(storedPass));
+
+        // ═══════════════════════════════════════════════════════════
+        // OPZIONE A: Ri-login con selectedProfileIndex (RACCOMANDATO)
+        // Il backend /login supporta già questo parametro
+        // ═══════════════════════════════════════════════════════════
+
+        const response = await fetch(`${API_BASE_URL}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                sessionId: tempSession.sessionId,
-                profileId: profileId
+                schoolCode,
+                username,
+                password,
+                selectedProfileIndex: profileIndex  // ← Backend supporta questo
             })
         });
 
         const data = await response.json();
 
         if (!data.success) {
-            throw new Error(data.error);
+            throw new Error(data.error || 'Errore nel caricamento del profilo');
         }
 
         console.log('✅ Dati profilo caricati:', data.student);
 
-        // Salva tutti i dati
-        localStorage.setItem('session', JSON.stringify(tempSession));
+        // Salva sessione permanentemente
+        const session = data.session;
+        session.profileIndex = profileIndex;
+        localStorage.setItem('session', JSON.stringify(session));
+
+        // Salva dati studente
         localStorage.setItem('student', JSON.stringify(data.student));
-        localStorage.setItem('tasks', JSON.stringify(data.tasks));
-        localStorage.setItem('voti', JSON.stringify(data.voti));
-        localStorage.setItem('promemoria', JSON.stringify(data.promemoria));
+        localStorage.setItem('tasks', JSON.stringify(data.tasks || []));
+        localStorage.setItem('voti', JSON.stringify(data.voti || []));
+        localStorage.setItem('promemoria', JSON.stringify(data.promemoria || []));
 
-        // Salva profileId per sync futuri
-        const sessionData = JSON.parse(localStorage.getItem('session'));
-        sessionData.profileId = profileId;
-        localStorage.setItem('session', JSON.stringify(sessionData));
-
-        // Pulisci sessione temporanea
+        // Pulisci dati temporanei
         sessionStorage.removeItem('tempSession');
+        sessionStorage.removeItem('tempProfiles');
+        sessionStorage.removeItem('tempStudent');
+        sessionStorage.removeItem('tempTasks');
+        sessionStorage.removeItem('tempVoti');
+        sessionStorage.removeItem('tempPromemoria');
+
+        console.log('💾 Dati salvati - redirect a dashboard');
 
         // Vai alla dashboard
         hideLoadingOverlay();
-        window.location.reload();
+        navigateToDashboard();
 
     } catch (error) {
         console.error('❌ Errore selezione profilo:', error);
         hideLoadingOverlay();
-        alert('Errore nella selezione: ' + error.message);
+        showError('Errore selezione profilo', error.message);
     }
 }
 
 
-// STEP 4: Sync aggiornato (include profileId)
-async function performSync() {
+// ============================================
+// STEP 4: Sync (Background Update)
+// ============================================
+
+async function performSync(silent = true) {
     try {
         const session = JSON.parse(localStorage.getItem('session'));
         const storedUser = localStorage.getItem('storedUser');
         const storedPass = localStorage.getItem('storedPass');
 
         if (!session || !storedUser || !storedPass) {
-            console.log('⚠️ Sessione non valida, richiesto nuovo login');
-            // Gestione logout/redirect
+            console.warn('⚠️ Sessione non valida - richiesto nuovo login');
+
+            if (!silent) {
+                showError('Sessione scaduta', 'Effettua nuovamente il login');
+            }
+
+            // Redirect a login
+            setTimeout(() => {
+                localStorage.clear();
+                window.location.href = '/index.html';
+            }, 2000);
+
             return;
         }
 
-        console.log('🔄 Sincronizzazione in background...');
+        if (!silent) {
+            console.log('🔄 Sincronizzazione manuale...');
+        } else {
+            console.log('🔄 Sincronizzazione background...');
+        }
 
         const response = await fetch(`${API_BASE_URL}/sync`, {
             method: 'POST',
@@ -179,20 +355,20 @@ async function performSync() {
                 schoolCode: session.schoolCode,
                 storedUser: storedUser,
                 storedPass: storedPass,
-                profileId: session.profileId  // NUOVO: passa il profilo selezionato
+                profileIndex: session.profileIndex || 0  // ← CORRETTO: profileIndex
             })
         });
 
         const data = await response.json();
 
         if (!data.success) {
-            throw new Error(data.error);
+            throw new Error(data.error || 'Sync fallito');
         }
 
         // Aggiorna dati locali
-        localStorage.setItem('tasks', JSON.stringify(data.tasks));
-        localStorage.setItem('voti', JSON.stringify(data.voti));
-        localStorage.setItem('promemoria', JSON.stringify(data.promemoria));
+        localStorage.setItem('tasks', JSON.stringify(data.tasks || []));
+        localStorage.setItem('voti', JSON.stringify(data.voti || []));
+        localStorage.setItem('promemoria', JSON.stringify(data.promemoria || []));
 
         // Aggiorna token se presenti
         if (data.new_tokens) {
@@ -204,19 +380,26 @@ async function performSync() {
 
         console.log('✅ Sync completato');
 
-        // Ricarica UI se necessario (qui si potrebbe chiamare una funzione globale di refresh)
-        if (typeof renderVoti === 'function') {
-            renderVoti(data.voti);
+        // Aggiorna UI se funzioni disponibili
+        if (typeof window.updateDashboard === 'function') {
+            window.updateDashboard();
         }
-        if (typeof renderTasks === 'function') {
-            // Assumes updateTasks or similar exists, but local storage is source of truth for rendering mostly
-            // updateTasks() parses from local storage usually? No, it takes args sometimes.
-            // Let's reload page if critical
-            // Or call updateTasks() if defined globally
-        }
+
+        // Event custom per notificare altri componenti
+        window.dispatchEvent(new CustomEvent('syncCompleted', {
+            detail: {
+                tasks: data.tasks,
+                voti: data.voti,
+                promemoria: data.promemoria
+            }
+        }));
 
     } catch (error) {
         console.error('⚠️ Errore Sync:', error);
+
+        if (!silent) {
+            showError('Errore sincronizzazione', error.message);
+        }
     }
 }
 
@@ -227,31 +410,137 @@ async function performSync() {
 
 function getInitials(name) {
     if (!name) return '?';
+
     return name
-        .split(' ')
+        .trim()
+        .split(/\s+/)  // Gestisce spazi multipli
+        .filter(word => word.length > 0)
         .map(word => word[0])
         .join('')
         .toUpperCase()
-        .substring(0, 2);
+        .substring(0, 2) || '?';
 }
+
 
 function cancelProfileSelection() {
-    sessionStorage.removeItem('tempSession');
-    document.getElementById('profile-selector-container').style.display = 'none';
-    document.getElementById('login-form-container').style.display = 'block';
-}
+    console.log('🚫 Selezione profilo annullata');
 
-function showLoadingOverlay(message) {
-    const overlay = document.getElementById('loading-overlay');
-    if (overlay) {
-        overlay.querySelector('.loading-message').textContent = message;
-        overlay.style.display = 'flex';
+    // Pulisci dati temporanei
+    sessionStorage.removeItem('tempSession');
+    sessionStorage.removeItem('tempProfiles');
+    sessionStorage.removeItem('tempStudent');
+    sessionStorage.removeItem('tempTasks');
+    sessionStorage.removeItem('tempVoti');
+    sessionStorage.removeItem('tempPromemoria');
+
+    // Mostra form login
+    const selectorContainer = document.getElementById('profile-selector-container');
+    const loginContainer = document.getElementById('login-form-container');
+
+    if (selectorContainer) {
+        selectorContainer.style.display = 'none';
+    }
+
+    if (loginContainer) {
+        loginContainer.style.display = 'block';
     }
 }
 
+
+function showLoadingOverlay(message = 'Caricamento...') {
+    const overlay = document.getElementById('loading-overlay');
+
+    if (overlay) {
+        const msgEl = overlay.querySelector('.loading-message');
+        if (msgEl) {
+            msgEl.textContent = message;
+        }
+        overlay.style.display = 'flex';
+    } else {
+        console.warn('⚠️ Loading overlay element not found');
+    }
+}
+
+
 function hideLoadingOverlay() {
     const overlay = document.getElementById('loading-overlay');
+
     if (overlay) {
         overlay.style.display = 'none';
     }
 }
+
+
+function showError(title, message) {
+    // Usa una modale di errore se disponibile
+    const errorModal = document.getElementById('error-modal');
+
+    if (errorModal) {
+        const titleEl = errorModal.querySelector('.error-title');
+        const messageEl = errorModal.querySelector('.error-message');
+
+        if (titleEl) titleEl.textContent = title;
+        if (messageEl) messageEl.textContent = message;
+
+        errorModal.style.display = 'flex';
+    } else {
+        // Fallback: alert
+        alert(`${title}\n\n${message}`);
+    }
+}
+
+
+function navigateToDashboard() {
+    // Opzione 1: Usa history API (mantiene stato)
+    if (window.location.pathname !== '/dashboard.html') {
+        window.location.href = '/dashboard.html';
+    } else {
+        // Già nella dashboard, ricarica dati
+        if (typeof window.loadDashboardData === 'function') {
+            window.loadDashboardData();
+        } else {
+            window.location.reload();
+        }
+    }
+}
+
+
+// ============================================
+// AUTO-SYNC (Background)
+// ============================================
+
+// Avvia sync automatico ogni 5 minuti
+let syncInterval = null;
+
+function startAutoSync() {
+    if (syncInterval) {
+        clearInterval(syncInterval);
+    }
+
+    // Sync ogni 5 minuti (300000 ms)
+    syncInterval = setInterval(() => {
+        performSync(true);  // silent = true
+    }, 300000);
+
+    console.log('🔄 Auto-sync abilitato (ogni 5 minuti)');
+}
+
+function stopAutoSync() {
+    if (syncInterval) {
+        clearInterval(syncInterval);
+        syncInterval = null;
+        console.log('🛑 Auto-sync disabilitato');
+    }
+}
+
+
+// ============================================
+// EXPORT (se usi moduli)
+// ============================================
+
+// Se usi ES modules:
+// export { performLogin, selectProfile, performSync, startAutoSync, stopAutoSync };
+
+// Se usi script globali: le funzioni sono già disponibili globalmente
+
+console.log('✅ profile-logic.js caricato correttamente');
