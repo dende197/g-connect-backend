@@ -361,23 +361,20 @@ function buildName(obj = {}) {
 function normalizeClass(raw) {
     if (!raw) return null;
     const txt = String(raw).toUpperCase().replace(/\s+/g, ' ').trim();
-    // Primo tentativo: "3A", "3AB", "3 A", "3  AB"
+    // 1) Match esplicito: "3A", "3AB", "3 A", "3  AB"
     let m = txt.match(/\b([1-5])\s*([A-Z]{1,2})\b/);
     if (m) {
-        // Per coerenza UI, di default teniamo solo la prima lettera (es. "3A")
+        // Per coerenza UI: numero + prima lettera (es. "3AB" -> "3A")
         return m[1] + m[2][0];
     }
-    // Secondo tentativo: cerca numero + lettera ovunque
+    // 2) Numero+lettera ovunque (es. "Classe 2 B" -> "2B")
     m = txt.match(/([1-5])\s*([A-Z])/);
     if (m) return m[1] + m[2];
-    // Terzo tentativo: ricava primo numero e prima lettera
+    // 3) Prima cifra 1-5 + prima lettera
     const digit = (txt.match(/[1-5]/) || [])[0];
     const letter = (txt.match(/[A-Z]/) || [])[0];
     if (digit && letter) return digit + letter;
-
-    // FALLBACK: se non troviamo il pattern standard, restituiamo il testo originale (max 5 caratteri)
-    // Meglio avere "SERAL" che "N/D"
-    return txt.substring(0, 5);
+    return null;
 }
 
 function safeData(obj) {
@@ -721,6 +718,38 @@ async function getAlunnoAnagrafe(headers) {
         return null;
     }
 }
+// Curriculum (classe corrente) con fallback famiglia
+async function getCurriculum(headers) {
+    try {
+        const res = await axios.post(ENDPOINT + "curriculum", {}, { headers, timeout: 15000 });
+        return res.data;
+    } catch (_) {
+        try {
+            const baseFam = ENDPOINT.replace('/appfamiglia', '/famiglia');
+            const res2 = await axios.post(baseFam + "curriculum", {}, { headers, timeout: 15000 });
+            return res2.data;
+        } catch (e) {
+            debugLog("⚠️ Errore Curriculum", e.message);
+            return {};
+        }
+    }
+}
+
+function extractClassFromCurriculum(currData) {
+    try {
+        const d = safeData(currData);
+        const list = Array.isArray(d) ? d : (d.dati || []);
+        const current = list[0] || {};
+        const name = buildName(current);
+        const rawCls = current.desClasse || current.classe || current.classeCorrente || current.desDenominazione;
+        const cls = normalizeClass(rawCls);
+        return { name, cls };
+    } catch (e) {
+        debugLog("⚠️ Errore estrazione classe da Curriculum", e.message);
+        return { name: null, cls: null };
+    }
+}
+
 
 function createHeaders(school, accessToken, authToken) {
     return {
@@ -746,6 +775,23 @@ async function resolveIdentityForProfile(school, username, password, accessToken
 
     const headers = createHeaders(school, accessToken, authToken);
 
+    // STRATEGIA 0: Curriculum (classe corrente)
+    if (!cls || !CLASS_REGEX.test(cls)) {
+        try {
+            debugLog("🕵️ Identity: Tentativo 0 (Curriculum)...");
+            const curriculum = await getCurriculum(headers);
+            const extracted = extractClassFromCurriculum(curriculum);
+            if (!name && extracted.name) name = extracted.name;
+            if (!cls && extracted.cls) cls = extracted.cls;
+            if (name && cls && CLASS_REGEX.test(cls)) {
+                debugLog("✅ Identity risolta con CURRICULUM");
+                return { name, cls };
+            }
+        } catch (e) {
+            debugLog("⚠️ Fail Curriculum", e.message);
+        }
+    }
+
     // STRATEGIA A: /scheda
     if (!name || !cls || !CLASS_REGEX.test(cls)) {
         try {
@@ -754,9 +800,8 @@ async function resolveIdentityForProfile(school, username, password, accessToken
             const extracted = extractStudentFromScheda(scheda);
 
             if (extracted.name) name = extracted.name;
-            if (extracted.cls) cls = extracted.cls;
+            if (extracted.cls) cls = normalizeClass(extracted.cls) || cls;
 
-            cls = normalizeClass(cls) || cls;
             if (name && cls && CLASS_REGEX.test(cls)) {
                 debugLog("✅ Identity risolta con SCHEDA");
                 return { name, cls };
@@ -774,9 +819,8 @@ async function resolveIdentityForProfile(school, username, password, accessToken
             const extracted = extractStudentFromDashboard(dashboard);
 
             if (!name && extracted.name) name = extracted.name;
-            if ((!cls || !CLASS_REGEX.test(cls)) && extracted.cls) cls = extracted.cls;
+            if ((!cls || !CLASS_REGEX.test(cls)) && extracted.cls) cls = normalizeClass(extracted.cls) || cls;
 
-            cls = normalizeClass(cls) || cls;
             if (name && cls && CLASS_REGEX.test(cls)) {
                 debugLog("✅ Identity risolta con DASHBOARD");
                 return { name, cls };
@@ -796,10 +840,10 @@ async function resolveIdentityForProfile(school, username, password, accessToken
                 if (Array.isArray(anagrafe) && anagrafe.length > 0) {
                     const a = anagrafe[0];
                     if (a.nominativo) name = a.nominativo;
-                    if (a.desClasse) cls = a.desClasse;
+                    if (a.desClasse) cls = normalizeClass(a.desClasse) || cls;
                 } else if (anagrafe.nominativo) {
                     name = anagrafe.nominativo;
-                    if (anagrafe.desClasse) cls = anagrafe.desClasse;
+                    if (anagrafe.desClasse) cls = normalizeClass(anagrafe.desClasse) || cls;
                 }
             }
         } catch (e) {
@@ -819,10 +863,9 @@ async function resolveIdentityForProfile(school, username, password, accessToken
                 name = (an.desNominativo || an.nominativo).trim().toUpperCase();
             }
             if ((!cls || !CLASS_REGEX.test(cls)) && (an.desClasse || an.classe)) {
-                cls = (an.desClasse || an.classe).trim().toUpperCase();
+                cls = normalizeClass(an.desClasse || an.classe) || cls;
             }
 
-            cls = normalizeClass(cls) || cls;
             if (name && cls && CLASS_REGEX.test(cls)) {
                 debugLog("✅ Identity risolta con ALUNNO");
                 return { name, cls };
@@ -833,11 +876,99 @@ async function resolveIdentityForProfile(school, username, password, accessToken
     }
 
     // Pulizia finale
-    if (name) name = name.trim().toUpperCase();
     if (cls) cls = normalizeClass(cls) || null;
 
     debugLog("🏁 Identity finale", { name, cls });
     return { name: name || null, cls: cls || null };
+}
+
+async function resolveClassFromAnagraficaWeb(jar) {
+    try {
+        if (!jar) return { name: null, cls: null };
+        const client = wrapper(axios.create({ jar, withCredentials: true, timeout: 15000 }));
+
+        // La pagina dei dati anagrafici
+        const url = 'https://www.portaleargo.it/argoweb/famiglia/anagrafica-alunno.jsf';
+        debugLog("🌐 Identity: Tentativo Dati Anagrafici (HTML)...");
+
+        const res = await client.get(url, {
+            headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html' }
+        });
+
+        const $ = cheerio.load(res.data);
+        let name = null, cls = null;
+
+        // Helper per normalizzare il nome "COGNOME NOME"
+        const normalizeName = (raw) => {
+            if (!raw) return null;
+            let s = String(raw).replace(/\s+/g, ' ').trim();
+            // Rimuovi prefissi tipo "Alunno:", "Nominativo:", ecc.
+            s = s.replace(/^(Alunno|Studente|Nominativo)\s*:\s*/i, '').trim();
+            // Uppercase omogeneo
+            return s.toUpperCase();
+        };
+
+        // Nome: vari tentativi robusti
+        // 1) Toolbar/header ID noto
+        if (!name) {
+            const t = $('#_idJsp44').text().trim();
+            if (t) name = normalizeName(t);
+        }
+        // 2) Label "Nominativo:" vicino
+        if (!name) {
+            const nominativoText = $('span:contains("Nominativo")').closest('tr,div,li').text();
+            if (nominativoText) {
+                const m = nominativoText.match(/Nominativo\s*:\s*(.+)/i);
+                if (m) name = normalizeName(m[1]);
+            }
+        }
+        // 3) Label "Alunno:" o "Studente:"
+        if (!name) {
+            const alunnoText = $('span:contains("Alunno"), span:contains("Studente")').closest('tr,div,li').text();
+            if (alunnoText) {
+                const m = alunnoText.match(/(Alunno|Studente)\s*:\s*(.+)/i);
+                if (m) name = normalizeName(m[2]);
+            }
+        }
+        // 4) Coppia Nome/Cognome in etichette adiacenti
+        if (!name) {
+            let nome = null, cognome = null;
+            $('td,div,li,label,span').each((_, el) => {
+                const txt = $(el).text().trim();
+                if (/^Nome\b/i.test(txt)) {
+                    const sibling = $(el).next('td,div,span,input').text().trim() || $(el).next('input').val() || '';
+                    if (sibling) nome = sibling.trim();
+                }
+                if (/^Cognome\b/i.test(txt)) {
+                    const sibling = $(el).next('td,div,span,input').text().trim() || $(el).next('input').val() || '';
+                    if (sibling) cognome = sibling.trim();
+                }
+            });
+            if (nome || cognome) {
+                name = normalizeName(`${cognome || ''} ${nome || ''}`.trim());
+            }
+        }
+        // 5) Input hidden/valori JSF (se presenti)
+        if (!name) {
+            const hiddenNom = $('input[name*="nominativo"], input[id*="nominativo"]').val();
+            if (hiddenNom) name = normalizeName(hiddenNom);
+        }
+
+        // Classe: vari tentativi
+        let rawCls = $('#_idJsp56').text().trim();
+        if (!rawCls) rawCls = $('span:contains("Classe:")').next().text().trim();
+        if (!rawCls) rawCls = $('td:contains("Classe:")').next().text().trim();
+
+        cls = normalizeClass(rawCls);
+
+        if (DEBUG_MODE) {
+            debugLog(`✅ Anagrafica Web parsed`, { name, cls });
+        }
+        return { name: name || null, cls: cls || null };
+    } catch (e) {
+        debugLog("⚠️ resolveClassFromAnagraficaWeb error", e.message);
+        return { name: null, cls: null };
+    }
 }
 
 async function resolveIdentityFromWebUI(jar) {
@@ -854,16 +985,26 @@ async function resolveIdentityFromWebUI(jar) {
 
         const $ = cheerio.load(res.data);
 
+        // Helper per normalizzare il nome "COGNOME NOME"
+        const normalizeName = (raw) => {
+            if (!raw) return null;
+            let s = String(raw).replace(/\s+/g, ' ').trim();
+            s = s.replace(/^(Alunno|Studente|Nominativo)\s*:\s*/i, '').trim();
+            return s.toUpperCase();
+        };
+
         // Nome principale (toolbar "Alunno:")
-        let name = $('#_idJsp44').text().trim();
-        if (!name) name = $('span:contains("Alunno:")').next().text().trim();
-        if (!name) name = $('td:contains("Alunno:")').next().text().trim();
+        let name = normalizeName($('#_idJsp44').text().trim());
+        if (!name) {
+            const t = $('span:contains("Alunno:")').next().text().trim() || $('td:contains("Alunno:")').next().text().trim();
+            if (t) name = normalizeName(t);
+        }
 
         // Fallback su "Nominativo: ..." in statusbar
         if (!name) {
             const t = $('span:contains("Nominativo")').text() || $('td:contains("Nominativo")').text();
             const m = t && t.match(/Nominativo\s*:\s*(.+)/i);
-            if (m) name = m[1].trim();
+            if (m) name = normalizeName(m[1]);
         }
 
         // Classe (riga "Classe:")
@@ -875,7 +1016,6 @@ async function resolveIdentityFromWebUI(jar) {
 
         if (!cls) {
             const bodyText = $('body').text();
-            // Cerca pattern tipo "Classe: 5 A" o "Classe 5A" o "5A" isolato
             const patterns = [
                 /Classe\s*:\s*([1-5]\s*[A-Z]{1,2})/i,
                 /Sezione\s*:\s*([1-5]\s*[A-Z]{1,2})/i,
@@ -891,7 +1031,6 @@ async function resolveIdentityFromWebUI(jar) {
         }
 
         // Pulizia/normalizzazione
-        name = name ? name.toUpperCase() : null;
         cls = cls ? normalizeClass(cls) : null;
 
         if (name) debugLog(`✅ Identity risolta da WEB UI: ${name} (${cls})`);
@@ -1656,6 +1795,16 @@ app.post('/login', async (req, res) => {
             const webId = await resolveIdentityFromWebUI(jar);
             if (webId.name) studentName = webId.name;
             if (webId.cls && webId.cls !== "N/D") studentClass = normalizeClass(webId.cls) || studentClass;
+
+            // Se ancora non valida, prova direttamente "Dati Anagrafici"
+            if (!normalizeClass(studentClass) || (!studentName || studentName.startsWith('STUDENTE'))) {
+                const webAna = await resolveClassFromAnagraficaWeb(jar);
+                if (webAna.cls) studentClass = normalizeClass(webAna.cls) || studentClass;
+                // Usa il nome reale se ancora placeholder
+                if (webAna.name && (!studentName || studentName.startsWith('STUDENTE'))) {
+                    studentName = webAna.name;
+                }
+            }
         }
 
         // 4. Dati Scolastici (Parallelo)
