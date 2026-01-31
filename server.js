@@ -403,7 +403,7 @@ async function enrichProfiles(school, accessToken, profiles) {
         let name = null;
         let cls = null;
 
-        // 1) connotati (GET) appfamiglia → fallback famiglia
+        // 1) connotati (GET)
         try {
             debugLog(`P${index}: Tentativo CONNOTATI...`);
             let r1 = await axios.get(baseApp + "connotati", { headers, timeout: 6000 });
@@ -423,7 +423,7 @@ async function enrichProfiles(school, accessToken, profiles) {
             debugLog(`P${index}: Connotati Error`, e.message);
         }
 
-        // 2) curriculum (POST) appfamiglia → fallback famiglia
+        // 2) curriculum (POST)
         if (!name || !cls) {
             try {
                 debugLog(`P${index}: Tentativo CURRICULUM...`);
@@ -449,7 +449,7 @@ async function enrichProfiles(school, accessToken, profiles) {
             }
         }
 
-        // 3) scheda (POST) appfamiglia → fallback famiglia
+        // 3) scheda (POST)
         if (!name || !cls) {
             try {
                 debugLog(`P${index}: Tentativo SCHEDA...`);
@@ -473,7 +473,7 @@ async function enrichProfiles(school, accessToken, profiles) {
             }
         }
 
-        // 4) dashboard intestazione (payload conforme)
+        // 4) dashboard intestazione
         if (!name || !cls) {
             try {
                 debugLog(`P${index}: Tentativo DASHBOARD...`);
@@ -492,7 +492,55 @@ async function enrichProfiles(school, accessToken, profiles) {
             }
         }
 
-        // Normlizzazione finale
+        // 5) anagrafe (GET)
+        if (!name || !cls) {
+            try {
+                debugLog(`P${index}: Tentativo ANAGRAFE...`);
+                const baseUrl = baseApp.replace('/appfamiglia', '/famiglia');
+                let r5 = await axios.get(baseUrl + "anagrafe", { headers, timeout: 6000 });
+                debugLog(`P${index}: Raw Anagrafe Response`, r5.data);
+                let d5 = safeData(r5.data);
+                let an = Array.isArray(d5) ? d5[0] : d5;
+                if (!name) name = an.nominativo || an.desNominativo;
+                if (!cls) cls = normalizeClass(an.desClasse || an.classe);
+            } catch (e) {
+                debugLog(`P${index}: Anagrafe Error`, e.message);
+            }
+        }
+
+        // 6) alunno (GET)
+        if (!name || !cls) {
+            try {
+                debugLog(`P${index}: Tentativo ALUNNO...`);
+                let r6 = await axios.get(baseApp + "alunno", { headers, timeout: 6000 });
+                debugLog(`P${index}: Raw Alunno Response`, r6.data);
+                let d6 = safeData(r6.data);
+                let obj = Array.isArray(d6) ? d6[0] : d6;
+                let an = obj.alunno || obj;
+                name = buildName(an);
+                cls = normalizeClass(an.desClasse || an.classe);
+            } catch (e) {
+                debugLog(`P${index}: Alunno Error`, e.message);
+            }
+        }
+
+        // 7) alunno/anagrafe (GET)
+        if (!name || !cls) {
+            try {
+                debugLog(`P${index}: Tentativo ALUNNO/ANAGRAFE...`);
+                let r7 = await axios.get(baseApp + "alunno/anagrafe", { headers, timeout: 6000 });
+                debugLog(`P${index}: Raw Alunno Anagrafe Response`, r7.data);
+                let d7 = safeData(r7.data);
+                let obj = Array.isArray(d7) ? d7[0] : d7;
+                let an = obj.alunno || obj;
+                name = buildName(an);
+                cls = normalizeClass(an.desClasse || an.classe);
+            } catch (e) {
+                debugLog(`P${index}: Alunno Anagrafe Error`, e.message);
+            }
+        }
+
+        // Normalizzazione finale
         name = (name || p.name || `STUDENTE ${index + 1}`).trim().toUpperCase();
         cls = (normalizeClass(cls || p.class) || "N/D").trim().toUpperCase();
 
@@ -775,16 +823,25 @@ async function resolveIdentityFromWebUI(jar) {
 
         // Nome principale (toolbar "Alunno:")
         let name = $('#_idJsp44').text().trim();
+        if (!name) name = $('span:contains("Alunno:")').next().text().trim();
+        if (!name) name = $('td:contains("Alunno:")').next().text().trim();
 
         // Fallback su "Nominativo: ..." in statusbar
         if (!name) {
-            const t = $('span:contains("Nominativo")').text();
+            const t = $('span:contains("Nominativo")').text() || $('td:contains("Nominativo")').text();
             const m = t && t.match(/Nominativo\s*:\s*(.+)/i);
             if (m) name = m[1].trim();
         }
 
         // Classe (riga "Classe:")
         let cls = $('#_idJsp56').text().trim();
+        if (!cls) cls = $('span:contains("Classe:")').next().text().trim();
+        if (!cls) cls = $('td:contains("Classe:")').next().text().trim();
+        if (!cls) {
+            const t = $('body').text();
+            const m = t.match(/Classe\s*:\s*([1-5]\s*[A-Z]{1,2})/i);
+            if (m) cls = m[1];
+        }
 
         // Pulizia/normalizzazione
         name = name ? name.toUpperCase() : null;
