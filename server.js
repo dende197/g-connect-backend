@@ -358,22 +358,34 @@ function buildName(obj = {}) {
     return combo ? combo.toUpperCase() : null;
 }
 
-function normalizeClass(raw) {
+function normalizeClass(raw, strict = false) {
     if (!raw) return null;
-    const txt = String(raw).toUpperCase().replace(/\s+/g, ' ').trim();
-    // 1) Match esplicito: "3A", "3AB", "3 A", "3  AB"
+    let txt = String(raw).toUpperCase().replace(/\s+/g, ' ').trim();
+
+    // Filtro "False Positives" comuni (parole italiane che iniziano con lettere di sezione)
+    // Esempio: "4 ORE" non deve diventare "4O"
+    const blackList = /\b(ORE|ANNI|ANNO|OGGETTI|OTTOBRE|ORA|ORDINE|OFFERTA|OPZIONE|ORARIO)\b/i;
+    if (blackList.test(txt)) return null;
+
+    // 1) Match esplicito: "3A", "3AB", "3 A", "3  AB" con word boundaries
     let m = txt.match(/\b([1-5])\s*([A-Z]{1,2})\b/);
     if (m) {
         // Per coerenza UI: numero + prima lettera (es. "3AB" -> "3A")
         return m[1] + m[2][0];
     }
+
+    // Se siamo in strict mode (scansione globale testo), accettiamo solo match sicuri sopra
+    if (strict) return null;
+
     // 2) Numero+lettera ovunque (es. "Classe 2 B" -> "2B")
     m = txt.match(/([1-5])\s*([A-Z])/);
     if (m) return m[1] + m[2];
-    // 3) Prima cifra 1-5 + prima lettera
+
+    // 3) Prima cifra 1-5 + prima lettera (Ultima spiaggia per campi singoli)
     const digit = (txt.match(/[1-5]/) || [])[0];
     const letter = (txt.match(/[A-Z]/) || [])[0];
     if (digit && letter) return digit + letter;
+
     return null;
 }
 
@@ -992,7 +1004,7 @@ async function resolveClassFromAnagraficaWeb(jar) {
         // C) Global Text Search (Ultima Spiggia)
         if (!cls) {
             const bodyText = $('body').text();
-            cls = normalizeClass(bodyText); // normalizeClass ora è molto bravo a pescare pattern dal testo
+            cls = normalizeClass(bodyText, true); // Strict mode: solo match garantiti
         }
 
         if (DEBUG_MODE) debugLog(`✅ GOD MODE Results`, { name, cls });
@@ -1058,7 +1070,7 @@ async function resolveIdentityFromWebUI(jar) {
 
         if (!cls) {
             const bodyText = $('body').text();
-            cls = normalizeClass(bodyText);
+            cls = normalizeClass(bodyText, true);
         }
 
         if (name) debugLog(`✅ Identity risolta da WEB UI: ${name} (${cls})`);
