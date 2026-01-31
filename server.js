@@ -15,6 +15,16 @@ const cheerio = require('cheerio');
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 
+// Root Route for checking status
+app.get('/', (req, res) => {
+    res.json({
+        status: "online",
+        message: "G-Connect Backend is running",
+        debugMode: DEBUG_MODE,
+        timestamp: new Date().toISOString()
+    });
+});
+
 // ============= CORS (CORRETTO) =============
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || "";
 const _allowed = ALLOWED_ORIGINS
@@ -350,7 +360,7 @@ function normalizeClass(raw) {
     // Primo tentativo: "3A", "3AB", "3 A", "3  AB"
     let m = txt.match(/\b([1-5])\s*([A-Z]{1,2})\b/);
     if (m) {
-        // Per coerenza UI, di default teniamo solo la prima lettera (es. "3AB" -> "3A")
+        // Per coerenza UI, di default teniamo solo la prima lettera (es. "3A")
         return m[1] + m[2][0];
     }
     // Secondo tentativo: cerca numero + lettera ovunque
@@ -360,7 +370,10 @@ function normalizeClass(raw) {
     const digit = (txt.match(/[1-5]/) || [])[0];
     const letter = (txt.match(/[A-Z]/) || [])[0];
     if (digit && letter) return digit + letter;
-    return null;
+
+    // FALLBACK: se non troviamo il pattern standard, restituiamo il testo originale (max 5 caratteri)
+    // Meglio avere "SERAL" che "N/D"
+    return txt.substring(0, 5);
 }
 
 function safeData(obj) {
@@ -394,23 +407,28 @@ async function enrichProfiles(school, accessToken, profiles) {
         try {
             debugLog(`P${index}: Tentativo CONNOTATI...`);
             let r1 = await axios.get(baseApp + "connotati", { headers, timeout: 6000 });
+            debugLog(`P${index}: Raw Connotati App Response`, r1.data);
             let d1 = safeData(r1.data);
             name = buildName(d1);
             cls = normalizeClass(d1.desClasse || d1.classe);
 
             if (!name) {
                 r1 = await axios.get(baseFam + "connotati", { headers, timeout: 6000 });
+                debugLog(`P${index}: Raw Connotati Fam Response`, r1.data);
                 d1 = safeData(r1.data);
                 name = buildName(d1);
                 cls = normalizeClass(d1.desClasse || d1.classe);
             }
-        } catch (e) { }
+        } catch (e) {
+            debugLog(`P${index}: Connotati Error`, e.message);
+        }
 
         // 2) curriculum (POST) appfamiglia → fallback famiglia
         if (!name || !cls) {
             try {
                 debugLog(`P${index}: Tentativo CURRICULUM...`);
                 let r2 = await axios.post(baseApp + "curriculum", {}, { headers, timeout: 6000 });
+                debugLog(`P${index}: Raw Curriculum App Response`, r2.data);
                 let d2 = safeData(r2.data);
                 let list = Array.isArray(d2) ? d2 : (d2.dati || []);
                 let current = list[0] || {};
@@ -419,13 +437,16 @@ async function enrichProfiles(school, accessToken, profiles) {
 
                 if (!name) {
                     r2 = await axios.post(baseFam + "curriculum", {}, { headers, timeout: 6000 });
+                    debugLog(`P${index}: Raw Curriculum Fam Response`, r2.data);
                     d2 = safeData(r2.data);
                     list = Array.isArray(d2) ? d2 : (d2.dati || []);
                     current = list[0] || {};
                     name = buildName(current);
                     cls = normalizeClass(current.desClasse || current.classe);
                 }
-            } catch (e) { }
+            } catch (e) {
+                debugLog(`P${index}: Curriculum Error`, e.message);
+            }
         }
 
         // 3) scheda (POST) appfamiglia → fallback famiglia
@@ -433,6 +454,7 @@ async function enrichProfiles(school, accessToken, profiles) {
             try {
                 debugLog(`P${index}: Tentativo SCHEDA...`);
                 let r3 = await axios.post(baseApp + "scheda", { opzioni: "{}" }, { headers, timeout: 6000 });
+                debugLog(`P${index}: Raw Scheda App Response`, r3.data);
                 let d3 = safeData(r3.data);
                 let al = d3.alunno || d3;
                 name = buildName(al);
@@ -440,12 +462,15 @@ async function enrichProfiles(school, accessToken, profiles) {
 
                 if (!name) {
                     r3 = await axios.post(baseFam + "scheda", { opzioni: "{}" }, { headers, timeout: 6000 });
+                    debugLog(`P${index}: Raw Scheda Fam Response`, r3.data);
                     d3 = safeData(r3.data);
                     al = d3.alunno || d3;
                     name = buildName(al);
                     cls = normalizeClass(al.desClasse || al.classe);
                 }
-            } catch (e) { }
+            } catch (e) {
+                debugLog(`P${index}: Scheda Error`, e.message);
+            }
         }
 
         // 4) dashboard intestazione (payload conforme)
@@ -457,11 +482,14 @@ async function enrichProfiles(school, accessToken, profiles) {
                     opzioni: JSON.stringify({ intestazione: true })
                 };
                 const r4 = await axios.post(baseApp + "dashboard/dashboard", payload, { headers, timeout: 6000 });
+                debugLog(`P${index}: Raw Dashboard App Response`, r4.data);
                 const d4 = safeData(r4.data);
                 const intest = d4.intestazione || d4;
                 name = buildName(intest);
                 cls = normalizeClass(intest.desClasse || intest.classe);
-            } catch (e) { }
+            } catch (e) {
+                debugLog(`P${index}: Dashboard Error`, e.message);
+            }
         }
 
         // Normlizzazione finale
