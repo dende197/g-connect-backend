@@ -2744,8 +2744,14 @@
                         </div>
                         
                         <div style="margin-bottom: 28px;">
-                            <label style="display: block; font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; margin-left: 4px;">CLASSE</label>
-                            <input type="text" id="edit-user-class" value="${state.user.class || ''}" placeholder="Es. 5B" style="width: 100%; height: 54px; border-radius: 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: white; padding: 0 16px; font-size: 16px; font-weight: 600; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='rgba(255,255,255,0.12)'">
+                            <label style="display: block; font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; margin-left: 4px;">CLASSE (Automatica)</label>
+                            <div style="width: 100%; height: 54px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); padding: 0 16px; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; cursor: not-allowed; opacity: 0.8;">
+                                <span>${state.user.class || 'N/D'}</span>
+                                <i class="ph-bold ph-lock-simple" style="font-size: 18px; color: var(--text-dim);"></i>
+                            </div>
+                            <p style="font-size: 11px; color: var(--text-dim); margin: 6px 0 0 4px; line-height: 1.4;">
+                                La classe viene risolta automaticamente da DidUP e non può essere modificata manualmente.
+                            </p>
                         </div>
                         
                         <button onclick="saveProfileChanges()" class="btn-primary" style="width: 100%; height: 56px; border-radius: 16px; font-size: 18px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 10px;">
@@ -2758,7 +2764,6 @@
 
         async function saveProfileChanges() {
             const newName = document.getElementById('edit-user-name').value.trim();
-            const newClass = document.getElementById('edit-user-class').value.trim();
 
             if (!newName) {
                 alert("Inserisci almeno il nome");
@@ -2770,12 +2775,10 @@
 
                 await saveProfileToServer({
                     name: newName,
-                    class: newClass,
-                    avatar: state.user.avatar // Già caricato se cambiato tramite handleAvatarUpload
+                    avatar: state.user.avatar
                 });
 
                 state.user.name = newName;
-                state.user.class = newClass;
                 localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
 
                 closeModal();
