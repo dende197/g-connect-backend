@@ -887,10 +887,15 @@ async function resolveClassFromAnagraficaWeb(jar) {
         if (!jar) return { name: null, cls: null };
         const client = wrapper(axios.create({ jar, withCredentials: true, timeout: 15000 }));
 
-        // La pagina dei dati anagrafici
+        // 1. Session Warming: Passa dalla home per stabilizzare i cookie JSF
+        await client.get('https://www.portaleargo.it/argoweb/famiglia/index.jsf', {
+            headers: { 'User-Agent': USER_AGENT }
+        }).catch(() => { });
+
+        // 2. Pagina Target: Dati Anagrafici
         const url = 'https://www.portaleargo.it/argoweb/famiglia/anagrafica-alunno.jsf';
         const urlHit = url.split('/').pop();
-        debugLog("🌐 Identity: Tentativo Dati Anagrafici (HTML)...");
+        debugLog(`🌐 Identity (GOD MODE): Tentativo ${urlHit}...`);
 
         const res = await client.get(url, {
             headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html' }
@@ -899,112 +904,102 @@ async function resolveClassFromAnagraficaWeb(jar) {
         const $ = cheerio.load(res.data);
         let name = null, cls = null;
 
-        // Helper per normalizzare e validare il nome
-        const normalizeName = (raw) => {
-            if (!raw) return null;
-            let s = String(raw).replace(/\s+/g, ' ').trim();
-            // Rimuovi prefissi tipo "Alunno:", "Nominativo:", ecc.
-            s = s.replace(/^(Alunno|Studente|Nominativo)\s*:\s*/i, '').trim();
-            s = s.toUpperCase();
-            // Scarta testi UI (link/password, pulsanti)
-            if (/PASSWORD|RECUPERA|CAMBIA\s+PASSWORD|ACCEDI|LOGOUT/i.test(s)) return null;
-            // Scarta se troppo corto o solo una parola generica
-            if (s.length < 3 || /^\w+$/.test(s) && /NOMINATIVO|ALUNNO|STUDENTE/i.test(s)) return null;
-            return s;
+        // Helper: Validazione stringa nome
+        const isValidName = (s) => {
+            if (!s) return false;
+            const t = s.toUpperCase();
+            if (t.length < 3) return false;
+            // Scarta boilerplate PWA/UI
+            if (/PASSWORD|RECUPERA|CAMBIA|LOGOUT|ESC|ACCEDI|REGISTRA|MENU|CERCA/i.test(t)) return false;
+            // Scarta label stesse
+            if (/^NOMINATIVO$|^ALUNNO$|^STUDENTE$/i.test(t)) return false;
+            return true;
         };
 
-        // Nome: vari tentativi robusti
-        // 1) Toolbar/header ID noto
-        if (!name) {
-            const t = $('#_idJsp44').text().trim();
-            if (t) name = normalizeName(t);
-        }
-        // 2) Label "Nominativo:" vicino
-        if (!name) {
-            const nominativoText = $('span:contains("Nominativo")').closest('tr,div,li').text();
-            if (nominativoText) {
-                const m = nominativoText.match(/Nominativo\s*:\s*(.+)/i);
-                if (m) name = normalizeName(m[1]);
+        const cleanAndCaps = (s) => (s || '').replace(/\s+/g, ' ').trim().toUpperCase();
+
+        // --- RICERCA NOME ---
+        // A) ID Prioritari
+        const idPriorities = ['#_idJsp44', '#nominativo', '#alunnoName', '[id*="nominativoAlunno"]'];
+        for (const selector of idPriorities) {
+            const raw = $(selector).text().trim() || $(selector).val();
+            if (isValidName(raw)) {
+                name = cleanAndCaps(raw.replace(/^(Alunno|Studente|Nominativo)\s*:\s*/i, ''));
+                break;
             }
-        }
-        // 3) Label "Alunno:" o "Studente:"
-        if (!name) {
-            const alunnoText = $('span:contains("Alunno"), span:contains("Studente")').closest('tr,div,li').text();
-            if (alunnoText) {
-                const m = alunnoText.match(/(Alunno|Studente)\s*:\s*(.+)/i);
-                if (m) name = normalizeName(m[2]);
-            }
-        }
-        // 4) Coppia Nome/Cognome in etichette adiacenti o input
-        if (!name) {
-            let nome = null, cognome = null;
-            $('td,div,li,label,span').each((_, el) => {
-                const txt = $(el).text().trim();
-                if (/^Nome\b/i.test(txt)) {
-                    const sibling = $(el).next('td,div,span,input').text().trim() || $(el).next('input').val() || '';
-                    if (sibling) nome = sibling.trim();
-                }
-                if (/^Cognome\b/i.test(txt)) {
-                    const sibling = $(el).next('td,div,span,input').text().trim() || $(el).next('input').val() || '';
-                    if (sibling) cognome = sibling.trim();
-                }
-            });
-            if (nome || cognome) {
-                name = normalizeName(`${cognome || ''} ${nome || ''}`.trim());
-            }
-        }
-        // 5) Input hidden/valori JSF (se presenti)
-        if (!name) {
-            const hiddenNom = $('input[name*="nominativo"], input[id*="nominativo"]').val();
-            if (hiddenNom) name = normalizeName(hiddenNom);
-        }
-        // 6) Ultimo filtro anti-UI
-        if (name && /PASSWORD|RECUPERA|CAMBIA\s+PASSWORD|ACCEDI|LOGOUT/i.test(name)) {
-            name = null;
         }
 
-        // Classe: vari tentativi
-        // 1) tabella: label "Classe" + cella successiva
-        if (!cls) {
-            const cell = $('td:contains("Classe")').next('td').text().trim();
-            const norm = normalizeClass(cell);
-            if (norm) cls = norm;
+        // B) Keyword Scanning (Cerca label e vedi valore adiacente)
+        if (!name) {
+            $('td, span, div, label, b, th').each((_, el) => {
+                if (name) return; // break
+                const txt = $(el).text().trim();
+                if (/^(Nominativo|Alunno|Studente)\s*:/i.test(txt)) {
+                    // Cerca nel testo stesso dopo i due punti
+                    const afterColon = txt.split(':')[1];
+                    if (isValidName(afterColon)) {
+                        name = cleanAndCaps(afterColon);
+                    }
+                    // Altrimenti guarda il prossimo elemento
+                    const nextVal = $(el).next().text().trim() || $(el).parent().next().text().trim();
+                    if (!name && isValidName(nextVal)) {
+                        name = cleanAndCaps(nextVal);
+                    }
+                }
+            });
         }
-        // 2) label "Classe:" in blocchi + adiacente
-        if (!cls) {
-            const classeText = $('span:contains("Classe")').closest('tr,div,li').text();
-            if (classeText) {
-                const m = classeText.match(/Classe\s*:\s*([^\n]+)/i);
-                if (m) cls = normalizeClass(m[1]);
+
+        // C) Form Analysis (Nome/Cognome separati)
+        if (!name) {
+            let extractedNome = null, extractedCognome = null;
+            $('label, td').each((_, el) => {
+                const txt = $(el).text().trim();
+                const val = $(el).nextAll('td, span, input').first().text().trim() || $(el).nextAll('input').first().val();
+                if (/^Nome$/i.test(txt)) extractedNome = val;
+                if (/^Cognome$/i.test(txt)) extractedCognome = val;
+            });
+            if (extractedNome || extractedCognome) {
+                const combined = `${extractedCognome || ''} ${extractedNome || ''}`.trim();
+                if (isValidName(combined)) name = cleanAndCaps(combined);
             }
         }
-        // 3) ID toolbar conosciuto
-        if (!cls) {
-            const raw = $('#_idJsp56').text().trim();
-            if (raw) cls = normalizeClass(raw);
+
+        // --- RICERCA CLASSE ---
+        // A) ID Prioritari
+        const clsIds = ['#_idJsp56', '[id*="classe"]', '[id*="sezione"]'];
+        for (const selector of clsIds) {
+            const raw = $(selector).text().trim() || $(selector).val();
+            const norm = normalizeClass(raw);
+            if (norm) { cls = norm; break; }
         }
-        // 4) qualsiasi label "Classe" + adiacente
+
+        // B) Keyword Scanning
         if (!cls) {
-            $('td,div,li').each((_, el) => {
+            $('td, span, div, label, b').each((_, el) => {
+                if (cls) return;
                 const txt = $(el).text().trim();
-                if (/^Classe\b/i.test(txt)) {
-                    const sibling = $(el).next('td,div,span').text().trim();
-                    const norm = normalizeClass(sibling);
+                if (/^Classe$|^Sezione$/i.test(txt)) {
+                    const val = $(el).next().text().trim() || $(el).next('input').val() || $(el).parent().next().text().trim();
+                    const norm = normalizeClass(val);
                     if (norm) cls = norm;
                 }
+                // Check for "Classe: 3A" in the same text
+                const match = txt.match(/(?:Classe|Sezione)\s*:\s*([1-5]\s*[A-Z]{1,2})/i);
+                if (match) cls = normalizeClass(match[1]);
             });
         }
-        // 5) input/hidden/field contenenti "classe"
+
+        // C) Global Text Search (Ultima Spiggia)
         if (!cls) {
-            const val = $('input[name*="classe"], input[id*="classe"], span[id*="classe"]').val() || $('span[id*="classe"]').text();
-            const norm = normalizeClass(val);
-            if (norm) cls = norm;
+            const bodyText = $('body').text();
+            cls = normalizeClass(bodyText); // normalizeClass ora è molto bravo a pescare pattern dal testo
         }
 
-        if (DEBUG_MODE) debugLog(`✅ Anagrafica Web parsed (${urlHit})`, { name, cls });
+        if (DEBUG_MODE) debugLog(`✅ GOD MODE Results`, { name, cls });
         return { name: name || null, cls: cls || null };
+
     } catch (e) {
-        debugLog("⚠️ resolveClassFromAnagraficaWeb error", e.message);
+        debugLog("⚠️ resolveClassFromAnagraficaWeb GOD MODE error", e.message);
         return { name: null, cls: null };
     }
 }
@@ -1023,53 +1018,48 @@ async function resolveIdentityFromWebUI(jar) {
 
         const $ = cheerio.load(res.data);
 
-        // Helper per normalizzare il nome "COGNOME NOME"
-        const normalizeName = (raw) => {
-            if (!raw) return null;
-            let s = String(raw).replace(/\s+/g, ' ').trim();
-            s = s.replace(/^(Alunno|Studente|Nominativo)\s*:\s*/i, '').trim();
-            return s.toUpperCase();
+        // Helper: Validazione stringa nome (Anti-UI)
+        const isValidName = (s) => {
+            if (!s) return false;
+            const t = s.toUpperCase();
+            return t.length >= 3 && !/PASSWORD|RECUPERA|CAMBIA|LOGOUT|ESC|ACCEDI|REGISTRA|MENU|CERCA/i.test(t);
         };
 
-        // Nome principale (toolbar "Alunno:")
-        let name = normalizeName($('#_idJsp44').text().trim());
-        if (!name) {
-            const t = $('span:contains("Alunno:")').next().text().trim() || $('td:contains("Alunno:")').next().text().trim();
-            if (t) name = normalizeName(t);
-        }
+        const cleanAndCaps = (s) => (s || '').replace(/\s+/g, ' ').trim().toUpperCase();
 
-        // Fallback su "Nominativo: ..." in statusbar
-        if (!name) {
-            const t = $('span:contains("Nominativo")').text() || $('td:contains("Nominativo")').text();
-            const m = t && t.match(/Nominativo\s*:\s*(.+)/i);
-            if (m) name = normalizeName(m[1]);
-        }
-
-        // Classe (riga "Classe:")
-        let cls = $('#_idJsp56').text().trim();
-        if (!cls) cls = $('span:contains("Classe:")').next().text().trim();
-        if (!cls) cls = $('td:contains("Classe:")').next().text().trim();
-        if (!cls) cls = $('span:contains("Sezione:")').next().text().trim();
-        if (!cls) cls = $('td:contains("Sezione:")').next().text().trim();
-
-        if (!cls) {
-            const bodyText = $('body').text();
-            const patterns = [
-                /Classe\s*:\s*([1-5]\s*[A-Z]{1,2})/i,
-                /Sezione\s*:\s*([1-5]\s*[A-Z]{1,2})/i,
-                /([1-5])\^?\s*([A-Z]{1,2})\b/i
-            ];
-            for (const p of patterns) {
-                const match = bodyText.match(p);
-                if (match) {
-                    cls = match[1] + (match[2] || '');
-                    break;
-                }
+        // Nome principale
+        let name = null;
+        const nameIds = ['#_idJsp44', '#nominativo', '[id*="nominativo"]'];
+        for (const id of nameIds) {
+            const raw = $(id).text().trim();
+            if (isValidName(raw)) {
+                name = cleanAndCaps(raw.replace(/^(Alunno|Studente|Nominativo)\s*:\s*/i, ''));
+                break;
             }
         }
 
-        // Pulizia/normalizzazione
-        cls = cls ? normalizeClass(cls) : null;
+        if (!name) {
+            const t = $('span:contains("Alunno:")').next().text().trim() ||
+                $('td:contains("Alunno:")').next().text().trim() ||
+                $('span:contains("Nominativo")').text();
+            if (isValidName(t)) {
+                name = cleanAndCaps(t.replace(/^(Alunno|Studente|Nominativo)\s*:\s*/i, ''));
+            }
+        }
+
+        // Classe
+        let cls = null;
+        const clsIds = ['#_idJsp56', '[id*="classe"]', '[id*="sezione"]'];
+        for (const id of clsIds) {
+            const raw = $(id).text().trim();
+            const norm = normalizeClass(raw);
+            if (norm) { cls = norm; break; }
+        }
+
+        if (!cls) {
+            const bodyText = $('body').text();
+            cls = normalizeClass(bodyText);
+        }
 
         if (name) debugLog(`✅ Identity risolta da WEB UI: ${name} (${cls})`);
         return { name, cls: cls || "N/D" };
