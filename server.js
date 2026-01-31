@@ -889,6 +889,7 @@ async function resolveClassFromAnagraficaWeb(jar) {
 
         // La pagina dei dati anagrafici
         const url = 'https://www.portaleargo.it/argoweb/famiglia/anagrafica-alunno.jsf';
+        const urlHit = url.split('/').pop();
         debugLog("🌐 Identity: Tentativo Dati Anagrafici (HTML)...");
 
         const res = await client.get(url, {
@@ -898,14 +899,18 @@ async function resolveClassFromAnagraficaWeb(jar) {
         const $ = cheerio.load(res.data);
         let name = null, cls = null;
 
-        // Helper per normalizzare il nome "COGNOME NOME"
+        // Helper per normalizzare e validare il nome
         const normalizeName = (raw) => {
             if (!raw) return null;
             let s = String(raw).replace(/\s+/g, ' ').trim();
             // Rimuovi prefissi tipo "Alunno:", "Nominativo:", ecc.
             s = s.replace(/^(Alunno|Studente|Nominativo)\s*:\s*/i, '').trim();
-            // Uppercase omogeneo
-            return s.toUpperCase();
+            s = s.toUpperCase();
+            // Scarta testi UI (link/password, pulsanti)
+            if (/PASSWORD|RECUPERA|CAMBIA\s+PASSWORD|ACCEDI|LOGOUT/i.test(s)) return null;
+            // Scarta se troppo corto o solo una parola generica
+            if (s.length < 3 || /^\w+$/.test(s) && /NOMINATIVO|ALUNNO|STUDENTE/i.test(s)) return null;
+            return s;
         };
 
         // Nome: vari tentativi robusti
@@ -930,7 +935,7 @@ async function resolveClassFromAnagraficaWeb(jar) {
                 if (m) name = normalizeName(m[2]);
             }
         }
-        // 4) Coppia Nome/Cognome in etichette adiacenti
+        // 4) Coppia Nome/Cognome in etichette adiacenti o input
         if (!name) {
             let nome = null, cognome = null;
             $('td,div,li,label,span').each((_, el) => {
@@ -953,17 +958,50 @@ async function resolveClassFromAnagraficaWeb(jar) {
             const hiddenNom = $('input[name*="nominativo"], input[id*="nominativo"]').val();
             if (hiddenNom) name = normalizeName(hiddenNom);
         }
+        // 6) Ultimo filtro anti-UI
+        if (name && /PASSWORD|RECUPERA|CAMBIA\s+PASSWORD|ACCEDI|LOGOUT/i.test(name)) {
+            name = null;
+        }
 
         // Classe: vari tentativi
-        let rawCls = $('#_idJsp56').text().trim();
-        if (!rawCls) rawCls = $('span:contains("Classe:")').next().text().trim();
-        if (!rawCls) rawCls = $('td:contains("Classe:")').next().text().trim();
-
-        cls = normalizeClass(rawCls);
-
-        if (DEBUG_MODE) {
-            debugLog(`✅ Anagrafica Web parsed`, { name, cls });
+        // 1) tabella: label "Classe" + cella successiva
+        if (!cls) {
+            const cell = $('td:contains("Classe")').next('td').text().trim();
+            const norm = normalizeClass(cell);
+            if (norm) cls = norm;
         }
+        // 2) label "Classe:" in blocchi + adiacente
+        if (!cls) {
+            const classeText = $('span:contains("Classe")').closest('tr,div,li').text();
+            if (classeText) {
+                const m = classeText.match(/Classe\s*:\s*([^\n]+)/i);
+                if (m) cls = normalizeClass(m[1]);
+            }
+        }
+        // 3) ID toolbar conosciuto
+        if (!cls) {
+            const raw = $('#_idJsp56').text().trim();
+            if (raw) cls = normalizeClass(raw);
+        }
+        // 4) qualsiasi label "Classe" + adiacente
+        if (!cls) {
+            $('td,div,li').each((_, el) => {
+                const txt = $(el).text().trim();
+                if (/^Classe\b/i.test(txt)) {
+                    const sibling = $(el).next('td,div,span').text().trim();
+                    const norm = normalizeClass(sibling);
+                    if (norm) cls = norm;
+                }
+            });
+        }
+        // 5) input/hidden/field contenenti "classe"
+        if (!cls) {
+            const val = $('input[name*="classe"], input[id*="classe"], span[id*="classe"]').val() || $('span[id*="classe"]').text();
+            const norm = normalizeClass(val);
+            if (norm) cls = norm;
+        }
+
+        if (DEBUG_MODE) debugLog(`✅ Anagrafica Web parsed (${urlHit})`, { name, cls });
         return { name: name || null, cls: cls || null };
     } catch (e) {
         debugLog("⚠️ resolveClassFromAnagraficaWeb error", e.message);
