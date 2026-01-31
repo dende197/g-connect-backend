@@ -26,16 +26,16 @@ async function clean() {
 
     console.log(`⚠️ Trovati ${data.length} profili sospetti:`, data.map(p => `${p.name} (${p.id})`));
 
-    // Delete
+    // Delete specific test profile and wildcards
     const { error: delError } = await supabase
         .from('profiles')
         .delete()
-        .ilike('name', 'STUDENTE%');
+        .or(`id.eq.SG20925:cinqueanna:0,name.ilike.STUDENTE%`);
 
     if (delError) {
         console.error("❌ Errore cancellazione:", delError);
     } else {
-        console.log("✅ Cancellazione completata.");
+        console.log("✅ Cancellazione completata (Target: 'SG20925:cinqueanna:0' + Wildcard).");
     }
 }
 

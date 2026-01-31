@@ -96,7 +96,7 @@ const ENDPOINT = "https://www.portaleargo.it/appfamiglia/api/rest/";
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36";
 
 const SENSITIVE_KEYS = new Set(["x-auth-token", "Authorization", "authToken", "access_token", "token", "password"]);
-const CLASS_REGEX = /^[1-5][A-Z]$/;
+const CLASS_REGEX = /^[1-5][A-Z]{1,2}$/;
 const SUBJECT_TOKENS = new Set([
     "ITALIANO", "INGLESE", "STORIA", "GEOGRAFIA", "FILOSOFIA", "MATEMATICA", "SCIENZE", "BIOLOGIA",
     "FISICA", "ARTE", "DISEGNO", "RELIGIONE", "RELIGIOSA", "EDUCAZIONE", "MUSICA", "TECNOLOGIE",
@@ -347,8 +347,20 @@ function buildName(obj = {}) {
 function normalizeClass(raw) {
     if (!raw) return null;
     const txt = String(raw).toUpperCase().replace(/\s+/g, ' ').trim();
-    const m = txt.match(/\b([1-5])\s*([A-Z]{1,2})\b/);
-    return m ? (m[1] + m[2]) : txt.slice(0, 5);
+    // Primo tentativo: "3A", "3AB", "3 A", "3  AB"
+    let m = txt.match(/\b([1-5])\s*([A-Z]{1,2})\b/);
+    if (m) {
+        // Per coerenza UI, di default teniamo solo la prima lettera (es. "3AB" -> "3A")
+        return m[1] + m[2][0];
+    }
+    // Secondo tentativo: cerca numero + lettera ovunque
+    m = txt.match(/([1-5])\s*([A-Z])/);
+    if (m) return m[1] + m[2];
+    // Terzo tentativo: ricava primo numero e prima lettera
+    const digit = (txt.match(/[1-5]/) || [])[0];
+    const letter = (txt.match(/[A-Z]/) || [])[0];
+    if (digit && letter) return digit + letter;
+    return null;
 }
 
 function safeData(obj) {
@@ -488,16 +500,9 @@ function extractStudentFromScheda(schedaResp) {
         }
 
         if (!cls) {
-            let tempCls = al.desClasse || al.classe || root.desDenominazione || '';
-            if (tempCls) {
-                tempCls = String(tempCls).trim().toUpperCase();
-                if (!CLASS_REGEX.test(tempCls)) {
-                    const m = tempCls.match(/\b([1-5][A-Z])\b/);
-                    if (m) tempCls = m[1];
-                    else tempCls = tempCls.substring(0, 5);
-                }
-                cls = tempCls;
-            }
+            const tempCls = al.desClasse || al.classe || root.desDenominazione || '';
+            const norm = normalizeClass(tempCls);
+            if (norm) cls = norm;
         }
 
         if (name && cls) break;
@@ -623,7 +628,7 @@ function createHeaders(school, accessToken, authToken) {
 
 async function resolveIdentityForProfile(school, username, password, accessToken, authToken, currentName, currentClass) {
     let name = (currentName || '').trim().toUpperCase();
-    let cls = (currentClass || '').trim().toUpperCase();
+    let cls = normalizeClass(currentClass) || '';
 
     // FAST EXIT
     if (name && cls && CLASS_REGEX.test(cls) && name !== username.toUpperCase()) {
@@ -642,6 +647,7 @@ async function resolveIdentityForProfile(school, username, password, accessToken
             if (extracted.name) name = extracted.name;
             if (extracted.cls) cls = extracted.cls;
 
+            cls = normalizeClass(cls) || cls;
             if (name && cls && CLASS_REGEX.test(cls)) {
                 debugLog("✅ Identity risolta con SCHEDA");
                 return { name, cls };
@@ -661,6 +667,7 @@ async function resolveIdentityForProfile(school, username, password, accessToken
             if (!name && extracted.name) name = extracted.name;
             if ((!cls || !CLASS_REGEX.test(cls)) && extracted.cls) cls = extracted.cls;
 
+            cls = normalizeClass(cls) || cls;
             if (name && cls && CLASS_REGEX.test(cls)) {
                 debugLog("✅ Identity risolta con DASHBOARD");
                 return { name, cls };
@@ -706,6 +713,7 @@ async function resolveIdentityForProfile(school, username, password, accessToken
                 cls = (an.desClasse || an.classe).trim().toUpperCase();
             }
 
+            cls = normalizeClass(cls) || cls;
             if (name && cls && CLASS_REGEX.test(cls)) {
                 debugLog("✅ Identity risolta con ALUNNO");
                 return { name, cls };
@@ -717,13 +725,7 @@ async function resolveIdentityForProfile(school, username, password, accessToken
 
     // Pulizia finale
     if (name) name = name.trim().toUpperCase();
-    if (cls) {
-        cls = cls.trim().toUpperCase();
-        if (!CLASS_REGEX.test(cls)) {
-            const m = cls.match(/\b([1-5][A-Z])\b/);
-            if (m) cls = m[1];
-        }
-    }
+    if (cls) cls = normalizeClass(cls) || null;
 
     debugLog("🏁 Identity finale", { name, cls });
     return { name: name || null, cls: cls || null };
@@ -1446,10 +1448,11 @@ app.post('/api/resolve-profile', async (req, res) => {
             target.name, target.class
         );
 
+        const finalClass = normalizeClass(cls);
         res.json({
             success: true,
             name: name || `STUDENTE ${targetIdx + 1}`,
-            class: (cls && CLASS_REGEX.test(cls)) ? cls : "N/D"
+            class: finalClass || "N/D"
         });
 
     } catch (e) {
@@ -1513,14 +1516,14 @@ app.post('/login', async (req, res) => {
 
         // 5. Identità autoritativa
         let studentName = targetProfile.name;
-        let studentClass = targetProfile.class;
+        let studentClass = normalizeClass(targetProfile.class) || targetProfile.class;
         const jar = loginRes.jar;
 
         // Fallback HTML se i metodi JSON non hanno risolto il nome reale
         if ((!studentName || studentName.startsWith('STUDENTE')) || studentClass === "N/D") {
             const webId = await resolveIdentityFromWebUI(jar);
             if (webId.name) studentName = webId.name;
-            if (webId.cls && webId.cls !== "N/D") studentClass = webId.cls;
+            if (webId.cls && webId.cls !== "N/D") studentClass = normalizeClass(webId.cls) || studentClass;
         }
 
         // 4. Dati Scolastici (Parallelo)
@@ -1535,10 +1538,11 @@ app.post('/login', async (req, res) => {
         if (supabase) {
             try {
                 const pid = `${school}:${username}:${targetIndex}`;
+                const normalizedClass = normalizeClass(studentClass);
                 await supabase.from("profiles").upsert({
                     id: pid,
                     name: studentName,
-                    class: studentClass,
+                    class: normalizedClass || studentClass || "N/D",
                     last_active: new Date().toISOString()
                 }, { onConflict: "id" });
                 debugLog("👤 Profile upsert", { id: pid, name: studentName, class: studentClass });
@@ -1557,7 +1561,7 @@ app.post('/login', async (req, res) => {
                 userName: username,
                 profileIndex: targetIndex
             },
-            student: { name: studentName, class: studentClass, school: school },
+            student: { name: studentName, class: normalizeClass(studentClass) || studentClass || "N/D", school: school },
             tasks: tasksData,
             voti: gradesData,
             promemoria: announcementsData
@@ -1692,14 +1696,15 @@ app.post('/sync', async (req, res) => {
                         school, user, pwd, accessToken, authToken, t.name, t.class
                     );
                     sName = resIdent.name;
-                    sClass = resIdent.cls;
+                    sClass = normalizeClass(resIdent.cls) || resIdent.cls;
                 }
 
                 const pid = `${school}:${user}:${profileIndex}`;
                 const payload = { id: pid, last_active: new Date().toISOString() };
 
                 if (sName) payload.name = sName;
-                if (sClass && CLASS_REGEX.test(sClass)) payload.class = sClass;
+                const sClassNorm = normalizeClass(sClass);
+                if (sClassNorm) payload.class = sClassNorm;
 
                 await supabase.from("profiles").upsert(payload, { onConflict: "id" });
                 debugLog("👤 Sync profile upsert", payload);
