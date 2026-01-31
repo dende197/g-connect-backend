@@ -324,15 +324,19 @@ class AdvancedArgo {
                 first: soggetti[0] ? Object.keys(soggetti[0]) : []
             });
 
-            const profiles = soggetti.map((sog, idx) => ({
-                index: idx,
-                name: (sog.desNominativo || '').trim().toUpperCase(),
-                class: (sog.classe || '').trim().toUpperCase(),
-                school: (sog.codMin || sog.codiceScuola || school || '').trim().toUpperCase(),
-                token: sog.token || '',
-                idSoggetto: sog.idSoggetto,
-                raw: sog
-            }));
+            const profiles = soggetti.map((sog, idx) => {
+                const rawName = (sog.desNominativo || sog.nominativo || '').trim().toUpperCase();
+                const rawClass = (sog.desClasse || sog.classe || sog.codiceClasse || '').trim().toUpperCase();
+                return {
+                    index: idx,
+                    name: rawName,
+                    class: normalizeClass(rawClass) || rawClass || "N/D",
+                    school: (sog.codMin || sog.codiceScuola || school || '').trim().toUpperCase(),
+                    token: sog.token || '',
+                    idSoggetto: sog.idSoggetto,
+                    raw: sog
+                };
+            });
 
             return { access_token: accessToken, profiles, jar };
 
@@ -423,7 +427,7 @@ async function enrichProfiles(school, accessToken, profiles) {
             debugLog(`P${index}: Connotati Error`, e.message);
         }
 
-        // 2) curriculum (POST)
+        // 2) curriculum (POST) - ORDINATO PER ANNO
         if (!name || !cls) {
             try {
                 debugLog(`P${index}: Tentativo CURRICULUM...`);
@@ -431,18 +435,31 @@ async function enrichProfiles(school, accessToken, profiles) {
                 debugLog(`P${index}: Raw Curriculum App Response`, r2.data);
                 let d2 = safeData(r2.data);
                 let list = Array.isArray(d2) ? d2 : (d2.dati || []);
-                let current = list[0] || {};
-                name = buildName(current);
-                cls = normalizeClass(current.desClasse || current.classe);
 
-                if (!name) {
+                // Ordina per anno scolastico (es. "20252026") discendente
+                list.sort((a, b) => {
+                    const yearA = parseInt(String(a.annoScolastico || '0').replace(/\//g, ''));
+                    const yearB = parseInt(String(b.annoScolastico || '0').replace(/\//g, ''));
+                    return yearB - yearA;
+                });
+
+                let current = list[0] || {};
+                if (!name) name = buildName(current);
+                if (!cls) cls = normalizeClass(current.desClasse || current.classe);
+
+                if (!name || !cls) {
                     r2 = await axios.post(baseFam + "curriculum", {}, { headers, timeout: 6000 });
                     debugLog(`P${index}: Raw Curriculum Fam Response`, r2.data);
                     d2 = safeData(r2.data);
                     list = Array.isArray(d2) ? d2 : (d2.dati || []);
+                    list.sort((a, b) => {
+                        const yearA = parseInt(String(a.annoScolastico || '0').replace(/\//g, ''));
+                        const yearB = parseInt(String(b.annoScolastico || '0').replace(/\//g, ''));
+                        return yearB - yearA;
+                    });
                     current = list[0] || {};
-                    name = buildName(current);
-                    cls = normalizeClass(current.desClasse || current.classe);
+                    if (!name) name = buildName(current);
+                    if (!cls) cls = normalizeClass(current.desClasse || current.classe);
                 }
             } catch (e) {
                 debugLog(`P${index}: Curriculum Error`, e.message);
@@ -457,16 +474,16 @@ async function enrichProfiles(school, accessToken, profiles) {
                 debugLog(`P${index}: Raw Scheda App Response`, r3.data);
                 let d3 = safeData(r3.data);
                 let al = d3.alunno || d3;
-                name = buildName(al);
-                cls = normalizeClass(al.desClasse || al.classe);
+                if (!name) name = buildName(al);
+                if (!cls) cls = normalizeClass(al.desClasse || al.classe);
 
-                if (!name) {
+                if (!name || !cls) {
                     r3 = await axios.post(baseFam + "scheda", { opzioni: "{}" }, { headers, timeout: 6000 });
                     debugLog(`P${index}: Raw Scheda Fam Response`, r3.data);
                     d3 = safeData(r3.data);
                     al = d3.alunno || d3;
-                    name = buildName(al);
-                    cls = normalizeClass(al.desClasse || al.classe);
+                    if (!name) name = buildName(al);
+                    if (!cls) cls = normalizeClass(al.desClasse || al.classe);
                 }
             } catch (e) {
                 debugLog(`P${index}: Scheda Error`, e.message);
@@ -485,8 +502,8 @@ async function enrichProfiles(school, accessToken, profiles) {
                 debugLog(`P${index}: Raw Dashboard App Response`, r4.data);
                 const d4 = safeData(r4.data);
                 const intest = d4.intestazione || d4;
-                name = buildName(intest);
-                cls = normalizeClass(intest.desClasse || intest.classe);
+                if (!name) name = buildName(intest);
+                if (!cls) cls = normalizeClass(intest.desClasse || intest.classe);
             } catch (e) {
                 debugLog(`P${index}: Dashboard Error`, e.message);
             }
@@ -517,8 +534,8 @@ async function enrichProfiles(school, accessToken, profiles) {
                 let d6 = safeData(r6.data);
                 let obj = Array.isArray(d6) ? d6[0] : d6;
                 let an = obj.alunno || obj;
-                name = buildName(an);
-                cls = normalizeClass(an.desClasse || an.classe);
+                if (!name) name = buildName(an);
+                if (!cls) cls = normalizeClass(an.desClasse || an.classe);
             } catch (e) {
                 debugLog(`P${index}: Alunno Error`, e.message);
             }
@@ -533,10 +550,26 @@ async function enrichProfiles(school, accessToken, profiles) {
                 let d7 = safeData(r7.data);
                 let obj = Array.isArray(d7) ? d7[0] : d7;
                 let an = obj.alunno || obj;
-                name = buildName(an);
-                cls = normalizeClass(an.desClasse || an.classe);
+                if (!name) name = buildName(an);
+                if (!cls) cls = normalizeClass(an.desClasse || an.classe);
             } catch (e) {
                 debugLog(`P${index}: Alunno Anagrafe Error`, e.message);
+            }
+        }
+
+        // 8) voti (POST) - NUOVA STRATEGIA
+        if (!name || !cls) {
+            try {
+                debugLog(`P${index}: Tentativo VOTI...`);
+                const r8 = await axios.post(baseApp + "voti", { opzioni: "{}" }, { headers, timeout: 6000 });
+                debugLog(`P${index}: Raw Voti App Response`, r8.data);
+                const d8 = safeData(r8.data);
+                const list = Array.isArray(d8) ? d8 : (d8.dati || []);
+                const first = list[0] || {};
+                if (!name) name = buildName(first);
+                if (!cls) cls = normalizeClass(first.desClasse || first.classe);
+            } catch (e) {
+                debugLog(`P${index}: Voti Error`, e.message);
             }
         }
 
@@ -837,10 +870,24 @@ async function resolveIdentityFromWebUI(jar) {
         let cls = $('#_idJsp56').text().trim();
         if (!cls) cls = $('span:contains("Classe:")').next().text().trim();
         if (!cls) cls = $('td:contains("Classe:")').next().text().trim();
+        if (!cls) cls = $('span:contains("Sezione:")').next().text().trim();
+        if (!cls) cls = $('td:contains("Sezione:")').next().text().trim();
+
         if (!cls) {
-            const t = $('body').text();
-            const m = t.match(/Classe\s*:\s*([1-5]\s*[A-Z]{1,2})/i);
-            if (m) cls = m[1];
+            const bodyText = $('body').text();
+            // Cerca pattern tipo "Classe: 5 A" o "Classe 5A" o "5A" isolato
+            const patterns = [
+                /Classe\s*:\s*([1-5]\s*[A-Z]{1,2})/i,
+                /Sezione\s*:\s*([1-5]\s*[A-Z]{1,2})/i,
+                /([1-5])\^?\s*([A-Z]{1,2})\b/i
+            ];
+            for (const p of patterns) {
+                const match = bodyText.match(p);
+                if (match) {
+                    cls = match[1] + (match[2] || '');
+                    break;
+                }
+            }
         }
 
         // Pulizia/normalizzazione
