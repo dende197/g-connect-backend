@@ -193,13 +193,24 @@ class AdvancedArgo {
             const reqChallenge = await client.get(`${CHALLENGE_URL}?${challengeParams.toString()}`);
 
             // Estrai login_challenge dall'URL
-            const finalUrl = reqChallenge.request.res.responseUrl || reqChallenge.config.url;
+            // Estrai login_challenge dall'URL o dall'HTML
+            const finalUrl = reqChallenge.request?.res?.responseUrl || reqChallenge.config.url || '';
+            let loginChallenge = null;
             const matchChallenge = finalUrl.match(/login_challenge=([0-9a-f]+)/);
 
-            if (!matchChallenge) {
-                throw new Error("Login challenge non trovata nell'URL");
+            if (matchChallenge) {
+                loginChallenge = matchChallenge[1];
+            } else if (reqChallenge.data) {
+                try {
+                    const $ = cheerio.load(reqChallenge.data);
+                    const hidden = $('input[name="challenge"]').val();
+                    if (hidden) loginChallenge = hidden;
+                } catch (_) { }
             }
-            const loginChallenge = matchChallenge[1];
+
+            if (!loginChallenge) {
+                throw new Error("Login challenge non trovata (URL/HTML)");
+            }
 
             // 2. POST Login
             const loginBody = new URLSearchParams();
@@ -219,6 +230,19 @@ class AdvancedArgo {
             });
 
             let location = reqLogin.headers['location'];
+            if (!location && reqLogin.data) {
+                try {
+                    const $ = cheerio.load(reqLogin.data);
+                    // Prova link diretto con code=
+                    location = $('a[href*="code="]').attr('href') || null;
+                    // Prova meta refresh: content="0;url=..."
+                    if (!location) {
+                        const meta = $('meta[http-equiv="refresh"]').attr('content') || '';
+                        const m = meta.match(/url=(.+)$/i);
+                        if (m) location = m[1];
+                    }
+                } catch (_) { }
+            }
             if (!location) {
                 throw new Error("Credenziali errate o scuola non valida (No Location header)");
             }
