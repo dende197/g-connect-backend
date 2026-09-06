@@ -5183,39 +5183,44 @@ function getSubjectColor(subject) {
     const normalized = normalizeSubjectName(s);
     const abbr = getSubjectAbbrev(s).toLowerCase();
     const colorByAbbrev = {
-        mat: '#3B9DD4',
-        fis: '#2563EB',
-        ing: '#2DB86A',
-        ita: '#9B4DD4',
-        sto: '#C8921E',
+        mat: '#2563EB',
+        fis: '#6366F1',
+        ing: '#14B8A6',
+        ita: '#EF4444',
+        sto: '#EAB308',
         geo: '#D4A037',
         lat: '#D44B4B',
-        sci: '#1DB87A',
-        bio: '#1DB870',
+        sci: '#22C55E',
+        bio: '#10B981',
         chi: '#9040C8',
-        fil: '#7060C8',
-        art: '#E06020',
-        dis: '#E06020',
-        scm: '#38A020',
+        fil: '#A855F7',
+        art: '#EC4899',
+        dis: '#EC4899',
+        scm: '#FF6B00',
         rel: '#C82090',
-        inf: '#3060D0',
+        inf: '#06B6D4',
         dir: '#2A5CC8',
         eco: '#C89020',
         fra: '#3055C0',
         ted: '#C82060',
         spa: '#C83030',
         grc: '#C82090',
-        civ: '#E67E22'
+        civ: '#BE123C'
     };
     if (colorByAbbrev[abbr]) return colorByAbbrev[abbr];
 
-    if (normalized.includes('educazione civica') || normalized.includes('ed civica') || normalized.includes('civica')) return '#E67E22';
-    if (normalized.includes('scienze motorie') || normalized.includes('motorie') || normalized.includes('sportive')) return '#38A020';
-    if (normalized.includes('scienze naturali') || normalized.includes('naturali')) return '#1DB87A';
-    if (normalized.includes('filosofia')) return '#7060C8';
-    if (normalized.includes('fisica')) return '#2563EB';
+    if (normalized.includes('educazione civica') || normalized.includes('ed civica') || normalized.includes('civica')) return '#BE123C';
+    if (normalized.includes('scienze motorie') || normalized.includes('motorie') || normalized.includes('sportive')) return '#FF6B00';
+    if (normalized.includes('scienze naturali') || normalized.includes('naturali')) return '#22C55E';
+    if (normalized.includes('informatica')) return '#06B6D4';
+    if (normalized.includes('matematica')) return '#2563EB';
+    if (normalized.includes('filosofia')) return '#A855F7';
+    if (normalized.includes('fisica')) return '#6366F1';
+    if (normalized.includes('storia')) return '#EAB308';
+    if (normalized.includes('italiano')) return '#EF4444';
+    if (normalized.includes('inglese')) return '#14B8A6';
     const isArtDrawingSubject = isArtDrawingSubjectNormalized(normalized);
-    if (isArtDrawingSubject) return '#E06020';
+    if (isArtDrawingSubject) return '#EC4899';
 
     // Fallback: stable vibrant color
     let hash = 0;
@@ -8784,114 +8789,125 @@ window.filterCircolari = function(query) {
 function getSubjectTheme(rawSubject) {
     const s = (typeof normalizeSubjectName === 'function' ? normalizeSubjectName(rawSubject) : String(rawSubject || '')).toLowerCase();
     
-    if (s.includes('matem') || s.includes('algeb') || s.includes('geom') || s.includes('trigon')) {
+    // 1. Scienze Motorie e Sportive (Educazione Fisica)
+    if (s.includes('motor') || s.includes('ed. fis') || s.includes('sport') || s.includes('ginnas') || (s.includes('educazione') && s.includes('fisic'))) {
         return {
-            color: '#60a5fa',
-            gradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(96, 165, 250, 0.32)',
-            icon: 'ph-calculator',
-            iconBg: 'rgba(59, 130, 246, 0.22)',
-            glow: 'rgba(59, 130, 246, 0.35)'
+            color: '#ff6b00',
+            gradient: 'linear-gradient(135deg, rgba(255, 107, 0, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
+            border: 'rgba(255, 107, 0, 0.35)',
+            icon: 'ph-person-simple-run',
+            iconBg: 'rgba(255, 107, 0, 0.22)',
+            glow: 'rgba(255, 107, 0, 0.35)'
         };
     }
+    // 2. Educazione Civica
+    if (s.includes('civic') || s.includes('cittadin')) {
+        return {
+            color: '#be123c',
+            gradient: 'linear-gradient(135deg, rgba(190, 18, 60, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
+            border: 'rgba(190, 18, 60, 0.35)',
+            icon: 'ph-scales',
+            iconBg: 'rgba(190, 18, 60, 0.22)',
+            glow: 'rgba(190, 18, 60, 0.35)'
+        };
+    }
+    // 3. Informatica (Cyber Neon Cyan - contrasto netto da Matematica)
+    if (s.includes('inform') || s.includes('sistemi') || s.includes('tps') || s.includes('telecom') || s.includes('tecnol')) {
+        return {
+            color: '#06b6d4',
+            gradient: 'linear-gradient(135deg, rgba(6, 182, 212, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
+            border: 'rgba(6, 182, 212, 0.35)',
+            icon: 'ph-code',
+            iconBg: 'rgba(6, 182, 212, 0.22)',
+            glow: 'rgba(6, 182, 212, 0.40)'
+        };
+    }
+    // 4. Matematica (Classic Royal Cobalt Blue)
+    if (s.includes('matem') || s.includes('algeb') || s.includes('geom') || s.includes('trigon')) {
+        return {
+            color: '#2563eb',
+            gradient: 'linear-gradient(135deg, rgba(37, 99, 235, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
+            border: 'rgba(37, 99, 235, 0.35)',
+            icon: 'ph-calculator',
+            iconBg: 'rgba(37, 99, 235, 0.22)',
+            glow: 'rgba(37, 99, 235, 0.35)'
+        };
+    }
+    // 5. Italiano (Rosso Vivo)
     if (s.includes('ital') || s.includes('letter') || s.includes('epic') || s.includes('antol') || s.includes('narrat') || s.includes('gramm')) {
         return {
-            color: '#f87171',
+            color: '#ef4444',
             gradient: 'linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(248, 113, 113, 0.32)',
+            border: 'rgba(239, 68, 68, 0.35)',
             icon: 'ph-book-open-text',
             iconBg: 'rgba(239, 68, 68, 0.22)',
             glow: 'rgba(239, 68, 68, 0.35)'
         };
     }
-    if (s.includes('civic') || s.includes('cittadin')) {
-        return {
-            color: '#14b8a6',
-            gradient: 'linear-gradient(135deg, rgba(20, 184, 166, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(20, 184, 166, 0.32)',
-            icon: 'ph-scales',
-            iconBg: 'rgba(20, 184, 166, 0.22)',
-            glow: 'rgba(20, 184, 166, 0.35)'
-        };
-    }
+    // 6. Storia Triennio (Oro Giallo Antico - nettamente distinto dall'arancione)
     if ((s.includes('storia') || s.includes('geogr')) && !s.includes('arte')) {
         return {
-            color: '#fbbf24',
-            gradient: 'linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(251, 191, 36, 0.32)',
+            color: '#eab308',
+            gradient: 'linear-gradient(135deg, rgba(234, 179, 8, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
+            border: 'rgba(234, 179, 8, 0.35)',
             icon: 'ph-scroll',
-            iconBg: 'rgba(245, 158, 11, 0.22)',
-            glow: 'rgba(245, 158, 11, 0.35)'
+            iconBg: 'rgba(234, 179, 8, 0.22)',
+            glow: 'rgba(234, 179, 8, 0.35)'
         };
     }
+    // 7. Filosofia (Viola Ametista)
     if (s.includes('filos')) {
         return {
-            color: '#c084fc',
+            color: '#a855f7',
             gradient: 'linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(192, 132, 252, 0.32)',
+            border: 'rgba(168, 85, 247, 0.35)',
             icon: 'ph-brain',
             iconBg: 'rgba(168, 85, 247, 0.22)',
             glow: 'rgba(168, 85, 247, 0.35)'
         };
     }
+    // 8. Inglese (Teal / Verde Marino)
     if (s.includes('ingl') || s.includes('franc') || s.includes('spag') || s.includes('tedes') || s.includes('lingua')) {
         return {
-            color: '#2dd4bf',
-            gradient: 'linear-gradient(135deg, rgba(45, 212, 191, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(45, 212, 191, 0.32)',
+            color: '#14b8a6',
+            gradient: 'linear-gradient(135deg, rgba(20, 184, 166, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
+            border: 'rgba(20, 184, 166, 0.35)',
             icon: 'ph-globe',
-            iconBg: 'rgba(45, 212, 191, 0.22)',
-            glow: 'rgba(45, 212, 191, 0.35)'
+            iconBg: 'rgba(20, 184, 166, 0.22)',
+            glow: 'rgba(20, 184, 166, 0.35)'
         };
     }
+    // 9. Fisica (Cosmic Indigo)
     if (s.includes('fisic') && !s.includes('educazione') && !s.includes('motor')) {
         return {
-            color: '#818cf8',
+            color: '#6366f1',
             gradient: 'linear-gradient(135deg, rgba(99, 102, 241, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(129, 140, 248, 0.32)',
+            border: 'rgba(99, 102, 241, 0.35)',
             icon: 'ph-atom',
             iconBg: 'rgba(99, 102, 241, 0.22)',
             glow: 'rgba(99, 102, 241, 0.35)'
         };
     }
+    // 10. Scienze Naturali (Verde Smeraldo Natura)
     if (s.includes('scienz') || s.includes('chimic') || s.includes('biol') || s.includes('geol') || s.includes('natura')) {
         return {
-            color: '#34d399',
-            gradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(52, 211, 153, 0.32)',
+            color: '#22c55e',
+            gradient: 'linear-gradient(135deg, rgba(34, 197, 94, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
+            border: 'rgba(34, 197, 94, 0.35)',
             icon: 'ph-flask',
-            iconBg: 'rgba(16, 185, 129, 0.22)',
-            glow: 'rgba(16, 185, 129, 0.35)'
+            iconBg: 'rgba(34, 197, 94, 0.22)',
+            glow: 'rgba(34, 197, 94, 0.35)'
         };
     }
+    // 11. Disegno e Storia dell'Arte Triennio (Magenta / Rosa Artista)
     if (s.includes('arte') || s.includes('disegn')) {
         return {
-            color: '#f472b6',
+            color: '#ec4899',
             gradient: 'linear-gradient(135deg, rgba(236, 72, 153, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(244, 114, 182, 0.32)',
+            border: 'rgba(236, 72, 153, 0.35)',
             icon: 'ph-palette',
             iconBg: 'rgba(236, 72, 153, 0.22)',
             glow: 'rgba(236, 72, 153, 0.35)'
-        };
-    }
-    if (s.includes('motor') || s.includes('ed. fis') || s.includes('sport') || s.includes('ginnas')) {
-        return {
-            color: '#fb923c',
-            gradient: 'linear-gradient(135deg, rgba(249, 115, 22, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(251, 146, 60, 0.32)',
-            icon: 'ph-barbell',
-            iconBg: 'rgba(249, 115, 22, 0.22)',
-            glow: 'rgba(249, 115, 22, 0.35)'
-        };
-    }
-    if (s.includes('inform') || s.includes('sistemi') || s.includes('tps') || s.includes('telecom') || s.includes('tecnol')) {
-        return {
-            color: '#38bdf8',
-            gradient: 'linear-gradient(135deg, rgba(14, 165, 233, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(56, 189, 248, 0.32)',
-            icon: 'ph-code',
-            iconBg: 'rgba(14, 165, 233, 0.22)',
-            glow: 'rgba(14, 165, 233, 0.35)'
         };
     }
     if (s.includes('diritto') || s.includes('econ')) {
@@ -11302,9 +11318,6 @@ function renderProfile() {
                         <span style="font-size:12px;color:#8e909f;font-weight:500;">
                             ${effClass ? `Classe attiva: <strong style="color:#b6c4ff;">${escapeHtml(effClass)}</strong>` : 'Classe non definita'}
                         </span>
-                        <button onclick="window.promptSetUserClass()" style="background:rgba(37,99,235,0.2);border:0.5px solid rgba(182,196,255,0.25);color:#b6c4ff;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:transform 0.12s ease;" ontouchstart="this.style.transform='scale(0.96)'" ontouchend="this.style.transform='scale(1)'">
-                            <i class="ph-bold ph-pencil-simple"></i> ${effClass ? 'Modifica' : 'Imposta Classe'}
-                        </button>
                     </div>
                 </div>
             </div>
@@ -11703,7 +11716,6 @@ function renderGradesView() {
                 </div>
                 <div style="text-align:right;flex-shrink:0;margin-left:12px;position:relative;z-index:1;">
                     <span style="font-size:22px;font-weight:800;color:${hasFeatVotes ? (featureItem.media >= 6 ? '#ffffff' : '#ffb4ab') : 'rgba(255,255,255,0.45)'};letter-spacing:-0.02em;">${hasFeatVotes ? featureItem.media.toFixed(1) : '—'}</span>
-                    <div style="width:36px;height:3px;background:${hasFeatVotes ? `linear-gradient(90deg, ${featureTheme.color}, #30d158)` : 'rgba(255,255,255,0.1)'};border-radius:9999px;margin-top:4px;margin-left:auto;"></div>
                 </div>
             </div>` : '';
 
@@ -11849,7 +11861,7 @@ function renderGradesView() {
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:9999px;background:rgba(41,151,255,0.14);border:0.5px solid rgba(41,151,255,0.35);font-size:10px;font-weight:700;color:#2997ff;backdrop-filter:blur(12px);">
-                            <i class="ph-bold ph-graduation-cap" style="font-size:12px;"></i> A.S. ${escapeHtml(activeYearKey)}${isCurrentSchoolYear ? ' (In corso)' : ' (Archivio)'}
+                            <i class="ph-bold ph-graduation-cap" style="font-size:12px;"></i> A.S. ${escapeHtml(activeYearKey)}
                         </span>
                         <button onclick="if(navigator.share){navigator.share({title:'Media Generale',text:'La mia media su Gandhi Diary per l\\'A.S. ${escapeJsSingleQuote(activeYearKey)} è ${hasMedia ? media.toFixed(2) : 'in aggiornamento'}!'}).catch(()=>{});}" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.08);border:0.5px solid rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#ffffff;transition:transform 0.15s ease;" ontouchstart="this.style.transform='scale(0.9)'" ontouchend="this.style.transform='scale(1)'">
                             <i class="ph ph-share-network text-[16px] text-[#ffffff]"></i>
@@ -11865,11 +11877,7 @@ function renderGradesView() {
                         <div style="background:${isPositive ? 'rgba(48,209,88,0.18)' : 'rgba(255,69,58,0.18)'};padding:3px 9px;border-radius:9999px;display:inline-flex;align-items:center;gap:4px;border:1px solid ${isPositive ? 'rgba(48,209,88,0.4)' : 'rgba(255,69,58,0.4)'};box-shadow:0 2px 6px ${isPositive ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.15)'};">
                             <i class="ph-bold ${isPositive ? 'ph-trend-up' : 'ph-trend-down'}" style="font-size:12px;color:${isPositive ? '#30d158' : '#ff453a'};"></i>
                             <span style="font-size:11px;font-weight:700;color:${isPositive ? '#30d158' : '#ff453a'};">${diffStr}</span>
-                        </div>` : (!hasMedia && isCurrentSchoolYear ? `
-                        <div style="background:rgba(41,151,255,0.12);padding:3px 9px;border-radius:9999px;display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(41,151,255,0.3);">
-                            <i class="ph-bold ph-sparkle" style="font-size:12px;color:#2997ff;"></i>
-                            <span style="font-size:11px;font-weight:700;color:#2997ff;">Nuovo Anno</span>
-                        </div>` : '')}
+                        </div>` : ''}
                     </div>
                     <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:9999px;background:${globalStatusBadge.bg};border:1px solid ${globalStatusBadge.border};font-size:11px;font-weight:700;color:${globalStatusBadge.color};">
                         <i class="ph-fill ${globalStatusBadge.icon}" style="font-size:13px;"></i> ${globalStatusBadge.label}
