@@ -44,47 +44,7 @@
             // Scienze Motorie e Sportive
             { id: 'v26-scm-1', materia: 'Scienze Motorie e Sportive', valore: 9, voto: 9, data: '2026-09-20', tipo: 'Pratico', docente: 'Prof. Galli', commento: 'Test di resistenza aerobica (Cooper test) e coordinazione' },
             // Educazione Civica
-            { id: 'v26-civ-1', materia: 'Educazione Civica', valore: 8, voto: 8, data: '2026-09-25', tipo: 'Orale', docente: 'Prof.ssa Bianchi', commento: 'Principi fondamentali della Costituzione Italiana (art. 1-12)' },
-
-            // === STORICO ANNO SCOLASTICO 2025/2026 (Per abilitare confronto quadrimestri e grafici) ===
-            // 1° Quadrimestre 2025/2026 (Ottobre 2025 - Gennaio 2026)
-            { id: 'v25-ita-1', materia: 'Italiano', valore: 7, voto: 7, data: '2025-10-15', tipo: 'Scritto', docente: 'Prof.ssa Bianchi' },
-            { id: 'v25-ita-2', materia: 'Italiano', valore: 8, voto: 8, data: '2025-11-20', tipo: 'Orale', docente: 'Prof.ssa Bianchi' },
-            { id: 'v25-ita-3', materia: 'Italiano', valore: 7.5, voto: 7.5, data: '2026-01-12', tipo: 'Scritto', docente: 'Prof.ssa Bianchi' },
-            { id: 'v25-mat-1', materia: 'Matematica', valore: 6, voto: 6, data: '2025-10-22', tipo: 'Scritto', docente: 'Prof. Ferrari' },
-            { id: 'v25-mat-2', materia: 'Matematica', valore: 7, voto: 7, data: '2025-11-28', tipo: 'Scritto', docente: 'Prof. Ferrari' },
-            { id: 'v25-mat-3', materia: 'Matematica', valore: 7.5, voto: 7.5, data: '2026-01-15', tipo: 'Orale', docente: 'Prof. Ferrari' },
-            { id: 'v25-fis-1', materia: 'Fisica', valore: 6.5, voto: 6.5, data: '2025-10-18', tipo: 'Scritto', docente: 'Prof. Costa' },
-            { id: 'v25-fis-2', materia: 'Fisica', valore: 7, voto: 7, data: '2025-12-05', tipo: 'Orale', docente: 'Prof. Costa' },
-            { id: 'v25-inf-1', materia: 'Informatica', valore: 8, voto: 8, data: '2025-10-24', tipo: 'Pratico', docente: 'Prof. De Luca' },
-            { id: 'v25-inf-2', materia: 'Informatica', valore: 8.5, voto: 8.5, data: '2025-12-14', tipo: 'Scritto', docente: 'Prof. De Luca' },
-            { id: 'v25-sci-1', materia: 'Scienze Naturali', valore: 6.5, voto: 6.5, data: '2025-11-04', tipo: 'Scritto', docente: 'Prof.ssa Romano' },
-            { id: 'v25-sci-2', materia: 'Scienze Naturali', valore: 7, voto: 7, data: '2026-01-10', tipo: 'Orale', docente: 'Prof.ssa Romano' },
-            { id: 'v25-ing-1', materia: 'Inglese', valore: 8, voto: 8, data: '2025-10-29', tipo: 'Scritto', docente: 'Prof. Miller' },
-            { id: 'v25-ing-2', materia: 'Inglese', valore: 8.5, voto: 8.5, data: '2025-12-18', tipo: 'Orale', docente: 'Prof. Miller' },
-            { id: 'v25-sto-1', materia: 'Storia Triennio', valore: 7, voto: 7, data: '2025-11-12', tipo: 'Orale', docente: 'Prof. Moretti' },
-            { id: 'v25-fil-1', materia: 'Filosofia', valore: 7.5, voto: 7.5, data: '2025-11-25', tipo: 'Orale', docente: 'Prof. Moretti' },
-            { id: 'v25-art-1', materia: 'Disegno e Storia Dell\'Arte Triennio', valore: 7, voto: 7, data: '2025-11-15', tipo: 'Pratico', docente: 'Prof.ssa Ricci' },
-            { id: 'v25-scm-1', materia: 'Scienze Motorie e Sportive', valore: 8.5, voto: 8.5, data: '2025-12-02', tipo: 'Pratico', docente: 'Prof. Galli' },
-            { id: 'v25-civ-1', materia: 'Educazione Civica', valore: 7.5, voto: 7.5, data: '2026-01-08', tipo: 'Orale', docente: 'Prof.ssa Bianchi' },
-            // 2° Quadrimestre 2025/2026 (Febbraio 2026 - Maggio 2026)
-            { id: 'v25-ita-4', materia: 'Italiano', valore: 8, voto: 8, data: '2026-03-10', tipo: 'Scritto', docente: 'Prof.ssa Bianchi' },
-            { id: 'v25-ita-5', materia: 'Italiano', valore: 8.5, voto: 8.5, data: '2026-05-14', tipo: 'Orale', docente: 'Prof.ssa Bianchi' },
-            { id: 'v25-mat-4', materia: 'Matematica', valore: 7, voto: 7, data: '2026-03-18', tipo: 'Scritto', docente: 'Prof. Ferrari' },
-            { id: 'v25-mat-5', materia: 'Matematica', valore: 8, voto: 8, data: '2026-05-20', tipo: 'Scritto', docente: 'Prof. Ferrari' },
-            { id: 'v25-fis-3', materia: 'Fisica', valore: 7, voto: 7, data: '2026-03-22', tipo: 'Scritto', docente: 'Prof. Costa' },
-            { id: 'v25-fis-4', materia: 'Fisica', valore: 7.5, voto: 7.5, data: '2026-05-18', tipo: 'Orale', docente: 'Prof. Costa' },
-            { id: 'v25-inf-3', materia: 'Informatica', valore: 9, voto: 9, data: '2026-04-05', tipo: 'Pratico', docente: 'Prof. De Luca' },
-            { id: 'v25-inf-4', materia: 'Informatica', valore: 9, voto: 9, data: '2026-05-22', tipo: 'Scritto', docente: 'Prof. De Luca' },
-            { id: 'v25-sci-3', materia: 'Scienze Naturali', valore: 7.5, voto: 7.5, data: '2026-03-25', tipo: 'Scritto', docente: 'Prof.ssa Romano' },
-            { id: 'v25-sci-4', materia: 'Scienze Naturali', valore: 8, voto: 8, data: '2026-05-19', tipo: 'Orale', docente: 'Prof.ssa Romano' },
-            { id: 'v25-ing-3', materia: 'Inglese', valore: 8.5, voto: 8.5, data: '2026-04-12', tipo: 'Scritto', docente: 'Prof. Miller' },
-            { id: 'v25-ing-4', materia: 'Inglese', valore: 9, voto: 9, data: '2026-05-25', tipo: 'Orale', docente: 'Prof. Miller' },
-            { id: 'v25-sto-2', materia: 'Storia Triennio', valore: 8, voto: 8, data: '2026-04-20', tipo: 'Orale', docente: 'Prof. Moretti' },
-            { id: 'v25-fil-2', materia: 'Filosofia', valore: 8.5, voto: 8.5, data: '2026-05-10', tipo: 'Orale', docente: 'Prof. Moretti' },
-            { id: 'v25-art-2', materia: 'Disegno e Storia Dell\'Arte Triennio', valore: 7.5, voto: 7.5, data: '2026-05-08', tipo: 'Pratico', docente: 'Prof.ssa Ricci' },
-            { id: 'v25-scm-2', materia: 'Scienze Motorie e Sportive', valore: 9, voto: 9, data: '2026-05-15', tipo: 'Pratico', docente: 'Prof. Galli' },
-            { id: 'v25-civ-2', materia: 'Educazione Civica', valore: 8.5, voto: 8.5, data: '2026-05-23', tipo: 'Orale', docente: 'Prof.ssa Bianchi' }
+            { id: 'v26-civ-1', materia: 'Educazione Civica', valore: 8, voto: 8, data: '2026-09-25', tipo: 'Orale', docente: 'Prof.ssa Bianchi', commento: 'Principi fondamentali della Costituzione Italiana (art. 1-12)' }
         ],
 
         // --------------------------------------------------------------------

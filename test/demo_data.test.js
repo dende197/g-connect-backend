@@ -34,18 +34,18 @@ test('G-Connect Demo / Mock Data Engine Suite', async (t) => {
         }
     });
 
-    await t.test('DEMO_DATA.voti includes both current 2026/27 and historical 2025/26 votes', () => {
+    await t.test('DEMO_DATA.voti contains exclusively current 2026/27 votes with no historical 2025/26 votes', () => {
         const votes2026 = DEMO_DATA.voti.filter(v => v.data && v.data.startsWith('2026-09'));
         const votes2025 = DEMO_DATA.voti.filter(v => v.data && (v.data.startsWith('2025') || v.data.startsWith('2026-01') || v.data.startsWith('2026-05')));
         assert.ok(votes2026.length >= 15, 'Must have realistic votes for current school year 2026/27');
-        assert.ok(votes2025.length >= 25, 'Must have historical votes for previous school year 2025/26');
+        assert.strictEqual(votes2025.length, 0, 'Must NOT contain any historical 2025/26 votes');
     });
 
     await t.test('DEMO_DATA.voti includes both passing grades and failing grades for recovery testing', () => {
         const failingVotes = DEMO_DATA.voti.filter(v => typeof v.valore === 'number' && v.valore < 6);
         const passingVotes = DEMO_DATA.voti.filter(v => typeof v.valore === 'number' && v.valore >= 6);
         assert.ok(failingVotes.length >= 2, 'Should include at least 2 failing grades for recovery and goal testing');
-        assert.ok(passingVotes.length >= 20, 'Should include ample passing grades');
+        assert.ok(passingVotes.length >= 12, 'Should include ample passing grades');
     });
 
     await t.test('DEMO_DATA.tasks, verifiche, activities, and assenzeData are populated', () => {
