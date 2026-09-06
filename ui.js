@@ -4720,7 +4720,7 @@ function mostraAssenzeModal() {
             </div>
 
             <!-- List of Items -->
-            <div id="assenze-items-list" style="display:flex;flex-direction:column;gap:10px;max-height:55vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px;">
+            <div id="assenze-items-list" style="display:flex;flex-direction:column;gap:10px;min-height:45vh;max-height:55vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px;">
                 ${all.length > 0 ? all.map(renderCardHtml).join('') : ''}
             </div>
 
@@ -4734,7 +4734,7 @@ function mostraAssenzeModal() {
 
     if (typeof window.openBottomSheet === 'function') {
         window.openBottomSheet({
-            title: 'Registro Presenze & Assenze',
+            title: 'Registro Assenze',
             html: sheetHtml
         });
     }
