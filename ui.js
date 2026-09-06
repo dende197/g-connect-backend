@@ -5194,9 +5194,9 @@ function getSubjectColor(subject) {
         bio: '#10B981',
         chi: '#9040C8',
         fil: '#A855F7',
-        art: '#EC4899',
-        dis: '#EC4899',
-        scm: '#FF6B00',
+        art: '#FF6B00',
+        dis: '#FF6B00',
+        scm: '#E0F2FE',
         rel: '#C82090',
         inf: '#06B6D4',
         dir: '#2A5CC8',
@@ -5205,12 +5205,12 @@ function getSubjectColor(subject) {
         ted: '#C82060',
         spa: '#C83030',
         grc: '#C82090',
-        civ: '#BE123C'
+        civ: '#B46534'
     };
     if (colorByAbbrev[abbr]) return colorByAbbrev[abbr];
 
-    if (normalized.includes('educazione civica') || normalized.includes('ed civica') || normalized.includes('civica')) return '#BE123C';
-    if (normalized.includes('scienze motorie') || normalized.includes('motorie') || normalized.includes('sportive')) return '#FF6B00';
+    if (normalized.includes('educazione civica') || normalized.includes('ed civica') || normalized.includes('civica')) return '#B46534';
+    if (normalized.includes('scienze motorie') || normalized.includes('motorie') || normalized.includes('sportive')) return '#E0F2FE';
     if (normalized.includes('scienze naturali') || normalized.includes('naturali')) return '#22C55E';
     if (normalized.includes('informatica')) return '#06B6D4';
     if (normalized.includes('matematica')) return '#2563EB';
@@ -5220,7 +5220,7 @@ function getSubjectColor(subject) {
     if (normalized.includes('italiano')) return '#EF4444';
     if (normalized.includes('inglese')) return '#14B8A6';
     const isArtDrawingSubject = isArtDrawingSubjectNormalized(normalized);
-    if (isArtDrawingSubject) return '#EC4899';
+    if (isArtDrawingSubject) return '#FF6B00';
 
     // Fallback: stable vibrant color
     let hash = 0;
@@ -8789,26 +8789,26 @@ window.filterCircolari = function(query) {
 function getSubjectTheme(rawSubject) {
     const s = (typeof normalizeSubjectName === 'function' ? normalizeSubjectName(rawSubject) : String(rawSubject || '')).toLowerCase();
     
-    // 1. Scienze Motorie e Sportive (Educazione Fisica)
+    // 1. Scienze Motorie e Sportive (Educazione Fisica - Bianco ghiaccio tendente all'azzurro)
     if (s.includes('motor') || s.includes('ed. fis') || s.includes('sport') || s.includes('ginnas') || (s.includes('educazione') && s.includes('fisic'))) {
         return {
-            color: '#ff6b00',
-            gradient: 'linear-gradient(135deg, rgba(255, 107, 0, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(255, 107, 0, 0.35)',
+            color: '#e0f2fe',
+            gradient: 'linear-gradient(135deg, rgba(224, 242, 254, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
+            border: 'rgba(224, 242, 254, 0.38)',
             icon: 'ph-person-simple-run',
-            iconBg: 'rgba(255, 107, 0, 0.22)',
-            glow: 'rgba(255, 107, 0, 0.35)'
+            iconBg: 'rgba(224, 242, 254, 0.18)',
+            glow: 'rgba(224, 242, 254, 0.35)'
         };
     }
-    // 2. Educazione Civica
+    // 2. Educazione Civica (Marrone Acceso / Cuoio Caldo - netto contrasto da Italiano)
     if (s.includes('civic') || s.includes('cittadin')) {
         return {
-            color: '#be123c',
-            gradient: 'linear-gradient(135deg, rgba(190, 18, 60, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(190, 18, 60, 0.35)',
+            color: '#b46534',
+            gradient: 'linear-gradient(135deg, rgba(180, 101, 52, 0.20) 0%, rgba(23, 31, 51, 0.92) 100%)',
+            border: 'rgba(180, 101, 52, 0.38)',
             icon: 'ph-scales',
-            iconBg: 'rgba(190, 18, 60, 0.22)',
-            glow: 'rgba(190, 18, 60, 0.35)'
+            iconBg: 'rgba(180, 101, 52, 0.22)',
+            glow: 'rgba(180, 101, 52, 0.35)'
         };
     }
     // 3. Informatica (Cyber Neon Cyan - contrasto netto da Matematica)
@@ -8899,15 +8899,15 @@ function getSubjectTheme(rawSubject) {
             glow: 'rgba(34, 197, 94, 0.35)'
         };
     }
-    // 11. Disegno e Storia dell'Arte Triennio (Magenta / Rosa Artista)
+    // 11. Disegno e Storia dell'Arte Triennio (Flame Orange - arancione vivo)
     if (s.includes('arte') || s.includes('disegn')) {
         return {
-            color: '#ec4899',
-            gradient: 'linear-gradient(135deg, rgba(236, 72, 153, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
-            border: 'rgba(236, 72, 153, 0.35)',
+            color: '#ff6b00',
+            gradient: 'linear-gradient(135deg, rgba(255, 107, 0, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
+            border: 'rgba(255, 107, 0, 0.35)',
             icon: 'ph-palette',
-            iconBg: 'rgba(236, 72, 153, 0.22)',
-            glow: 'rgba(236, 72, 153, 0.35)'
+            iconBg: 'rgba(255, 107, 0, 0.22)',
+            glow: 'rgba(255, 107, 0, 0.35)'
         };
     }
     if (s.includes('diritto') || s.includes('econ')) {
