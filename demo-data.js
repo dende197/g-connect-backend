@@ -108,16 +108,7 @@
                 done: false,
                 source: 'argo'
             },
-            {
-                id: 'task-demo-tomorrow-3',
-                subject: 'Informatica',
-                due_date: tomorrowIso,
-                text: 'Verifica pratica di laboratorio: programmazione orientata agli oggetti e algoritmi.',
-                done: false,
-                isExam: true,
-                type: 'verifica',
-                source: 'argo'
-            },
+
             {
                 id: 'task-demo-tomorrow-4',
                 subject: 'Scienze Naturali',
