@@ -4717,7 +4717,8 @@ function mostraAssenzeModal() {
             </div>
 
             <!-- List of Items -->
-            <div id="assenze-items-list" style="display:flex;flex-direction:column;gap:10px;max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px;">
+            <div id="assenze-items-list" style="display:flex;flex-direction:column;gap:10px;height:45vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px;padding-bottom:16px;-webkit-mask-image:linear-gradient(to bottom, black 0%, black 85%, transparent 100%);mask-image:linear-gradient(to bottom, black 0%, black 85%, transparent 100%);">
+
                 ${all.length > 0 ? all.map(renderCardHtml).join('') : ''}
                 <!-- Empty State -->
                 <div id="assenze-empty-msg" style="display:${all.length === 0 ? 'flex' : 'none'};align-items:center;justify-content:center;flex:1;text-align:center;padding:32px 16px;color:rgba(255,255,255,0.5);font-size:14px;font-style:italic;">
