@@ -4656,19 +4656,19 @@ function mostraAssenzeModal() {
         const capitalizedDate = dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1);
 
         const statusBadge = a.tipo === 'nota' 
-            ? `<span style="background:rgba(191,90,242,0.15);border:0.5px solid rgba(191,90,242,0.35);color:#bf5af2;font-size:11px;font-weight:700;padding:3px 8px;border-radius:9999px;display:inline-flex;align-items:center;gap:4px;"><i class="ph-fill ph-chat-circle-dots"></i> NOTA</span>`
+            ? `<span style="background:rgba(191,90,242,0.15);border:0.5px solid rgba(191,90,242,0.35);color:#bf5af2;font-size:10px;font-weight:700;padding:3px 8px;border-radius:9999px;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;flex-shrink:0;"><i class="ph-fill ph-chat-circle-dots"></i> NOTA</span>`
             : isPending
-            ? `<span style="background:rgba(255,69,58,0.18);border:0.5px solid rgba(255,69,58,0.4);color:#ff453a;font-size:11px;font-weight:700;padding:3px 8px;border-radius:9999px;display:inline-flex;align-items:center;gap:4px;"><i class="ph-fill ph-warning-circle"></i> DA GIUSTIFICARE</span>`
-            : `<span style="background:rgba(48,209,88,0.15);border:0.5px solid rgba(48,209,88,0.35);color:#30d158;font-size:11px;font-weight:700;padding:3px 8px;border-radius:9999px;display:inline-flex;align-items:center;gap:4px;"><i class="ph-fill ph-check-circle"></i> GIUSTIFICATA</span>`;
+            ? `<span style="background:rgba(255,69,58,0.18);border:0.5px solid rgba(255,69,58,0.4);color:#ff453a;font-size:10px;font-weight:700;padding:3px 8px;border-radius:9999px;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;flex-shrink:0;"><i class="ph-fill ph-warning-circle"></i> DA GIUSTIFICARE</span>`
+            : `<span style="background:rgba(48,209,88,0.15);border:0.5px solid rgba(48,209,88,0.35);color:#30d158;font-size:10px;font-weight:700;padding:3px 8px;border-radius:9999px;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;flex-shrink:0;"><i class="ph-fill ph-check-circle"></i> GIUSTIFICATA</span>`;
 
         return `
         <div class="assenze-card-item" data-pending="${isPending}" style="display:flex;flex-direction:column;gap:8px;padding:14px 16px;background:rgba(20,31,54,0.78);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:0.5px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.18);border-radius:20px;transition:all 0.2s ease;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
                 <div style="display:flex;align-items:center;gap:10px;">
                     <div style="width:36px;height:36px;border-radius:12px;background:${a.iconBg};display:flex;align-items:center;justify-content:center;color:${a.iconColor};flex-shrink:0;">
                         <i class="ph-fill ${a.icon}" style="font-size:18px;"></i>
                     </div>
-                    <div>
+                    <div style="min-width:0;flex:1;">
                         <h4 style="font-size:14px;font-weight:700;color:#ffffff;margin:0 0 2px;">${escapeHtml(a.label)}</h4>
                         <span style="font-size:12px;color:rgba(255,255,255,0.55);font-weight:500;">${capitalizedDate} · ${escapeHtml(a.hoursStr)}</span>
                     </div>
@@ -4720,13 +4720,12 @@ function mostraAssenzeModal() {
             </div>
 
             <!-- List of Items -->
-            <div id="assenze-items-list" style="display:flex;flex-direction:column;gap:10px;min-height:45vh;max-height:55vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px;">
+            <div id="assenze-items-list" style="display:flex;flex-direction:column;gap:10px;height:45vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px;">
                 ${all.length > 0 ? all.map(renderCardHtml).join('') : ''}
-            </div>
-
-            <!-- Empty State -->
-            <div id="assenze-empty-msg" style="display:${all.length === 0 ? 'block' : 'none'};text-align:center;padding:32px 16px;color:rgba(255,255,255,0.5);font-size:14px;font-style:italic;">
-                Nessun evento o assenza da visualizzare in questa categoria.
+                <!-- Empty State -->
+                <div id="assenze-empty-msg" style="display:${all.length === 0 ? 'flex' : 'none'};align-items:center;justify-content:center;flex:1;text-align:center;padding:32px 16px;color:rgba(255,255,255,0.5);font-size:14px;font-style:italic;">
+                    Nessun evento o assenza da visualizzare in questa categoria.
+                </div>
             </div>
 
         </div>
