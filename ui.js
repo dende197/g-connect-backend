@@ -2571,8 +2571,7 @@ function renderHome() {
 
     // 6c. Dati sintetici e precisi per il CAROSELLO STUDENT HUB (Overview a 3 slide)
     const _mediaColor = media >= 8 ? '#30d158' : media >= 7 ? '#64d2ff' : media >= 6 ? '#ff9f0a' : media > 0 ? '#ff453a' : '#8e909f';
-    const homeComp = (typeof getPreviousYearTermComparison === 'function') ? getPreviousYearTermComparison({}) : null;
-    const hasHomeComp = homeComp && homeComp.prevTermMedia !== null;
+
 
     // Calcolo % Ore di Assenza rispetto al monte ore totale annuale (~1000h, limite max 25% = 250h)
     const _monteOreTotale = 1000;
@@ -2679,7 +2678,7 @@ function renderHome() {
                                         ${!hasHomeMedia ? '—' : media.toFixed(2)}
                                     </div>
                                     <span style="font-size:9px;font-weight:800;color:${hasHomeMedia ? (isPositive ? '#30d158' : '#ff453a') : '#2997ff'};background:${hasHomeMedia ? (isPositive ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.15)') : 'rgba(41,151,255,0.15)'};padding:1px 5px;border-radius:999px;display:inline-flex;align-items:center;gap:2px;width:fit-content;white-space:nowrap;">
-                                        <i class="ph-bold ${hasHomeMedia ? (isPositive ? 'ph-trend-up' : 'ph-trend-down') : (hasHomeComp ? 'ph-target' : 'ph-sparkle')}" style="font-size:8px;"></i>${hasHomeMedia && diffStr ? diffStr : (hasHomeComp ? `${homeComp.termShort} 25/26: ${homeComp.prevTermMedia.toFixed(2)}` : 'Nuovo A.S.')}
+                                        <i class="ph-bold ${hasHomeMedia ? (isPositive ? 'ph-trend-up' : 'ph-trend-down') : 'ph-sparkle'}" style="font-size:8px;"></i>${hasHomeMedia && diffStr ? diffStr : 'Nuovo A.S.'}
                                     </span>
                                 </div>
 
@@ -4034,17 +4033,7 @@ function renderSubjectDetailView(subjectName) {
     const theme = getSubjectTheme(subjectName);
     const formattedTitle = formatSubjectTitle(subjectName);
 
-    // ── Previous School Year Term Comparison (A.S. 2025/26 Benchmark) ──
-    const prevComp = getPreviousYearTermComparison({ subject: subjectName });
-    const hasPrevComp = prevComp && prevComp.prevTermMedia !== null;
-    let prevDiff = null;
-    let isPrevPos = false;
-    let prevDiffStr = '';
-    if (hasSubjectMedia && hasPrevComp) {
-        prevDiff = media - prevComp.prevTermMedia;
-        isPrevPos = prevDiff >= 0;
-        prevDiffStr = (isPrevPos ? '+' : '') + prevDiff.toFixed(2);
-    }
+
 
     // ── Trend calculation: current average vs average without the latest grade ──
     const sortedByDate = [...votiData].sort((a, b) => (a.data || a.date || '').localeCompare(b.data || b.date || ''));
@@ -4235,16 +4224,7 @@ function renderSubjectDetailView(subjectName) {
                                 <span style="font-size:11px;font-weight:700;color:${isPosTrend ? '#30d158' : '#ff453a'};">${diffStr}</span>
                             </div>` : ''}
                         </div>
-                        ${hasPrevComp ? `
-                        <div style="margin-top:8px;">
-                            <div style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:9999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);backdrop-filter:blur(8px);">
-                                <i class="ph-bold ph-scales" style="color:${theme.color};font-size:12px;"></i>
-                                <span>vs ${escapeHtml(prevComp.termShort)} A.S. ${escapeHtml(prevComp.prevYearKey)}: <strong>${prevComp.prevTermMedia.toFixed(2)}</strong></span>
-                                ${hasSubjectMedia && prevDiff !== null ? `
-                                <span style="color:${isPrevPos ? '#30d158' : '#ff453a'};font-weight:800;">(${prevDiffStr})</span>` : `
-                                <span style="color:${theme.color};font-weight:700;">(Target)</span>`}
-                            </div>
-                        </div>` : ''}
+
                     </div>
                     <span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:9999px;background:${statusBadge.bg};border:1px solid ${statusBadge.border};font-size:11px;font-weight:700;color:${statusBadge.color};">
                         <i class="ph-fill ${statusBadge.icon}" style="font-size:13px;"></i> ${statusBadge.label}
@@ -4272,113 +4252,7 @@ function renderSubjectDetailView(subjectName) {
                 </div>`}
             </section>
 
-            <!-- ── CARD: CONFRONTO A.S. PRECEDENTE (Termine di Riferimento Quadrimestrale) ── -->
-            <section style="position:relative;padding:20px;background:rgba(20,31,54,0.78);backdrop-filter:blur(25px) saturate(180%);-webkit-backdrop-filter:blur(25px) saturate(180%);border:0.5px solid rgba(255,255,255,0.12);border-top:1px solid rgba(255,255,255,0.22);border-radius:26px;box-shadow:0 16px 36px -10px rgba(0,0,0,0.5);overflow:hidden;">
-                <!-- Sfumatura cromatica in angolo -->
-                <div style="position:absolute;top:-28px;right:-28px;width:100px;height:100px;background:${theme.color};opacity:0.20;border-radius:50%;filter:blur(26px);pointer-events:none;"></div>
 
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;position:relative;z-index:1;">
-                    <span style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${theme.color};display:flex;align-items:center;gap:6px;">
-                        <i class="ph-bold ph-arrows-left-right" style="font-size:13px;color:${theme.color};"></i>
-                        CONFRONTO A.S. ${escapeHtml(prevComp.prevYearKey)}
-                    </span>
-                    <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.12);padding:3px 10px;border-radius:999px;">
-                        ${escapeHtml(prevComp.termLabel)}
-                    </span>
-                </div>
-
-                ${hasPrevComp ? `
-                <div style="position:relative;z-index:1;">
-                    <!-- 2-Box Metric Comparison Grid -->
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-                        <!-- Box Attuale -->
-                        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:12px 14px;">
-                            <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:4px;">A.S. ${escapeHtml(activeYearKey)} (In corso)</span>
-                            <div style="display:flex;align-items:baseline;gap:6px;">
-                                <span style="font-size:26px;font-weight:800;color:#ffffff;line-height:1;font-variant-numeric:tabular-nums;">${hasSubjectMedia ? media.toFixed(2) : '—'}</span>
-                                ${hasSubjectMedia && prevDiff !== null ? `
-                                <span style="font-size:12px;font-weight:800;color:${isPrevPos ? '#30d158' : '#ff453a'};">
-                                    ${prevDiffStr}
-                                </span>` : ''}
-                            </div>
-                            <span style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;display:block;">${n} valutazion${n === 1 ? 'e' : 'i'}</span>
-                        </div>
-
-                        <!-- Box Storico Termine -->
-                        <div style="background:${theme.iconBg};border:1px solid ${theme.border};border-radius:18px;padding:12px 14px;">
-                            <span style="font-size:10px;font-weight:700;color:${theme.color};text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:4px;">A.S. ${escapeHtml(prevComp.prevYearKey)} (${prevComp.termShort})</span>
-                            <div style="display:flex;align-items:baseline;gap:6px;">
-                                <span style="font-size:26px;font-weight:800;color:${theme.color};line-height:1;font-variant-numeric:tabular-nums;">${prevComp.prevTermMedia.toFixed(2)}</span>
-                            </div>
-                            <span style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;display:block;">${prevComp.prevTermVotesCount} valutazion${prevComp.prevTermVotesCount === 1 ? 'e' : 'i'} finali</span>
-                        </div>
-                    </div>
-
-                    <!-- Dual Comparative Progress Bars -->
-                    <div style="margin-bottom:14px;background:rgba(0,0,0,0.2);padding:12px 14px;border-radius:16px;border:0.5px solid rgba(255,255,255,0.06);">
-                        <!-- Bar Current -->
-                        <div style="margin-bottom:10px;">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:11.5px;">
-                                <span style="color:rgba(255,255,255,0.7);font-weight:600;">Media attuale (${escapeHtml(activeYearKey)})</span>
-                                <span style="color:#ffffff;font-weight:800;">${hasSubjectMedia ? media.toFixed(2) : '0 voti'}</span>
-                            </div>
-                            <div style="width:100%;height:6px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;">
-                                <div style="width:${hasSubjectMedia ? Math.min(100, (media / 10 * 100)).toFixed(0) : 0}%;height:100%;background:${theme.color};border-radius:999px;transition:width 0.3s ease;"></div>
-                            </div>
-                        </div>
-
-                        <!-- Bar Prev Year Term -->
-                        <div>
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:11.5px;">
-                                <span style="color:rgba(255,255,255,0.7);font-weight:600;">Media finale ${escapeHtml(prevComp.termLabel)} (${escapeHtml(prevComp.prevYearKey)})</span>
-                                <span style="color:${theme.color};font-weight:800;">${prevComp.prevTermMedia.toFixed(2)}</span>
-                            </div>
-                            <div style="width:100%;height:6px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;">
-                                <div style="width:${Math.min(100, (prevComp.prevTermMedia / 10 * 100)).toFixed(0)}%;height:100%;background:rgba(255,255,255,0.45);border-radius:999px;"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Narrative Insight Banner -->
-                    <div style="padding:10px 14px;border-radius:14px;display:flex;align-items:center;gap:10px;${
-                        hasSubjectMedia 
-                            ? (isPrevPos 
-                                ? 'background:rgba(48,209,88,0.12);border:1px solid rgba(48,209,88,0.3);' 
-                                : 'background:rgba(255,69,58,0.12);border:1px solid rgba(255,69,58,0.3);')
-                            : 'background:rgba(41,151,255,0.12);border:1px solid rgba(41,151,255,0.3);'
-                    }">
-                        <div style="width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;${
-                            hasSubjectMedia
-                                ? (isPrevPos ? 'background:rgba(48,209,88,0.2);color:#30d158;' : 'background:rgba(255,69,58,0.2);color:#ff453a;')
-                                : 'background:rgba(41,151,255,0.2);color:#2997ff;'
-                        }">
-                            <i class="ph-bold ${
-                                hasSubjectMedia
-                                    ? (isPrevPos ? 'ph-trend-up' : 'ph-trend-down')
-                                    : 'ph-target'
-                            }" style="font-size:15px;"></i>
-                        </div>
-                        <p style="font-size:12px;color:rgba(255,255,255,0.9);line-height:1.35;margin:0;">
-                            ${hasSubjectMedia ? (
-                                isPrevPos 
-                                    ? `Stai superando la media finale del ${escapeHtml(prevComp.termLabel)} dell'anno scorso di <strong style="color:#30d158;">+${prevDiff.toFixed(2)}</strong> punti!` 
-                                    : `Sei a <strong style="color:#ff453a;">${Math.abs(prevDiff).toFixed(2)}</strong> punti dalla media del ${escapeHtml(prevComp.termLabel)} dell'anno scorso (${prevComp.prevTermMedia.toFixed(2)}). Hai tutto il tempo per recuperare!`
-                            ) : (
-                                `Nell'A.S. ${escapeHtml(prevComp.prevYearKey)} hai chiuso il ${escapeHtml(prevComp.termLabel)} con una media di <strong style="color:${theme.color};">${prevComp.prevTermMedia.toFixed(2)}</strong>. Questo è il tuo benchmark di partenza per quest'anno!`
-                            )}
-                        </p>
-                    </div>
-
-                    ${prevComp.prevYearFullMedia !== null ? `
-                    <p style="font-size:11px;color:rgba(255,255,255,0.45);margin:10px 2px 0;text-align:right;">
-                        Media complessiva intero A.S. ${escapeHtml(prevComp.prevYearKey)}: <strong>${prevComp.prevYearFullMedia.toFixed(2)}</strong> (${prevComp.prevYearVotesCount} voti totali)
-                    </p>` : ''}
-                </div>` : `
-                <div style="text-align:center;padding:16px 10px;color:rgba(255,255,255,0.5);position:relative;z-index:1;">
-                    <i class="ph ph-clock-counter-clockwise" style="font-size:24px;margin-bottom:6px;display:block;color:${theme.color};"></i>
-                    <p style="font-size:12px;margin:0;font-style:italic;">Nessuna valutazione registrata per ${escapeHtml(formattedTitle)} nel ${escapeHtml(prevComp.termLabel)} dell'A.S. ${escapeHtml(prevComp.prevYearKey)}.</p>
-                </div>`}
-            </section>
 
             <!-- ── CARD 2: VOTI RICEVUTI ── -->
             <section style="position:relative;padding:20px;background:rgba(20,31,54,0.78);backdrop-filter:blur(25px) saturate(180%);-webkit-backdrop-filter:blur(25px) saturate(180%);border:0.5px solid rgba(255,255,255,0.12);border-top:1px solid rgba(255,255,255,0.22);border-radius:26px;box-shadow:0 16px 36px -10px rgba(0,0,0,0.5);overflow:hidden;">
@@ -11830,17 +11704,7 @@ function renderGradesView() {
     const bestSubject = validSubjects.length > 0 ? validSubjects[0] : null;
     const minSubject = validSubjects.length > 0 ? [...validSubjects].sort((a, b) => a.media - b.media)[0] : null;
 
-    // ── Previous School Year Term Comparison for General Average ──
-    const generalComp = getPreviousYearTermComparison({});
-    const hasGenComp = isCurrentSchoolYear && generalComp && generalComp.prevTermMedia !== null;
-    let genDiff = null;
-    let isGenPos = false;
-    let genDiffStr = '';
-    if (hasMedia && hasGenComp) {
-        genDiff = media - generalComp.prevTermMedia;
-        isGenPos = genDiff >= 0;
-        genDiffStr = (isGenPos ? '+' : '') + genDiff.toFixed(2);
-    }
+
 
     // Status Badge
     let globalStatusBadge = { label: 'In attesa', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.08)', border: 'rgba(255,255,255,0.14)', icon: 'ph-hourglass-simple' };
@@ -11932,16 +11796,7 @@ function renderGradesView() {
                     </span>
                 </div>
 
-                ${hasGenComp ? `
-                <div style="margin-top:-6px;margin-bottom:16px;position:relative;z-index:1;">
-                    <div style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:9999px;background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.14);font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);backdrop-filter:blur(10px);">
-                        <i class="ph-bold ph-scales" style="font-size:13px;color:#2997ff;"></i>
-                        <span>Confronto ${escapeHtml(generalComp.termLabel)} A.S. ${escapeHtml(generalComp.prevYearKey)}: <strong>${generalComp.prevTermMedia.toFixed(2)}</strong></span>
-                        ${hasMedia && genDiff !== null ? `
-                        <span style="color:${isGenPos ? '#30d158' : '#ff453a'};font-weight:800;">(${genDiffStr})</span>` : `
-                        <span style="color:#2997ff;font-weight:700;">(Target da battere)</span>`}
-                    </div>
-                </div>` : ''}
+
 
                 <!-- 4 Bento Metric Pills (2x2 Grid) -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;position:relative;z-index:1;margin-bottom:16px;">
