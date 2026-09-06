@@ -112,8 +112,10 @@
                 id: 'task-demo-tomorrow-3',
                 subject: 'Informatica',
                 due_date: tomorrowIso,
-                text: 'Progetto di laboratorio: implementazione di una coda con priorità e test unitari.',
+                text: 'Verifica pratica di laboratorio: programmazione orientata agli oggetti e algoritmi.',
                 done: false,
+                isExam: true,
+                type: 'verifica',
                 source: 'argo'
             },
             {
@@ -148,6 +150,13 @@
         // 3. VERIFICHE PROGRAMMATE (CALENDARIO & PROMEMORIA)
         // --------------------------------------------------------------------
         verifiche: [
+            {
+                id: 'verif-demo-tomorrow',
+                materia: 'Informatica',
+                data: tomorrowIso,
+                text: 'Verifica pratica di laboratorio: programmazione orientata agli oggetti e algoritmi',
+                tipo: 'Prova Pratica'
+            },
             {
                 id: 'verif-demo-1',
                 materia: 'Matematica',

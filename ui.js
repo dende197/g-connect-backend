@@ -2494,15 +2494,11 @@ function renderHome() {
     const assenze = state.assenzeData || {};
     const verifiche = state.manualVerifiche || [];
     
-    // 2. Calcolo dinamico per l'anello di progresso del widget Assenze
+    // 2. Dati Assenze (monte ore annuale standard ~990h)
     const oreAssenzaTotali = typeof assenze.oreAssenzaTotali === 'number' ? assenze.oreAssenzaTotali : 0;
     const ritardiTotali = typeof assenze.totaleRitardi === 'number' ? assenze.totaleRitardi : 0;
     const usciteTotali = typeof assenze.totaleUscite === 'number' ? assenze.totaleUscite : 0;
     const assenzeGiorni = typeof assenze.totaleAssenze === 'number' ? assenze.totaleAssenze : 0;
-    
-    const maxOreIpotetiche = 100;
-    const progressPercentage = Math.min((oreAssenzaTotali / maxOreIpotetiche) * 100, 100);
-    const dashOffset = 251.2 - (251.2 * (progressPercentage / 100));
 
     // 3. Calcolo sicuro delle date locali
     const today = new Date();
@@ -2512,13 +2508,81 @@ function renderHome() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowISO = getLocalDateString(tomorrow);
 
+    // Helper: rilevamento affidabile Verifiche vs Compiti (come nel Planner)
+    const isVerificaItem = (item) => {
+        if (!item) return false;
+        if (item.isExam) return true;
+        const typeStr = String(item.type || item.tipo || '').toLowerCase();
+        if (typeStr.includes('verifica') || typeStr.includes('orale') || typeStr.includes('pratica') || typeStr.includes('test') || typeStr.includes('esame')) return true;
+        const textStr = `${item.text || ''} ${item.desc || ''} ${item.descrizione || ''} ${item.title || ''} ${item.subject || ''} ${item.materia || ''}`.toLowerCase();
+        return /verifica|interrogazione|test|esame|simulazione/i.test(textStr);
+    };
+
+    // Filtriamo i dati per Oggi (Domenica / Odierni)
+    const todayVerifiche = (state.verifiche || []).filter(v => v.data === todayISO);
+    const todayHomework = (state.tasks || []).filter(t => t.due_date === todayISO && t.subject !== 'QUEST');
+    const seenToday = new Set();
+    const allTodayItems = [];
+    todayVerifiche.forEach(v => {
+        const key = `${v.id || ''}||${v.materia || v.subject || ''}||${v.text || ''}`;
+        if (!seenToday.has(key)) {
+            seenToday.add(key);
+            allTodayItems.push({
+                id: v.id,
+                isExam: true,
+                subject: v.materia || v.subject || 'Materia',
+                desc: v.text || v.descrizione || 'Verifica in programma',
+                done: false
+            });
+        }
+    });
+    todayHomework.forEach(h => {
+        const isExam = isVerificaItem(h);
+        const key = `${h.id || ''}||${h.subject || ''}||${h.text || ''}`;
+        if (!seenToday.has(key)) {
+            seenToday.add(key);
+            allTodayItems.push({
+                id: h.id,
+                isExam,
+                subject: h.subject || h.materia || 'Materia',
+                desc: h.text || h.title || '',
+                done: !!h.done
+            });
+        }
+    });
+
     // Filtriamo i dati reali per Domani
     const tomorrowVerifiche = (state.verifiche || []).filter(v => v.data === tomorrowISO);
-    const tomorrowHomework = (state.tasks || []).filter(t => t.due_date === tomorrowISO);
-    const allTomorrowItems = [
-        ...tomorrowVerifiche.map(v => ({ id: v.id, isExam: true, title: v.materia || v.subject, desc: v.text || v.descrizione, done: false })),
-        ...tomorrowHomework.map(h => ({ id: h.id, isExam: false, title: h.subject, desc: h.text, done: h.done }))
-    ];
+    const tomorrowHomework = (state.tasks || []).filter(t => t.due_date === tomorrowISO && t.subject !== 'QUEST');
+    const seenTomorrow = new Set();
+    const allTomorrowItems = [];
+    tomorrowVerifiche.forEach(v => {
+        const key = `${v.id || ''}||${v.materia || v.subject || ''}||${v.text || ''}`;
+        if (!seenTomorrow.has(key)) {
+            seenTomorrow.add(key);
+            allTomorrowItems.push({
+                id: v.id,
+                isExam: true,
+                subject: v.materia || v.subject || 'Materia',
+                desc: v.text || v.descrizione || 'Verifica in programma',
+                done: false
+            });
+        }
+    });
+    tomorrowHomework.forEach(h => {
+        const isExam = isVerificaItem(h);
+        const key = `${h.id || ''}||${h.subject || ''}||${h.text || ''}`;
+        if (!seenTomorrow.has(key)) {
+            seenTomorrow.add(key);
+            allTomorrowItems.push({
+                id: h.id,
+                isExam,
+                subject: h.subject || h.materia || 'Materia',
+                desc: h.text || h.title || '',
+                done: !!h.done
+            });
+        }
+    });
 
     // 4. Prossima Verifica Imminente (per il 3° Widget del carosello)
     const argoUpcoming = (state.verifiche || [])
@@ -2572,73 +2636,80 @@ function renderHome() {
         progressWidth = Math.max(0, Math.min(100, ((10 - daysDiff) / 10) * 100));
     }
 
-    // Helper per icone Lucide delle materie
-    const getSubjectLucideIcon = (subject) => {
-        const s = (subject || '').toLowerCase();
-        if (s.includes('matem') || s.includes('math')) return 'calculator';
-        if (s.includes('fisic') || s.includes('physics') || s.includes('scienz') || s.includes('chimic')) return 'flask-conical';
-        if (s.includes('storia') || s.includes('history') || s.includes('filosofia')) return 'book-open';
-        if (s.includes('inglese') || s.includes('english') || s.includes('lingua') || s.includes('italiano')) return 'languages';
-        if (s.includes('arte') || s.includes('disegno')) return 'palette';
-        if (s.includes('informatica') || s.includes('computer')) return 'cpu';
-        return 'graduation-cap';
-    };
+    // 5. Card Renderer differenziato per Compiti vs Verifiche (stile Planner)
+    const renderHomeItemCard = (item, defaultTimeLabel) => {
+        const isExam = item.isExam;
+        const theme = (typeof getSubjectTheme === 'function') ? getSubjectTheme(item.subject) : { color: '#2997ff', icon: 'ph-book-open' };
+        const cardBg = isExam
+            ? 'linear-gradient(135deg, rgba(239,68,68,0.22) 0%, rgba(20,31,54,0.92) 100%)'
+            : 'rgba(20,31,54,0.78)';
+        const cardBorder = isExam
+            ? '1px solid rgba(239,68,68,0.45)'
+            : '0.5px solid rgba(255,255,255,0.12)';
+        const cardShadow = isExam
+            ? 'box-shadow:0 0 22px rgba(239,68,68,0.22);'
+            : '';
+        const accentColor = isExam ? '#ff453a' : '#2997ff';
+        const iconName = isExam ? 'ph-exam' : 'ph-book-open';
+        const iconBg = isExam ? 'rgba(239,68,68,0.25)' : 'rgba(41,151,255,0.16)';
+        const iconColor = isExam ? '#ffb4ab' : '#2997ff';
+        const iconBorder = isExam ? 'rgba(239,68,68,0.45)' : 'rgba(41,151,255,0.32)';
 
-    // Helper per colori inline delle materie
-    const getSubjectInlineColors = (subject, isExam) => {
-        if (isExam) return { bg: 'var(--error-container)', text: 'var(--on-error-container)', border: 'var(--outline-variant)' };
-        const s = (subject || '').toLowerCase();
-        if (s.includes('matem') || s.includes('math')) return { bg: 'var(--info-container)', text: 'var(--on-info-container)', border: 'var(--outline-variant)' };
-        if (s.includes('fisic') || s.includes('physics') || s.includes('scienz') || s.includes('chimic')) return { bg: 'var(--success-container)', text: 'var(--on-success-container)', border: 'var(--outline-variant)' };
-        return { bg: 'var(--secondary-container)', text: 'var(--on-secondary-container)', border: 'var(--outline-variant)' };
-    };
+        const badgeHtml = isExam
+            ? `<span style="background:rgba(239,68,68,0.28);color:#ffb4ab;font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:999px;letter-spacing:0.05em;border:1px solid rgba(239,68,68,0.45);display:inline-flex;align-items:center;gap:4px;"><i class="ph-fill ph-warning" style="font-size:10px;"></i> VERIFICA</span>`
+            : `<span style="background:rgba(41,151,255,0.16);color:#2997ff;font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:999px;letter-spacing:0.05em;border:0.5px solid rgba(41,151,255,0.35);display:inline-flex;align-items:center;gap:4px;"><i class="ph-fill ph-check-square" style="font-size:10px;"></i> COMPITO</span>`;
 
-    // 5. Card compatte per sezione "Domani" — Apple HIG Frosted Glass
-    const htmlDomani = allTomorrowItems.length > 0
-        ? allTomorrowItems.map(item => {
-            const icon = getSubjectLucideIcon(item.title);
-            const isExam = item.isExam;
-            const badgeBg = isExam ? 'rgba(255,69,58,0.15)' : 'rgba(41,151,255,0.15)';
-            const badgeText = isExam ? '#ff453a' : '#2997ff';
-            const badgeBorder = isExam ? 'rgba(255,69,58,0.35)' : 'rgba(41,151,255,0.35)';
+        const timeStr = isExam ? '09:00 - 12:00' : (defaultTimeLabel || 'In programma');
+        const doneStyle = item.done ? 'opacity:0.55;' : '';
+        const doneText = item.done ? 'text-decoration:line-through;' : '';
 
-            return `
-            <div class="tomorrow-card" style="
-                background:rgba(20,31,54,0.78);
-                backdrop-filter:blur(25px) saturate(180%);-webkit-backdrop-filter:blur(25px) saturate(180%);
-                border:0.5px solid rgba(255,255,255,0.12);border-top:1px solid rgba(255,255,255,0.22);
-                border-radius:22px; padding:16px 18px;
-                margin-bottom:10px;
-                position:relative; overflow:hidden; cursor:pointer;
-                transition:transform 0.15s ease;
-            " onclick="openTaskDetailModal('${item.id}')"
-               ontouchstart="this.style.transform='scale(0.98)'" ontouchend="this.style.transform='scale(1)'">
-                <!-- Accento laterale iOS -->
-                <div style="position:absolute;left:0;top:15%;height:70%;width:3.5px;background:${badgeText};border-radius:0 4px 4px 0;"></div>
+        return `
+        <div class="home-task-card" onclick="openTaskDetailModal('${escapeJsSingleQuote(item.id)}')" ontouchstart="this.style.transform='scale(0.98)'" ontouchend="this.style.transform='scale(1)'" style="
+            background:${cardBg};
+            backdrop-filter:blur(25px) saturate(180%);-webkit-backdrop-filter:blur(25px) saturate(180%);
+            border:${cardBorder};border-top:1px solid rgba(255,255,255,0.25);
+            border-radius:22px;padding:16px 18px;margin-bottom:10px;
+            position:relative;overflow:hidden;cursor:pointer;
+            transition:transform 0.15s ease;${cardShadow}${doneStyle}
+        ">
+            <!-- Accento laterale -->
+            <div style="position:absolute;left:0;top:15%;height:70%;width:${isExam ? '4px' : '3.5px'};background:${accentColor};border-radius:0 4px 4px 0;"></div>
 
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-left:8px;">
-                    <div style="width:38px;height:38px;border-radius:12px;background:${badgeBg};border:0.5px solid ${badgeBorder};display:flex;align-items:center;justify-content:center;color:${badgeText};">
-                        <i data-lucide="${icon}" style="width:18px;height:18px;stroke-width:2;"></i>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-left:8px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:38px;height:38px;border-radius:12px;background:${iconBg};border:0.5px solid ${iconBorder};display:flex;align-items:center;justify-content:center;color:${iconColor};flex-shrink:0;">
+                        <i class="ph-bold ${iconName}" style="font-size:19px;"></i>
                     </div>
-                    <span style="
-                        display:inline-flex; align-items:center; background:${badgeBg}; color:${badgeText};
-                        font-size:10px; font-weight:700; letter-spacing:0.06em;
-                        text-transform:uppercase; padding:4px 10px; border-radius:999px;
-                        border:0.5px solid ${badgeBorder};
-                    ">${item.isExam ? 'Verifica' : 'Compito'}</span>
+                    <div>
+                        <span style="font-size:10.5px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:${isExam ? '#ffb4ab' : theme.color};">${escapeHtml(item.subject)}</span>
+                    </div>
                 </div>
-                
-                <h4 style="font-size:15px;font-weight:700;color:#ffffff;margin:0 0 4px 8px;line-height:1.3;">${escapeHtml(item.title || 'Generico')}</h4>
-                
-                <div style="display:flex;align-items:center;color:rgba(255,255,255,0.55);font-size:12px;margin-left:8px;">
-                    <i class="ph ph-clock" style="font-size:14px;margin-right:6px;"></i>
-                    <span style="font-weight:500;">${item.isExam ? '09:00 - 12:00' : 'Scadenza domani'}</span>
+                <div>
+                    ${badgeHtml}
                 </div>
+            </div>
 
-                ${item.desc ? `<p style="font-size:12px;color:rgba(255,255,255,0.7);font-style:italic;margin:10px 0 0 8px;border-top:0.5px solid rgba(255,255,255,0.08);padding-top:8px;">"${escapeHtml(truncateWithEllipsis(item.desc, 100))}"</p>` : ''}
-            </div>`;
-        }).join('')
-        : `<div class="empty-state-card" style="text-align:center;padding:28px 16px;background:rgba(20,31,54,0.78);backdrop-filter:blur(25px);border:0.5px solid rgba(255,255,255,0.12);border-radius:22px;color:rgba(255,255,255,0.5);font-size:13px;font-style:italic;">Nessun impegno programmato per domani.</div>`;
+            <h4 style="font-size:14.5px;font-weight:700;color:#ffffff;margin:0 0 4px 8px;line-height:1.3;${doneText}">${escapeHtml(item.desc || item.subject)}</h4>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-left:8px;">
+                <div style="display:flex;align-items:center;color:rgba(255,255,255,0.55);font-size:11.5px;">
+                    <i class="ph ph-clock" style="font-size:13px;margin-right:5px;"></i>
+                    <span style="font-weight:500;">${timeStr}</span>
+                </div>
+                <span style="font-size:11px;font-weight:600;color:rgba(182,196,255,0.7);display:flex;align-items:center;gap:2px;">
+                    Dettagli <i class="ph-bold ph-caret-right" style="font-size:11px;"></i>
+                </span>
+            </div>
+        </div>`;
+    };
+
+    const htmlOggi = allTodayItems.length > 0
+        ? allTodayItems.map(item => renderHomeItemCard(item, 'Oggi')).join('')
+        : `<div class="empty-state-card" style="text-align:center;padding:24px 16px;background:rgba(20,31,54,0.78);backdrop-filter:blur(25px);border:0.5px solid rgba(255,255,255,0.12);border-radius:22px;color:rgba(255,255,255,0.5);font-size:13px;font-style:italic;">Nessun compito o verifica per oggi.</div>`;
+
+    const htmlDomani = allTomorrowItems.length > 0
+        ? allTomorrowItems.map(item => renderHomeItemCard(item, 'Scadenza domani')).join('')
+        : `<div class="empty-state-card" style="text-align:center;padding:24px 16px;background:rgba(20,31,54,0.78);backdrop-filter:blur(25px);border:0.5px solid rgba(255,255,255,0.12);border-radius:22px;color:rgba(255,255,255,0.5);font-size:13px;font-style:italic;">Nessun impegno programmato per domani.</div>`;
 
     // Inizializzazione icone Lucide subito dopo l'inserimento nel DOM
     setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 80);
@@ -2661,21 +2732,15 @@ function renderHome() {
         ? 'Nessuna novità oggi'
         : (_homeNotifCount === 1 ? '1 novità oggi' : `${_homeNotifCount} novità oggi`);
 
-    // 6b. Label assenze per widget Assenze
-    const _homeAssenzeLabel = (assenzeGiorni + ritardiTotali + usciteTotali) > 0
-        ? `${assenzeGiorni}g, ${ritardiTotali}r, ${usciteTotali}u`
-        : 'Nessuna recente';
-
     // 6c. Dati sintetici e precisi per il CAROSELLO STUDENT HUB (Overview a 3 slide)
     const _mediaColor = media >= 8 ? '#30d158' : media >= 7 ? '#64d2ff' : media >= 6 ? '#ff9f0a' : media > 0 ? '#ff453a' : '#8e909f';
 
-
-    // Calcolo % Ore di Assenza rispetto al monte ore totale annuale (~1000h, limite max 25% = 250h)
-    const _monteOreTotale = 1000;
-    const _limiteOreMax = 250;
+    // Calcolo % Ore di Assenza rispetto al monte ore totale annuale (~990h, limite max 25% = 248h)
+    const _monteOreTotale = 990;
+    const _limiteOreMax = Math.round(_monteOreTotale * 0.25);
     const _assenzePctTotale = ((oreAssenzaTotali / _monteOreTotale) * 100).toFixed(1);
-    const _assenzeStatusColor = oreAssenzaTotali > 180 ? '#ff453a' : (oreAssenzaTotali > 100 ? '#ff9f0a' : '#30d158');
-    const _assenzeStatusBg = oreAssenzaTotali > 180 ? 'rgba(255,69,58,0.15)' : (oreAssenzaTotali > 100 ? 'rgba(255,159,10,0.15)' : 'rgba(48,209,88,0.15)');
+    const _assenzeStatusColor = oreAssenzaTotali > 180 ? '#ff453a' : (oreAssenzaTotali > 80 ? '#ff9f0a' : '#30d158');
+    const _assenzeStatusBg = oreAssenzaTotali > 180 ? 'rgba(255,69,58,0.15)' : (oreAssenzaTotali > 80 ? 'rgba(255,159,10,0.15)' : 'rgba(48,209,88,0.15)');
 
     // Dati per "Quanto Manca A..." (Slide 2)
     const _countdownsData = (typeof window.getSchoolCountdowns === 'function') ? window.getSchoolCountdowns() : null;
@@ -2701,13 +2766,23 @@ function renderHome() {
 
         <div style="padding:0;">
 
-            <!-- HEADER (iOS HIG Large Title): Overview + Avatar -->
+            <!-- HEADER (iOS HIG Large Title): Overview + Notifiche + Avatar -->
             <header class="ios-header-wrapper" style="display:flex;justify-content:space-between;align-items:flex-end;padding:max(env(safe-area-inset-top,0px),24px) 20px 14px 20px;">
                 <div>
                     <div class="ios-sub-title" style="color:rgba(255,255,255,0.5);font-weight:700;letter-spacing:0.06em;font-size:11px;">PANORAMICA</div>
                     <h1 class="ios-large-title" style="color:#ffffff;font-weight:800;font-size:32px;letter-spacing:-0.03em;margin:2px 0 0;">Overview</h1>
                 </div>
-                ${avatarHtml}
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <button id="header-notif-btn" onclick="if(typeof window.triggerHaptic==='function')window.triggerHaptic('light');openTodayNotifications();" style="position:relative;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.14);display:flex;align-items:center;justify-content:center;color:#ffffff;cursor:pointer;transition:transform 0.15s ease, background 0.15s ease;" ontouchstart="this.style.transform='scale(0.92)'" ontouchend="this.style.transform='scale(1)'" aria-label="Notifiche">
+                        <i class="ph-bold ph-bell" style="font-size:20px;color:#dae2fd;"></i>
+                        ${_homeNotifCount > 0 ? `
+                            <span style="position:absolute;top:5px;right:5px;min-width:16px;height:16px;border-radius:999px;background:#2997ff;border:2px solid #0b1326;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#ffffff;padding:0 3px;box-shadow:0 0 8px rgba(41,151,255,0.8);">
+                                ${_homeNotifCount > 9 ? '9+' : _homeNotifCount}
+                            </span>
+                        ` : ''}
+                    </button>
+                    ${avatarHtml}
+                </div>
             </header>
 
             <div style="margin-bottom: 16px; padding: 0 20px;">
@@ -2794,8 +2869,8 @@ function renderHome() {
                                     <div style="font-size:20px;font-weight:900;color:${_assenzeStatusColor};font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-0.03em;margin:3px 0 1px;">
                                         ${_assenzePctTotale}%
                                     </div>
-                                    <span style="font-size:8.5px;font-weight:700;color:${_assenzeStatusColor};background:${_assenzeStatusBg};padding:1px 5px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:fit-content;">
-                                        ${oreAssenzaTotali}h / 250h
+                                    <span style="font-size:8.5px;font-weight:700;color:${_assenzeStatusColor};background:${_assenzeStatusBg};padding:1px 5px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:fit-content;" title="Monte ore annuale: 990h (limite 25% = 248h)">
+                                        ${oreAssenzaTotali}h / 990h
                                     </span>
                                 </div>
 
