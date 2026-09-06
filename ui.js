@@ -3038,48 +3038,7 @@ function renderHome() {
                 </div>
             </div>
 
-            <!-- WIDGETS NOTIFICHE & ASSENZE -->
-            <div style="padding:0 20px;margin-top:14px;">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                    <!-- NOTIFICHE -->
-                    <div onclick="openTodayNotifications()" style="
-                        background:rgba(23,31,54,0.85);
-                        backdrop-filter:blur(32px) saturate(190%);-webkit-backdrop-filter:blur(32px) saturate(190%);
-                        border:0.5px solid rgba(182,196,255,0.14);border-top:1px solid rgba(255,255,255,0.25);
-                        border-radius:22px;padding:16px 18px;cursor:pointer;
-                        transition:transform 0.15s ease;
-                        position:relative;overflow:hidden;
-                    " ontouchstart="this.style.transform='scale(0.97)'" ontouchend="this.style.transform='scale(1)'" onmouseenter="this.style.transform='scale(1.02)'" onmouseleave="this.style.transform='scale(1)'">
-                        <div style="position:relative;display:inline-block;">
-                            <div style="width:38px;height:38px;border-radius:12px;background:rgba(47,88,205,0.22);border:1px solid rgba(182,196,255,0.3);display:flex;align-items:center;justify-content:center;color:#b6c4ff;">
-                                <i class="ph-fill ph-bell text-[20px]"></i>
-                            </div>
-                            ${_homeNotifCount > 0 ? `
-                                <div style="position:absolute;top:-4px;right:-6px;min-width:18px;height:18px;background:#2997ff;border:2px solid #141f36;border-radius:999px;font-size:10px;font-weight:800;color:#ffffff;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 0 10px rgba(41,151,255,0.7);">
-                                    ${_homeNotifCount}
-                                </div>
-                            ` : ''}
-                        </div>
-                        <h4 style="font-size:15px;font-weight:700;color:#dae2fd;margin:12px 0 2px;">Notifiche</h4>
-                        <p style="font-size:12px;font-weight:500;color:${_homeNotifCount > 0 ? '#b6c4ff' : '#8e909f'};margin:0;">${_homeNotifLabel}</p>
-                    </div>
-                    <!-- ASSENZE -->
-                    <div onclick="mostraAssenzeModal()" style="
-                        background:rgba(23,31,54,0.85);
-                        backdrop-filter:blur(32px) saturate(190%);-webkit-backdrop-filter:blur(32px) saturate(190%);
-                        border:0.5px solid rgba(182,196,255,0.14);border-top:1px solid rgba(255,255,255,0.25);
-                        border-radius:22px;padding:16px 18px;cursor:pointer;
-                        transition:transform 0.15s ease;
-                        position:relative;overflow:hidden;
-                    " ontouchstart="this.style.transform='scale(0.97)'" ontouchend="this.style.transform='scale(1)'" onmouseenter="this.style.transform='scale(1.02)'" onmouseleave="this.style.transform='scale(1)'">
-                        <div style="width:38px;height:38px;border-radius:12px;background:rgba(110,231,183,0.15);border:1px solid rgba(110,231,183,0.3);display:flex;align-items:center;justify-content:center;color:#6ee7b7;">
-                            <i class="ph-fill ph-calendar-check text-[20px]"></i>
-                        </div>
-                        <h4 style="font-size:15px;font-weight:700;color:#dae2fd;margin:12px 0 2px;">Assenze</h4>
-                        <p style="font-size:12px;font-weight:500;color:#c4c5d6;margin:0;">${_homeAssenzeLabel}</p>
-                    </div>
-                </div>
-            </div>
+
 
         </div>
     </main>
