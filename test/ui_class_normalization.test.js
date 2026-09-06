@@ -60,11 +60,16 @@ describe('UI Class Normalization & Track Preservation (ui.js)', () => {
         assert.strictEqual(normalizeClassUi('5A'), '5A');
     });
 
-    test('Rejects invalid non-class phrases', () => {
+    test('Rejects invalid non-class phrases and placeholders', () => {
         assert.strictEqual(normalizeClassUi('4 ORE'), null);
         assert.strictEqual(normalizeClassUi('2 ANNI'), null);
         assert.strictEqual(normalizeClassUi(''), null);
         assert.strictEqual(normalizeClassUi(null), null);
+        assert.strictEqual(normalizeClassUi('...'), null);
+        assert.strictEqual(normalizeClassUi('..'), null);
+        assert.strictEqual(normalizeClassUi('N/D'), null);
+        assert.strictEqual(normalizeClassUi('STUDENTE'), null);
+        assert.strictEqual(normalizeClassUi('---'), null);
     });
 
     test('Storage keys for class representative and proposals are partitioned per class and track', () => {

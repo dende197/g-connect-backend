@@ -701,7 +701,10 @@ function getNumericGradeValue(vote) {
 }
 
 function getVoteDate(vote) {
-    const d = parseArgoDate(vote?.data || vote?.date);
+    const raw = vote?.data || vote?.date;
+    if (!raw) return null;
+    if (raw instanceof Date) return Number.isNaN(raw.getTime()) ? null : raw;
+    const d = (typeof parseArgoDate === 'function') ? parseArgoDate(raw) : (typeof window !== 'undefined' && typeof window.parseArgoDate === 'function' ? window.parseArgoDate(raw) : new Date(raw));
     if (!(d instanceof Date) || Number.isNaN(d.getTime())) return null;
     return d;
 }
@@ -805,7 +808,7 @@ function getSchoolYearRanges(refDate = new Date()) {
         firstTermStart: new Date(startYear, 8, 1, 0, 0, 0, 0),      // 1 Sep 00:00:00
         firstTermEnd: new Date(endYear, 0, 31, 23, 59, 59, 999),    // 31 Jan 23:59:59
         secondTermStart: new Date(endYear, 1, 1, 0, 0, 0, 0),       // 1 Feb 00:00:00
-        secondTermEnd: new Date(endYear, 5, 30, 23, 59, 59, 999)     // 30 Jun 23:59:59
+        secondTermEnd: new Date(endYear, 7, 31, 23, 59, 59, 999)     // 31 Aug 23:59:59
     };
 }
 
@@ -813,7 +816,7 @@ function getCurrentSchoolTerm(refDate = new Date()) {
     const ranges = getSchoolYearRanges(refDate);
     if (refDate >= ranges.firstTermStart && refDate <= ranges.firstTermEnd) return 'first';
     if (refDate >= ranges.secondTermStart && refDate <= ranges.secondTermEnd) return 'second';
-    return null;
+    return (refDate.getMonth() >= 8 || refDate.getMonth() === 0) ? 'first' : 'second';
 }
 
 function getVotesBySchoolTerm(votes, term, refDate = new Date()) {
@@ -826,6 +829,64 @@ function getVotesBySchoolTerm(votes, term, refDate = new Date()) {
         if (term === 'second') return d >= ranges.secondTermStart && d <= ranges.secondTermEnd;
         return false;
     });
+}
+
+function getPreviousYearTermComparison({
+    subject = null,
+    refDate = new Date(),
+    allVotes = null,
+    prevYearKey = null
+} = {}) {
+    const d = (refDate instanceof Date) ? refDate : ((typeof parseArgoDate === 'function') ? parseArgoDate(refDate) : new Date(refDate));
+    const validDate = (d instanceof Date && !Number.isNaN(d.getTime()) && d.getTime() > 86400000) ? d : new Date();
+    const currentSy = getSchoolYearFromDate(validDate) || { startYear: 2026, endYear: 2027, key: '2026/27' };
+    const prevStartYear = currentSy.startYear - 1;
+    const prevEndYear = currentSy.endYear - 1;
+    const targetPrevKey = prevYearKey || `${prevStartYear}/${String(prevEndYear).slice(-2)}`;
+
+    const m = validDate.getMonth();
+    const isFirstTerm = (m >= 8 || m === 0);
+    const term = isFirstTerm ? 'first' : 'second';
+    const termLabel = isFirstTerm ? '1° Quadrimestre' : '2° Quadrimestre';
+    const termShort = isFirstTerm ? '1°Q' : '2°Q';
+
+    const prevTermStart = isFirstTerm
+        ? new Date(prevStartYear, 8, 1, 0, 0, 0, 0)
+        : new Date(prevEndYear, 1, 1, 0, 0, 0, 0);
+    const prevTermEnd = isFirstTerm
+        ? new Date(prevEndYear, 0, 31, 23, 59, 59, 999)
+        : new Date(prevEndYear, 7, 31, 23, 59, 59, 999);
+
+    const votes = Array.isArray(allVotes) ? allVotes : (typeof getVotiData === 'function' ? getVotiData() : (state.voti || []));
+    const prevYearVotes = getVotesForSchoolYear(targetPrevKey, votes);
+
+    let targetVotes = prevYearVotes;
+    if (subject) {
+        targetVotes = prevYearVotes.filter(v => areSubjectsEquivalent(v.materia || v.subject, subject));
+    }
+
+    const prevTermVotes = targetVotes.filter(v => {
+        const vd = getVoteDate(v);
+        return vd && vd >= prevTermStart && vd <= prevTermEnd;
+    });
+
+    const termNums = prevTermVotes.map(getNumericGradeValue).filter(n => Number.isFinite(n));
+    const yearNums = targetVotes.map(getNumericGradeValue).filter(n => Number.isFinite(n));
+
+    const prevTermMedia = termNums.length ? averageFromNumeric(termNums) : null;
+    const prevYearFullMedia = yearNums.length ? averageFromNumeric(yearNums) : null;
+
+    return {
+        prevYearKey: targetPrevKey,
+        currentYearKey: currentSy.key,
+        term,
+        termLabel,
+        termShort,
+        prevTermMedia,
+        prevYearFullMedia,
+        prevTermVotesCount: prevTermVotes.length,
+        prevYearVotesCount: targetVotes.length
+    };
 }
 
 function averageFromNumeric(values) {
@@ -1038,6 +1099,12 @@ function showModal(html, className = '') {
 window._activeToasts = [];
 
 function showToast(message, type = 'success', customBackground = '') {
+    if (typeof message === 'object' && message !== null) {
+        type = message.type || type;
+        customBackground = message.customBackground || customBackground;
+        message = message.message || message.text || JSON.stringify(message);
+    }
+
     if (typeof window.triggerHaptic === 'function') {
         window.triggerHaptic(type === 'error' ? 'error' : 'light');
     }
@@ -1363,6 +1430,11 @@ function normalizeClassUi(cls, track) {
     if (!cls) return null;
     let txt = String(cls).toUpperCase().trim();
 
+    // Reject placeholders, uninitialized tokens, and non-classes
+    if (!txt || txt === '...' || txt === '..' || txt === 'N/D' || txt === 'STUDENTE' || txt === 'UNDEFINED' || txt === 'NULL' || txt === '---') {
+        return null;
+    }
+
     // Word boundary blacklist for non-class phrases (e.g. "4 ORE", "2 ANNI")
     if (/^\s*[1-5]\s*(?:ORE|ANNI|ANNO|OGGETTI|OTTOBRE|ORA|ORDINE|OFFERTA|ORARIO|OVVERO|OGNI|OLTRE)\b/i.test(txt)) {
         return null;
@@ -1415,7 +1487,7 @@ function normalizeClassUi(cls, track) {
         }
     }
 
-    return txt.length <= 15 ? txt : null;
+    return (txt.length <= 15 && txt !== '...' && txt !== 'N/D' && txt !== 'STUDENTE') ? txt : null;
 }
 function isValidClass(cls) {
     if (!cls) return false;
@@ -2425,12 +2497,7 @@ function renderHome() {
     };
 
     // 5. Card compatte per sezione "Domani" — Apple HIG Frosted Glass
-    const htmlDomani = isInitialLoad
-        ? [1, 2].map(() => `
-            <div class="tomorrow-card skeleton" style="border-radius:22px; padding:16px 18px; margin-bottom:10px; height:90px; background:rgba(20,31,54,0.78);">
-                SKELETON DATA
-            </div>`).join('')
-        : allTomorrowItems.length > 0
+    const htmlDomani = allTomorrowItems.length > 0
         ? allTomorrowItems.map(item => {
             const icon = getSubjectLucideIcon(item.title);
             const isExam = item.isExam;
@@ -2504,6 +2571,8 @@ function renderHome() {
 
     // 6c. Dati sintetici e precisi per il CAROSELLO STUDENT HUB (Overview a 3 slide)
     const _mediaColor = media >= 8 ? '#30d158' : media >= 7 ? '#64d2ff' : media >= 6 ? '#ff9f0a' : media > 0 ? '#ff453a' : '#8e909f';
+    const homeComp = (typeof getPreviousYearTermComparison === 'function') ? getPreviousYearTermComparison({}) : null;
+    const hasHomeComp = homeComp && homeComp.prevTermMedia !== null;
 
     // Calcolo % Ore di Assenza rispetto al monte ore totale annuale (~1000h, limite max 25% = 250h)
     const _monteOreTotale = 1000;
@@ -2609,8 +2678,8 @@ function renderHome() {
                                     <div style="font-size:22px;font-weight:900;color:${_mediaColor};font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-0.03em;margin:3px 0 1px;">
                                         ${!hasHomeMedia ? '—' : media.toFixed(2)}
                                     </div>
-                                    <span style="font-size:9px;font-weight:800;color:${hasHomeMedia ? (isPositive ? '#30d158' : '#ff453a') : '#2997ff'};background:${hasHomeMedia ? (isPositive ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.15)') : 'rgba(41,151,255,0.15)'};padding:1px 5px;border-radius:999px;display:inline-flex;align-items:center;gap:2px;width:fit-content;">
-                                        <i class="ph-bold ${hasHomeMedia ? (isPositive ? 'ph-trend-up' : 'ph-trend-down') : 'ph-sparkle'}" style="font-size:8px;"></i>${hasHomeMedia && diffStr ? diffStr : 'Nuovo A.S.'}
+                                    <span style="font-size:9px;font-weight:800;color:${hasHomeMedia ? (isPositive ? '#30d158' : '#ff453a') : '#2997ff'};background:${hasHomeMedia ? (isPositive ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.15)') : 'rgba(41,151,255,0.15)'};padding:1px 5px;border-radius:999px;display:inline-flex;align-items:center;gap:2px;width:fit-content;white-space:nowrap;">
+                                        <i class="ph-bold ${hasHomeMedia ? (isPositive ? 'ph-trend-up' : 'ph-trend-down') : (hasHomeComp ? 'ph-target' : 'ph-sparkle')}" style="font-size:8px;"></i>${hasHomeMedia && diffStr ? diffStr : (hasHomeComp ? `${homeComp.termShort} 25/26: ${homeComp.prevTermMedia.toFixed(2)}` : 'Nuovo A.S.')}
                                     </span>
                                 </div>
 
@@ -3965,6 +4034,18 @@ function renderSubjectDetailView(subjectName) {
     const theme = getSubjectTheme(subjectName);
     const formattedTitle = formatSubjectTitle(subjectName);
 
+    // ── Previous School Year Term Comparison (A.S. 2025/26 Benchmark) ──
+    const prevComp = getPreviousYearTermComparison({ subject: subjectName });
+    const hasPrevComp = prevComp && prevComp.prevTermMedia !== null;
+    let prevDiff = null;
+    let isPrevPos = false;
+    let prevDiffStr = '';
+    if (hasSubjectMedia && hasPrevComp) {
+        prevDiff = media - prevComp.prevTermMedia;
+        isPrevPos = prevDiff >= 0;
+        prevDiffStr = (isPrevPos ? '+' : '') + prevDiff.toFixed(2);
+    }
+
     // ── Trend calculation: current average vs average without the latest grade ──
     const sortedByDate = [...votiData].sort((a, b) => (a.data || a.date || '').localeCompare(b.data || b.date || ''));
     const allNums = sortedByDate.map(getNumericGradeValue).filter(v => Number.isFinite(v));
@@ -4154,6 +4235,16 @@ function renderSubjectDetailView(subjectName) {
                                 <span style="font-size:11px;font-weight:700;color:${isPosTrend ? '#30d158' : '#ff453a'};">${diffStr}</span>
                             </div>` : ''}
                         </div>
+                        ${hasPrevComp ? `
+                        <div style="margin-top:8px;">
+                            <div style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:9999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);backdrop-filter:blur(8px);">
+                                <i class="ph-bold ph-scales" style="color:${theme.color};font-size:12px;"></i>
+                                <span>vs ${escapeHtml(prevComp.termShort)} A.S. ${escapeHtml(prevComp.prevYearKey)}: <strong>${prevComp.prevTermMedia.toFixed(2)}</strong></span>
+                                ${hasSubjectMedia && prevDiff !== null ? `
+                                <span style="color:${isPrevPos ? '#30d158' : '#ff453a'};font-weight:800;">(${prevDiffStr})</span>` : `
+                                <span style="color:${theme.color};font-weight:700;">(Target)</span>`}
+                            </div>
+                        </div>` : ''}
                     </div>
                     <span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:9999px;background:${statusBadge.bg};border:1px solid ${statusBadge.border};font-size:11px;font-weight:700;color:${statusBadge.color};">
                         <i class="ph-fill ${statusBadge.icon}" style="font-size:13px;"></i> ${statusBadge.label}
@@ -4178,6 +4269,114 @@ function renderSubjectDetailView(subjectName) {
                 </div>` : `
                 <div style="margin-top:14px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:12px;font-size:11px;color:rgba(255,255,255,0.5);font-style:italic;">
                     Andamento temporale disponibile a partire da 2 mesi di valutazioni.
+                </div>`}
+            </section>
+
+            <!-- ── CARD: CONFRONTO A.S. PRECEDENTE (Termine di Riferimento Quadrimestrale) ── -->
+            <section style="position:relative;padding:20px;background:rgba(20,31,54,0.78);backdrop-filter:blur(25px) saturate(180%);-webkit-backdrop-filter:blur(25px) saturate(180%);border:0.5px solid rgba(255,255,255,0.12);border-top:1px solid rgba(255,255,255,0.22);border-radius:26px;box-shadow:0 16px 36px -10px rgba(0,0,0,0.5);overflow:hidden;">
+                <!-- Sfumatura cromatica in angolo -->
+                <div style="position:absolute;top:-28px;right:-28px;width:100px;height:100px;background:${theme.color};opacity:0.20;border-radius:50%;filter:blur(26px);pointer-events:none;"></div>
+
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;position:relative;z-index:1;">
+                    <span style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${theme.color};display:flex;align-items:center;gap:6px;">
+                        <i class="ph-bold ph-arrows-left-right" style="font-size:13px;color:${theme.color};"></i>
+                        CONFRONTO A.S. ${escapeHtml(prevComp.prevYearKey)}
+                    </span>
+                    <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.12);padding:3px 10px;border-radius:999px;">
+                        ${escapeHtml(prevComp.termLabel)}
+                    </span>
+                </div>
+
+                ${hasPrevComp ? `
+                <div style="position:relative;z-index:1;">
+                    <!-- 2-Box Metric Comparison Grid -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+                        <!-- Box Attuale -->
+                        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:12px 14px;">
+                            <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:4px;">A.S. ${escapeHtml(activeYearKey)} (In corso)</span>
+                            <div style="display:flex;align-items:baseline;gap:6px;">
+                                <span style="font-size:26px;font-weight:800;color:#ffffff;line-height:1;font-variant-numeric:tabular-nums;">${hasSubjectMedia ? media.toFixed(2) : '—'}</span>
+                                ${hasSubjectMedia && prevDiff !== null ? `
+                                <span style="font-size:12px;font-weight:800;color:${isPrevPos ? '#30d158' : '#ff453a'};">
+                                    ${prevDiffStr}
+                                </span>` : ''}
+                            </div>
+                            <span style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;display:block;">${n} valutazion${n === 1 ? 'e' : 'i'}</span>
+                        </div>
+
+                        <!-- Box Storico Termine -->
+                        <div style="background:${theme.iconBg};border:1px solid ${theme.border};border-radius:18px;padding:12px 14px;">
+                            <span style="font-size:10px;font-weight:700;color:${theme.color};text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:4px;">A.S. ${escapeHtml(prevComp.prevYearKey)} (${prevComp.termShort})</span>
+                            <div style="display:flex;align-items:baseline;gap:6px;">
+                                <span style="font-size:26px;font-weight:800;color:${theme.color};line-height:1;font-variant-numeric:tabular-nums;">${prevComp.prevTermMedia.toFixed(2)}</span>
+                            </div>
+                            <span style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;display:block;">${prevComp.prevTermVotesCount} valutazion${prevComp.prevTermVotesCount === 1 ? 'e' : 'i'} finali</span>
+                        </div>
+                    </div>
+
+                    <!-- Dual Comparative Progress Bars -->
+                    <div style="margin-bottom:14px;background:rgba(0,0,0,0.2);padding:12px 14px;border-radius:16px;border:0.5px solid rgba(255,255,255,0.06);">
+                        <!-- Bar Current -->
+                        <div style="margin-bottom:10px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:11.5px;">
+                                <span style="color:rgba(255,255,255,0.7);font-weight:600;">Media attuale (${escapeHtml(activeYearKey)})</span>
+                                <span style="color:#ffffff;font-weight:800;">${hasSubjectMedia ? media.toFixed(2) : '0 voti'}</span>
+                            </div>
+                            <div style="width:100%;height:6px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;">
+                                <div style="width:${hasSubjectMedia ? Math.min(100, (media / 10 * 100)).toFixed(0) : 0}%;height:100%;background:${theme.color};border-radius:999px;transition:width 0.3s ease;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Bar Prev Year Term -->
+                        <div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:11.5px;">
+                                <span style="color:rgba(255,255,255,0.7);font-weight:600;">Media finale ${escapeHtml(prevComp.termLabel)} (${escapeHtml(prevComp.prevYearKey)})</span>
+                                <span style="color:${theme.color};font-weight:800;">${prevComp.prevTermMedia.toFixed(2)}</span>
+                            </div>
+                            <div style="width:100%;height:6px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;">
+                                <div style="width:${Math.min(100, (prevComp.prevTermMedia / 10 * 100)).toFixed(0)}%;height:100%;background:rgba(255,255,255,0.45);border-radius:999px;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Narrative Insight Banner -->
+                    <div style="padding:10px 14px;border-radius:14px;display:flex;align-items:center;gap:10px;${
+                        hasSubjectMedia 
+                            ? (isPrevPos 
+                                ? 'background:rgba(48,209,88,0.12);border:1px solid rgba(48,209,88,0.3);' 
+                                : 'background:rgba(255,69,58,0.12);border:1px solid rgba(255,69,58,0.3);')
+                            : 'background:rgba(41,151,255,0.12);border:1px solid rgba(41,151,255,0.3);'
+                    }">
+                        <div style="width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;${
+                            hasSubjectMedia
+                                ? (isPrevPos ? 'background:rgba(48,209,88,0.2);color:#30d158;' : 'background:rgba(255,69,58,0.2);color:#ff453a;')
+                                : 'background:rgba(41,151,255,0.2);color:#2997ff;'
+                        }">
+                            <i class="ph-bold ${
+                                hasSubjectMedia
+                                    ? (isPrevPos ? 'ph-trend-up' : 'ph-trend-down')
+                                    : 'ph-target'
+                            }" style="font-size:15px;"></i>
+                        </div>
+                        <p style="font-size:12px;color:rgba(255,255,255,0.9);line-height:1.35;margin:0;">
+                            ${hasSubjectMedia ? (
+                                isPrevPos 
+                                    ? `Stai superando la media finale del ${escapeHtml(prevComp.termLabel)} dell'anno scorso di <strong style="color:#30d158;">+${prevDiff.toFixed(2)}</strong> punti!` 
+                                    : `Sei a <strong style="color:#ff453a;">${Math.abs(prevDiff).toFixed(2)}</strong> punti dalla media del ${escapeHtml(prevComp.termLabel)} dell'anno scorso (${prevComp.prevTermMedia.toFixed(2)}). Hai tutto il tempo per recuperare!`
+                            ) : (
+                                `Nell'A.S. ${escapeHtml(prevComp.prevYearKey)} hai chiuso il ${escapeHtml(prevComp.termLabel)} con una media di <strong style="color:${theme.color};">${prevComp.prevTermMedia.toFixed(2)}</strong>. Questo è il tuo benchmark di partenza per quest'anno!`
+                            )}
+                        </p>
+                    </div>
+
+                    ${prevComp.prevYearFullMedia !== null ? `
+                    <p style="font-size:11px;color:rgba(255,255,255,0.45);margin:10px 2px 0;text-align:right;">
+                        Media complessiva intero A.S. ${escapeHtml(prevComp.prevYearKey)}: <strong>${prevComp.prevYearFullMedia.toFixed(2)}</strong> (${prevComp.prevYearVotesCount} voti totali)
+                    </p>` : ''}
+                </div>` : `
+                <div style="text-align:center;padding:16px 10px;color:rgba(255,255,255,0.5);position:relative;z-index:1;">
+                    <i class="ph ph-clock-counter-clockwise" style="font-size:24px;margin-bottom:6px;display:block;color:${theme.color};"></i>
+                    <p style="font-size:12px;margin:0;font-style:italic;">Nessuna valutazione registrata per ${escapeHtml(formattedTitle)} nel ${escapeHtml(prevComp.termLabel)} dell'A.S. ${escapeHtml(prevComp.prevYearKey)}.</p>
                 </div>`}
             </section>
 
@@ -5113,7 +5312,7 @@ function showProfileActions() {
                     ${renderAvatar(state.user.name, 56)}
                     <div style="min-width: 0;">
                         <div style="font-size: 18px; font-weight: 800; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(state.user.name)}</div>
-                        <div style="font-size: 13px; color: var(--text-dim); font-weight: 600;">${escapeHtml(normalizeClassUi(state.user?.class, state.user?.specialization) || 'Studente')}</div>
+                        <div style="font-size: 13px; color: var(--text-dim); font-weight: 600;">${escapeHtml((typeof getEffectiveUserClass === 'function' && getEffectiveUserClass()) || normalizeClassUi(state.user?.class, state.user?.specialization) || 'Studente')}</div>
                     </div>
                 </div>
 
@@ -5148,7 +5347,7 @@ function renderSettings() {
                          ${renderAvatar(state.user.name, 56)}
                         <div>
                             <div style="font-size: 17px; font-weight: 600; color: var(--text-primary);">${escapeHtml(state.user.name)}</div>
-                            <div style="font-size: 14px; color: var(--text-secondary);">${escapeHtml(normalizeClassUi(state.user?.class, state.user?.specialization) || state.user?.class || 'Studente')}</div>
+                            <div style="font-size: 14px; color: var(--text-secondary);">${escapeHtml((typeof getEffectiveUserClass === 'function' && getEffectiveUserClass()) || normalizeClassUi(state.user?.class, state.user?.specialization) || state.user?.class || 'Studente')}</div>
                        </div>
                    </div>
                     
@@ -9230,11 +9429,31 @@ function renderPlanner() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 function getEffectiveUserClass() {
+    const override = localStorage.getItem('gc_user_class_override');
+    if (override) {
+        const normOverride = (typeof normalizeClassUi === 'function') ? normalizeClassUi(override) : override;
+        if (normOverride && normOverride !== 'N/D' && normOverride !== 'Studente') {
+            return normOverride.trim().toUpperCase();
+        }
+    }
     const savedSession = (typeof sessionManager !== 'undefined' && sessionManager.load) ? sessionManager.load() : null;
-    const rawClass = state.user?.class || state.userData?.class || savedSession?.class || localStorage.getItem('gc_user_class_override') || '';
-    const track = state.user?.specialization || state.userData?.specialization || savedSession?.specialization || '';
-    const norm = (typeof normalizeClassUi === 'function') ? normalizeClassUi(rawClass, track) : rawClass;
-    return (norm && norm !== 'N/D' && norm !== 'Studente') ? norm.trim().toUpperCase() : '';
+    const candidates = [
+        { c: state.user?.class, t: state.user?.specialization },
+        { c: state.userData?.class, t: state.userData?.specialization },
+        { c: savedSession?.class, t: savedSession?.specialization },
+        { c: localStorage.getItem('gc_cached_user_class'), t: null }
+    ];
+    for (const cand of candidates) {
+        if (cand.c && cand.c !== '...' && cand.c !== 'N/D' && cand.c !== 'Studente') {
+            const norm = (typeof normalizeClassUi === 'function') ? normalizeClassUi(cand.c, cand.t) : cand.c;
+            if (norm && norm !== '...' && norm !== 'N/D' && norm !== 'Studente') {
+                const res = norm.trim().toUpperCase();
+                try { localStorage.setItem('gc_cached_user_class', res); } catch(_) {}
+                return res;
+            }
+        }
+    }
+    return '';
 }
 
 function getClassRepresentativeStorageKey(className) {
@@ -11419,6 +11638,35 @@ function renderGradesView() {
 
     // ── Per-subject stats ────────────────────────────────────────────────────
     const subjectsMap = {};
+
+    // 1. First populate all subjects from all known votes, tasks, or canonical subjects
+    const canonicalSubjects = [
+        'Italiano', 'Matematica', 'Lingua e cultura inglese', 'Storia',
+        'Filosofia', 'Fisica', 'Scienze naturali', 'Disegno e storia dell\'arte',
+        'Scienze motorie e sportive', 'Religione cattolica'
+    ];
+    (allVoti || []).forEach(v => {
+        const sub = v.materia || v.subject || '';
+        if (!sub) return;
+        const key = getSubjectGroupKey(sub);
+        if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
+    });
+    if (Array.isArray(state.tasks)) {
+        state.tasks.forEach(t => {
+            const sub = t.subject || t.materia || '';
+            if (!sub || sub === 'QUEST' || sub === 'Generale') return;
+            const key = getSubjectGroupKey(sub);
+            if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
+        });
+    }
+    if (Object.keys(subjectsMap).length === 0) {
+        canonicalSubjects.forEach(sub => {
+            const key = getSubjectGroupKey(sub);
+            if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
+        });
+    }
+
+    // 2. Populate votes for the active school year
     votiData.forEach(v => {
         const sub = v.materia || v.subject || 'Altro';
         const key = getSubjectGroupKey(sub);
@@ -11428,14 +11676,20 @@ function renderGradesView() {
 
     let subjects = Object.values(subjectsMap).map(({ name, list }) => {
         const nums = list.map(getNumericGradeValue).filter(v => Number.isFinite(v));
-        const subMedia = averageFromNumeric(nums) || 0;
-        const lastVote = [...list].sort((a, b) =>
+        const hasVotes = nums.length > 0;
+        const subMedia = hasVotes ? (averageFromNumeric(nums) || 0) : null;
+        const lastVote = hasVotes ? [...list].sort((a, b) =>
             (b.data || b.date || '').localeCompare(a.data || a.date || '')
-        )[0];
-        const lastVal = getNumericGradeValue(lastVote);
-        const lastDate = lastVote ? (lastVote.data || lastVote.date || 'recentissimo') : 'recentissimo';
-        return { name, media: subMedia, lastVote: lastVal, lastVoteDate: lastDate };
-    }).sort((a, b) => b.media - a.media);
+        )[0] : null;
+        const lastVal = lastVote ? getNumericGradeValue(lastVote) : null;
+        const lastDate = lastVote ? (lastVote.data || lastVote.date || '') : '';
+        return { name, media: subMedia, hasVotes, lastVote: lastVal, lastVoteDate: lastDate };
+    }).sort((a, b) => {
+        if (a.hasVotes && b.hasVotes) return b.media - a.media;
+        if (a.hasVotes && !b.hasVotes) return -1;
+        if (!a.hasVotes && b.hasVotes) return 1;
+        return a.name.localeCompare(b.name);
+    });
 
     let materieContentHtml = '';
     let subjectSlidesCount = 0;
@@ -11452,8 +11706,9 @@ function renderGradesView() {
             const gridItems = slideItems.slice(1);
 
             const featureNameFormatted = formatSubjectTitle(featureItem ? featureItem.name : '');
-            const featureDateFormatted = formatFriendlyDate(featureItem ? featureItem.lastVoteDate : '');
+            const featureDateFormatted = (featureItem && featureItem.lastVoteDate) ? formatFriendlyDate(featureItem.lastVoteDate) : '';
             const featureTheme = featureItem ? getSubjectTheme(featureItem.name) : getSubjectTheme('');
+            const hasFeatVotes = !!(featureItem && featureItem.hasVotes && featureItem.media !== null);
 
             const featureHtml = featureItem ? `
             <div style="position:relative;padding:16px 18px;background:rgba(20,31,54,0.85);backdrop-filter:blur(25px) saturate(180%);-webkit-backdrop-filter:blur(25px) saturate(180%);border:0.5px solid ${featureTheme.border};border-top:1px solid rgba(255,255,255,0.25);border-radius:24px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:12px;transition:transform 0.15s ease;box-shadow:0 8px 24px -6px rgba(6,14,32,0.6);overflow:hidden;" onclick="navigateSubject('${escapeJsSingleQuote(featureItem.name)}')" ontouchstart="this.style.transform='scale(0.98)'" ontouchend="this.style.transform='scale(1)'">
@@ -11466,18 +11721,19 @@ function renderGradesView() {
                     </div>
                     <div style="min-width:0;flex:1;">
                         <h3 style="font-size:15px;font-weight:700;color:#ffffff;margin:0 0 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(featureNameFormatted)}</h3>
-                        <p style="font-size:12px;color:rgba(255,255,255,0.6);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Ultimo: ${featureItem.lastVote !== null && featureItem.lastVote !== undefined ? featureItem.lastVote : '—'} (${featureDateFormatted})</p>
+                        <p style="font-size:12px;color:rgba(255,255,255,0.6);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${hasFeatVotes ? `Ultimo: ${featureItem.lastVote !== null ? featureItem.lastVote : '—'} (${featureDateFormatted})` : 'Nessuna valutazione per ora'}</p>
                     </div>
                 </div>
                 <div style="text-align:right;flex-shrink:0;margin-left:12px;position:relative;z-index:1;">
-                    <span style="font-size:22px;font-weight:800;color:${featureItem.media >= 6 ? '#ffffff' : '#ffb4ab'};letter-spacing:-0.02em;">${featureItem.media.toFixed(1)}</span>
-                    <div style="width:36px;height:3px;background:linear-gradient(90deg, ${featureTheme.color}, #30d158);border-radius:9999px;margin-top:4px;margin-left:auto;"></div>
+                    <span style="font-size:22px;font-weight:800;color:${hasFeatVotes ? (featureItem.media >= 6 ? '#ffffff' : '#ffb4ab') : 'rgba(255,255,255,0.45)'};letter-spacing:-0.02em;">${hasFeatVotes ? featureItem.media.toFixed(1) : '—'}</span>
+                    <div style="width:36px;height:3px;background:${hasFeatVotes ? `linear-gradient(90deg, ${featureTheme.color}, #30d158)` : 'rgba(255,255,255,0.1)'};border-radius:9999px;margin-top:4px;margin-left:auto;"></div>
                 </div>
             </div>` : '';
 
             const gridCardsHtml = gridItems.map((item) => {
                 const itemFormattedName = formatSubjectTitle(item.name);
                 const itemTheme = getSubjectTheme(item.name);
+                const hasItemVotes = !!(item.hasVotes && item.media !== null);
                 return `
                 <div style="position:relative;padding:14px 16px;background:rgba(20,31,54,0.85);backdrop-filter:blur(25px) saturate(180%);-webkit-backdrop-filter:blur(25px) saturate(180%);border:0.5px solid ${itemTheme.border};border-top:1px solid rgba(255,255,255,0.22);border-radius:20px;display:flex;flex-direction:column;justify-content:space-between;height:114px;box-sizing:border-box;cursor:pointer;transition:transform 0.15s ease;overflow:hidden;" onclick="navigateSubject('${escapeJsSingleQuote(item.name)}')" ontouchstart="this.style.transform='scale(0.97)'" ontouchend="this.style.transform='scale(1)'">
                     <!-- Sfumatura cromatica in angolo del colore della materia -->
@@ -11487,7 +11743,7 @@ function renderGradesView() {
                         <div style="width:36px;height:36px;border-radius:12px;background:${itemTheme.iconBg};border:1px solid ${itemTheme.border};display:flex;align-items:center;justify-content:center;color:${itemTheme.color};flex-shrink:0;">
                             <i class="ph-fill ${itemTheme.icon}" style="font-size:18px;"></i>
                         </div>
-                        <span style="font-size:20px;font-weight:800;color:${item.media >= 6 ? '#ffffff' : '#ffb4ab'};letter-spacing:-0.02em;flex-shrink:0;">${item.media.toFixed(1)}</span>
+                        <span style="font-size:20px;font-weight:800;color:${hasItemVotes ? (item.media >= 6 ? '#ffffff' : '#ffb4ab') : 'rgba(255,255,255,0.45)'};letter-spacing:-0.02em;flex-shrink:0;">${hasItemVotes ? item.media.toFixed(1) : '—'}</span>
                     </div>
                     <h3 style="font-size:13px;font-weight:700;color:${itemTheme.color};line-height:1.25;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative;z-index:1;">${escapeHtml(itemFormattedName)}</h3>
                 </div>`;
@@ -11527,30 +11783,12 @@ function renderGradesView() {
         <div style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:6px;">
             ${dotsHtml}
         </div>` : ''}`;
-    } else {
-        materieContentHtml = `
-        <div style="position:relative;padding:26px 20px;background:rgba(20,31,54,0.76);backdrop-filter:blur(25px) saturate(180%);-webkit-backdrop-filter:blur(25px) saturate(180%);border:0.5px solid rgba(255,255,255,0.12);border-top:1px solid rgba(255,255,255,0.22);border-radius:24px;text-align:center;box-shadow:0 12px 32px -8px rgba(0,0,0,0.5);overflow:hidden;">
-            <div style="position:absolute;top:-25px;right:-25px;width:100px;height:100px;background:#2997ff;opacity:0.15;border-radius:50%;filter:blur(28px);pointer-events:none;"></div>
-            <div style="width:48px;height:48px;border-radius:16px;background:rgba(41,151,255,0.12);border:1px solid rgba(41,151,255,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#2997ff;">
-                <i class="ph-bold ${isCurrentSchoolYear ? 'ph-graduation-cap' : 'ph-archive'}" style="font-size:24px;"></i>
-            </div>
-            <h3 style="font-size:16px;font-weight:700;color:#ffffff;margin:0 0 6px;">${isCurrentSchoolYear ? 'Nuovo Anno Scolastico Avviato' : `Archivio A.S. ${escapeHtml(activeYearKey)}`}</h3>
-            <p style="font-size:13px;color:rgba(255,255,255,0.65);line-height:1.45;margin:0 auto ${archiveYears.length > 0 && isCurrentSchoolYear ? '16px' : '0'};max-width:320px;">
-                ${isCurrentSchoolYear 
-                    ? 'Nessuna valutazione registrata per l\'A.S. ' + escapeHtml(activeYearKey) + '. I voti appariranno qui automaticamente appena i docenti li pubblicheranno su DidUP.' 
-                    : 'Nessuna valutazione registrata per questo anno scolastico.'}
-            </p>
-            ${archiveYears.length > 0 && isCurrentSchoolYear ? `
-            <button onclick="window.selectSchoolYear('${archiveYears[0]}')" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:14px;background:rgba(41,151,255,0.18);border:1px solid rgba(41,151,255,0.4);color:#ffffff;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform 0.15s ease;" ontouchstart="this.style.transform='scale(0.97)'" ontouchend="this.style.transform='scale(1)'">
-                <i class="ph-bold ph-archive" style="font-size:14px;color:#2997ff;"></i>
-                <span>Consulta Archivio A.S. ${archiveYears[0]}</span>
-            </button>` : ''}
-        </div>`;
     }
 
     let aiInsightText = "L'anno scolastico è appena iniziato. Appena riceverai le prime valutazioni, l'AI analizzerà il tuo rendimento e suggerirà strategie di studio personalizzate.";
     if (votiData.length > 0 && subjects.length > 0) {
-        const minSubj = [...subjects].sort((a,b) => a.media - b.media)[0];
+        const validWithVotes = subjects.filter(s => s.hasVotes && s.media !== null);
+        const minSubj = validWithVotes.length > 0 ? [...validWithVotes].sort((a,b) => a.media - b.media)[0] : null;
         if (minSubj && minSubj.media < 7 && minSubj.media > 0) {
             aiInsightText = `Il tuo rendimento complessivo è solido. Ti suggeriamo di dedicare 30m extra a ${formatSubjectTitle(minSubj.name)} per equilibrare la media generale.`;
         } else if (hasMedia && media >= 8.5) {
@@ -11564,9 +11802,22 @@ function renderGradesView() {
     const totVoti = votiData.length;
     const suffCount = votiData.filter(v => getNumericGradeValue(v) >= 6).length;
     const insuffCount = totVoti - suffCount;
-    const suffPct = totVoti > 0 ? Math.round((suffCount / totVoti) * 100) : 100;
-    const bestSubject = subjects.length > 0 ? subjects[0] : null;
-    const minSubject = subjects.length > 0 ? [...subjects].sort((a, b) => a.media - b.media)[0] : null;
+    const suffPct = totVoti > 0 ? Math.round((suffCount / totVoti) * 100) : 0;
+    const validSubjects = subjects.filter(s => s.hasVotes && s.media !== null);
+    const bestSubject = validSubjects.length > 0 ? validSubjects[0] : null;
+    const minSubject = validSubjects.length > 0 ? [...validSubjects].sort((a, b) => a.media - b.media)[0] : null;
+
+    // ── Previous School Year Term Comparison for General Average ──
+    const generalComp = getPreviousYearTermComparison({});
+    const hasGenComp = isCurrentSchoolYear && generalComp && generalComp.prevTermMedia !== null;
+    let genDiff = null;
+    let isGenPos = false;
+    let genDiffStr = '';
+    if (hasMedia && hasGenComp) {
+        genDiff = media - generalComp.prevTermMedia;
+        isGenPos = genDiff >= 0;
+        genDiffStr = (isGenPos ? '+' : '') + genDiff.toFixed(2);
+    }
 
     // Status Badge
     let globalStatusBadge = { label: 'In attesa', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.08)', border: 'rgba(255,255,255,0.14)', icon: 'ph-hourglass-simple' };
@@ -11657,6 +11908,17 @@ function renderGradesView() {
                         <i class="ph-fill ${globalStatusBadge.icon}" style="font-size:13px;"></i> ${globalStatusBadge.label}
                     </span>
                 </div>
+
+                ${hasGenComp ? `
+                <div style="margin-top:-6px;margin-bottom:16px;position:relative;z-index:1;">
+                    <div style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:9999px;background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.14);font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);backdrop-filter:blur(10px);">
+                        <i class="ph-bold ph-scales" style="font-size:13px;color:#2997ff;"></i>
+                        <span>Confronto ${escapeHtml(generalComp.termLabel)} A.S. ${escapeHtml(generalComp.prevYearKey)}: <strong>${generalComp.prevTermMedia.toFixed(2)}</strong></span>
+                        ${hasMedia && genDiff !== null ? `
+                        <span style="color:${isGenPos ? '#30d158' : '#ff453a'};font-weight:800;">(${genDiffStr})</span>` : `
+                        <span style="color:#2997ff;font-weight:700;">(Target da battere)</span>`}
+                    </div>
+                </div>` : ''}
 
                 <!-- 4 Bento Metric Pills (2x2 Grid) -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;position:relative;z-index:1;margin-bottom:16px;">
@@ -11769,8 +12031,21 @@ window.openAllGradesModal = function() {
     const rawVoti = (typeof getVotesForSchoolYear === 'function') ? getVotesForSchoolYear(activeYearKey, allVoti) : allVoti;
 
     if (!rawVoti || rawVoti.length === 0) {
-        if (typeof window.showToast === 'function') {
-            window.showToast({ message: `Nessuna valutazione registrata per l'A.S. ${activeYearKey}`, type: 'info' });
+        if (typeof window.openBottomSheet === 'function') {
+            window.openBottomSheet({
+                title: `Tutti i Voti · A.S. ${escapeHtml(activeYearKey)} (0)`,
+                html: `
+                    <div style="text-align:center;padding:36px 20px 24px;color:rgba(255,255,255,0.7);">
+                        <div style="width:58px;height:58px;border-radius:18px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:#0a84ff;font-size:26px;">
+                            <i class="ph-fill ph-student"></i>
+                        </div>
+                        <h4 style="font-size:16px;font-weight:700;color:#fff;margin:0 0 6px;">Nessun voto registrato</h4>
+                        <p style="font-size:13px;color:rgba(255,255,255,0.5);margin:0;line-height:1.4;">Non sono ancora presenti valutazioni per l'anno scolastico ${escapeHtml(activeYearKey)}.</p>
+                    </div>
+                `
+            });
+        } else if (typeof window.showToast === 'function') {
+            window.showToast(`Nessuna valutazione registrata per l'A.S. ${activeYearKey}`, 'info');
         }
         return;
     }

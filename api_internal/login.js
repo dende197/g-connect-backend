@@ -141,11 +141,14 @@ module.exports = async function handler(req, res) {
         });
         let storedSpecialization = detectedTrack || null;
         let storedAvatar = null;
+        const normalizedClass = (studentClass && detectedTrack)
+            ? (normalizeClass(studentClass, { track: detectedTrack }) || normalizeClass(studentClass))
+            : (studentClass ? normalizeClass(studentClass) : null);
+        const finalStudentClass = normalizedClass || studentClass || 'N/D';
 
         const supabase = getSupabase();
         if (supabase) {
             try {
-                const normalizedClass = normalizeClass(studentClass);
                 const { data: existingProfile } = await supabase.from('profiles')
                     .select('specialization, avatar').eq('id', pid).single();
 
@@ -157,7 +160,7 @@ module.exports = async function handler(req, res) {
                 await supabase.from('profiles').upsert({
                     id: pid,
                     name: studentName,
-                    class: normalizedClass || studentClass || 'N/D',
+                    class: finalStudentClass,
                     specialization: storedSpecialization || null,
                     avatar: storedAvatar || null,
                     last_active: new Date().toISOString()
@@ -213,12 +216,14 @@ module.exports = async function handler(req, res) {
                 accessToken,
                 userName: username,
                 profileIndex: targetIndex,
-                idSoggetto: targetProfile?.idSoggetto || null
+                idSoggetto: targetProfile?.idSoggetto || null,
+                class: finalStudentClass,
+                specialization: storedSpecialization
             },
             student: {
                 id: pid,
                 name: studentName,
-                class: studentClass || 'N/D',
+                class: finalStudentClass,
                 school,
                 specialization: storedSpecialization,
                 avatar: storedAvatar
@@ -235,13 +240,18 @@ module.exports = async function handler(req, res) {
         resp.selectedProfile = {
             index: targetIndex,
             name: studentName,
-            class: studentClass,
+            class: finalStudentClass,
             school: targetProfile.school || school,
             idSoggetto: targetProfile.idSoggetto
         };
 
         if (profiles.length > 1) {
-            resp.profiles = profiles.map(p => ({ index: p.index, name: p.name, class: p.class, school: p.school || school }));
+            resp.profiles = profiles.map(p => ({
+                index: p.index,
+                name: p.name,
+                class: normalizeClass(p.class) || p.class,
+                school: p.school || school
+            }));
         }
 
         res.status(200).json(resp);

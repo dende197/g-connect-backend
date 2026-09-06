@@ -134,7 +134,7 @@
         // --- STATE ENGINE ---
         const state = {
             view: 'home',
-            user: { id: null, name: 'Studente', class: '...', avatar: null, specialization: null },
+            user: { id: null, name: 'Studente', class: '', avatar: null, specialization: null },
             didup: { connected: false, lastUpdate: null, lastSuccessTs: 0, stale: false },
 
             syncDiagnostics: [],
@@ -617,7 +617,19 @@
                     state.plannedClassActivities = Array.isArray(data.plannedActivities) ? data.plannedActivities : [];
                     localStorage.setItem(lsKey('planned_class_activities'), JSON.stringify(state.plannedClassActivities));
                     if (data.student) {
-                        state.user = { ...state.user, ...data.student };
+                        const rawCls = data.student.class || state.user?.class || '';
+                        const rawSpec = data.student.specialization || state.user?.specialization;
+                        const normCls = (typeof normalizeClassUi === 'function')
+                            ? (normalizeClassUi(rawCls, rawSpec) || rawCls)
+                            : rawCls;
+                        state.user = {
+                            ...state.user,
+                            ...data.student,
+                            class: normCls || data.student.class || state.user?.class || ''
+                        };
+                        if (normCls && normCls !== 'N/D' && normCls !== '...' && normCls !== 'Studente') {
+                            try { localStorage.setItem('gc_cached_user_class', normCls); } catch(_) {}
+                        }
                         localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
                     }
                     
@@ -971,6 +983,31 @@
                 // Hydrate
                 try {
                     state.user = JSON.parse(localStorage.getItem(lsKey('user'))) || state.user;
+                    
+                    // Eagerly resolve and normalize class so profile view never flickers or delays
+                    const cachedCls = localStorage.getItem('gc_cached_user_class');
+                    const overrideCls = localStorage.getItem('gc_user_class_override');
+                    const sessCls = session?.class;
+                    const sessSpec = session?.specialization || state.user?.specialization;
+                    const currentCls = state.user?.class;
+                    
+                    const candidateCls = (overrideCls && overrideCls !== '...' && overrideCls !== 'N/D') ? overrideCls
+                        : (currentCls && currentCls !== '...' && currentCls !== 'N/D') ? currentCls
+                        : (sessCls && sessCls !== '...' && sessCls !== 'N/D') ? sessCls
+                        : cachedCls;
+                        
+                    if (candidateCls) {
+                        const normalizedCandidate = (typeof normalizeClassUi === 'function')
+                            ? (normalizeClassUi(candidateCls, sessSpec) || candidateCls)
+                            : candidateCls;
+                        if (normalizedCandidate && normalizedCandidate !== '...' && normalizedCandidate !== 'N/D' && normalizedCandidate !== 'Studente') {
+                            state.user.class = normalizedCandidate;
+                            try { localStorage.setItem('gc_cached_user_class', normalizedCandidate); } catch(_) {}
+                        }
+                    }
+                    if (state.user && state.user.class === '...') {
+                        state.user.class = '';
+                    }
                     state.tasks = JSON.parse(localStorage.getItem(lsKey('tasks'))) || [];
                     state.lastMedia = parseFloat(localStorage.getItem(lsKey('lastMedia'))) || 0;
                     state.manualVerifiche = JSON.parse(localStorage.getItem(lsKey('manual_verifiche')) || '[]');
@@ -1325,14 +1362,26 @@
             const incoming = data.student || data.selectedProfile || {};
             const isValidName = (n) => n && typeof n === 'string' && n.trim().length >= 2 && /^[a-zA-ZÀ-ÿ0-9\s'.\-]+$/.test(n.trim());
             const isValidClass = (c) => c && String(c).trim().length >= 1 && String(c).trim().length <= 20;
+            const incomingCls = incoming.class || data.student?.class || data.selectedProfile?.class || '';
+            const incomingSpec = incoming.specialization || data.student?.specialization || data.selectedProfile?.specialization || state.user?.specialization;
+            const normIncomingCls = (typeof normalizeClassUi === 'function')
+                ? (normalizeClassUi(incomingCls, incomingSpec) || incomingCls)
+                : incomingCls;
+            const finalClass = (isValidClass(normIncomingCls) && normIncomingCls !== '...' && normIncomingCls !== 'N/D')
+                ? normIncomingCls
+                : ((isValidClass(incomingCls) && incomingCls !== '...' && incomingCls !== 'N/D') ? incomingCls : (state.user?.class || "N/D"));
+
             state.user = {
                 ...state.user,
                 id: data.student?.id || (data.session ? generatePid(data.session.schoolCode, data.session.userName, data.session.profileIndex) : 'guest'),
                 name: (incoming.name && isValidName(incoming.name)) ? incoming.name : (state.user?.name || "Studente"),
-                class: (incoming.class && isValidClass(incoming.class)) ? incoming.class : (state.user?.class || "N/D"),
-                specialization: incoming.specialization || state.user?.specialization,
+                class: finalClass,
+                specialization: incomingSpec || null,
                 avatar: incoming.avatar || state.user?.avatar || null
             };
+            if (finalClass && finalClass !== 'N/D' && finalClass !== '...' && finalClass !== 'Studente') {
+                try { localStorage.setItem('gc_cached_user_class', finalClass); } catch(_) {}
+            }
             localStorage.setItem(lsKey('user'), JSON.stringify(state.user));
 
             // 3. Supabase Auth Bridge

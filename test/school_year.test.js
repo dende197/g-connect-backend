@@ -7,21 +7,44 @@ const {
     getSchoolYearFromDate,
     getCurrentSchoolYearKey,
     getAvailableSchoolYears,
-    getVotesForSchoolYear
+    getVotesForSchoolYear,
+    getPreviousYearTermComparison
 } = require('../lib/helpers');
 
 // Load ui.js in sandbox to verify client-side calculations and empty-state handling
 const uiCode = fs.readFileSync(path.join(__dirname, '../ui.js'), 'utf8');
 
-const matchSYDate = uiCode.match(/function getSchoolYearFromDate\s*\([\s\S]*?\n\}/);
-const matchCurrentSY = uiCode.match(/function getCurrentSchoolYearKey\s*\([\s\S]*?\n\}/);
-const matchAvailSY = uiCode.match(/function getAvailableSchoolYears\s*\([\s\S]*?\n\}/);
-const matchVotesSY = uiCode.match(/function getVotesForSchoolYear\s*\([\s\S]*?\n\}/);
-const matchTrend = uiCode.match(/function getGradeMonthlyTrendSummary\s*\([\s\S]*?\n\}/);
-const matchCalcolaMedia = uiCode.match(/function calcolaMedia\s*\([\s\S]*?\n\}/);
-const matchNumeric = uiCode.match(/function getNumericGradeValue\s*\([\s\S]*?\n\}/);
-const matchAvg = uiCode.match(/function averageFromNumeric\s*\([\s\S]*?\n\}/);
-const matchGiustifica = uiCode.match(/function isGiustifica\s*\([\s\S]*?\n\}/);
+function extractFunctionCode(source, funcName) {
+    const regex = new RegExp(`function\\s+${funcName}\\s*\\(`);
+    const m = source.match(regex);
+    if (!m) return '';
+    const startIdx = m.index;
+    let paramParen = 0;
+    let bodyStart = -1;
+    for (let i = startIdx; i < source.length; i++) {
+        if (source[i] === '(') {
+            paramParen++;
+        } else if (source[i] === ')') {
+            paramParen--;
+            if (paramParen === 0) {
+                bodyStart = source.indexOf('{', i);
+                break;
+            }
+        }
+    }
+    if (bodyStart === -1) return '';
+    let braceCount = 0;
+    for (let i = bodyStart; i < source.length; i++) {
+        if (source[i] === '{') braceCount++;
+        else if (source[i] === '}') {
+            braceCount--;
+            if (braceCount === 0) {
+                return source.slice(startIdx, i + 1);
+            }
+        }
+    }
+    return '';
+}
 
 const uiSandbox = new Function(`
     let state = { voti: [] };
@@ -37,24 +60,35 @@ const uiSandbox = new Function(`
         const d = new Date(s);
         return isNaN(d.getTime()) ? new Date(0) : d;
     }
-    ${matchGiustifica[0]}
-    ${matchNumeric[0]}
-    ${matchAvg[0]}
-    ${matchCalcolaMedia[0]}
-    ${matchSYDate[0]}
-    ${matchCurrentSY[0]}
-    ${matchAvailSY[0]}
-    ${matchVotesSY[0]}
-    ${matchTrend[0]}
+    ${extractFunctionCode(uiCode, 'normalizeSubjectName')}
+    ${extractFunctionCode(uiCode, 'isArtDrawingSubjectNormalized')}
+    ${extractFunctionCode(uiCode, 'areSubjectsEquivalent')}
+    ${extractFunctionCode(uiCode, 'isGiustifica')}
+    ${extractFunctionCode(uiCode, 'getNumericGradeValue')}
+    ${extractFunctionCode(uiCode, 'getVoteDate')}
+    ${extractFunctionCode(uiCode, 'averageFromNumeric')}
+    ${extractFunctionCode(uiCode, 'calcolaMedia')}
+    ${extractFunctionCode(uiCode, 'getSchoolYearFromDate')}
+    ${extractFunctionCode(uiCode, 'getCurrentSchoolYearKey')}
+    ${extractFunctionCode(uiCode, 'getAvailableSchoolYears')}
+    ${extractFunctionCode(uiCode, 'getVotesForSchoolYear')}
+    ${extractFunctionCode(uiCode, 'getSchoolYearRanges')}
+    ${extractFunctionCode(uiCode, 'getCurrentSchoolTerm')}
+    ${extractFunctionCode(uiCode, 'getPreviousYearTermComparison')}
+    ${extractFunctionCode(uiCode, 'getGradeMonthlyTrendSummary')}
     return {
         getSchoolYearFromDate,
         getCurrentSchoolYearKey,
         getAvailableSchoolYears,
         getVotesForSchoolYear,
         getGradeMonthlyTrendSummary,
-        calcolaMedia
+        calcolaMedia,
+        getPreviousYearTermComparison,
+        areSubjectsEquivalent,
+        normalizeSubjectName
     };
 `)();
+
 
 test('Italian School Year (A.S.) Recognition & Boundary Tests', async (t) => {
     await t.test('September 1st belongs to the new school year', () => {
@@ -172,3 +206,110 @@ test('UI Grades Calculations & Zero-State Integrity (ui.js)', async (t) => {
         assert.strictEqual(summary.media, null);
     });
 });
+
+test('Previous School Year Term Comparison (A.S. 2025/26 Benchmark)', async (t) => {
+    const historicalVotes = [
+        // Matematica - 1° Quadrimestre A.S. 2025/26 (Sep 1, 2025 – Jan 31, 2026)
+        { materia: 'Matematica', valore: '8', data: '2025-10-15' },
+        { materia: 'Matematica', valore: '7', data: '2025-11-20' },
+        { materia: 'Matematica', valore: '7.5', data: '2026-01-14' },
+
+        // Matematica - 2° Quadrimestre A.S. 2025/26 (Feb 1, 2026 – Aug 31, 2026)
+        { materia: 'Matematica', valore: '9', data: '2026-03-12' },
+        { materia: 'Matematica', valore: '10', data: '2026-05-18' },
+
+        // Italiano - 1° Quadrimestre A.S. 2025/26
+        { materia: 'Italiano', valore: '6.5', data: '2025-11-05' },
+        { materia: 'Italiano', valore: '7.5', data: '2026-01-22' },
+
+        // Disegno e Storia dell'Arte - 1° Quadrimestre A.S. 2025/26
+        { materia: 'Disegno e storia dell\'arte', valore: '8.5', data: '2025-12-10' },
+
+        // Nuovi voti A.S. 2026/27
+        { materia: 'Matematica', valore: '8.5', data: '2026-09-20' }
+    ];
+
+    await t.test('Date 25 October 2026 resolves to 1° Quadrimestre and compares with 1°Q 2025/26', () => {
+        const refDate = new Date(2026, 9, 25); // 25 Ottobre 2026
+        const res = getPreviousYearTermComparison({
+            subject: 'Matematica',
+            refDate,
+            allVotes: historicalVotes
+        });
+
+        assert.strictEqual(res.currentYearKey, '2026/27');
+        assert.strictEqual(res.prevYearKey, '2025/26');
+        assert.strictEqual(res.term, 'first');
+        assert.strictEqual(res.termLabel, '1° Quadrimestre');
+        assert.strictEqual(res.termShort, '1°Q');
+        assert.strictEqual(res.prevTermVotesCount, 3);
+        // (8 + 7 + 7.5) / 3 = 7.50
+        assert.strictEqual(res.prevTermMedia, 7.5);
+        // Full year: (8 + 7 + 7.5 + 9 + 10) / 5 = 8.30
+        assert.strictEqual(res.prevYearVotesCount, 5);
+        assert.strictEqual(res.prevYearFullMedia, 8.3);
+    });
+
+    await t.test('Date 6 April 2027 resolves to 2° Quadrimestre and compares with 2°Q 2025/26', () => {
+        const refDate = new Date(2027, 3, 6); // 6 Aprile 2027
+        const res = getPreviousYearTermComparison({
+            subject: 'Matematica',
+            refDate,
+            allVotes: historicalVotes
+        });
+
+        assert.strictEqual(res.currentYearKey, '2026/27');
+        assert.strictEqual(res.prevYearKey, '2025/26');
+        assert.strictEqual(res.term, 'second');
+        assert.strictEqual(res.termLabel, '2° Quadrimestre');
+        assert.strictEqual(res.termShort, '2°Q');
+        assert.strictEqual(res.prevTermVotesCount, 2);
+        // (9 + 10) / 2 = 9.50
+        assert.strictEqual(res.prevTermMedia, 9.5);
+    });
+
+    await t.test('General average comparison (subject=null) aggregates all subjects for that term', () => {
+        const refDate = new Date(2026, 9, 25); // 25 Ottobre 2026 (1Q)
+        const res = getPreviousYearTermComparison({
+            subject: null,
+            refDate,
+            allVotes: historicalVotes
+        });
+
+        assert.strictEqual(res.term, 'first');
+        assert.strictEqual(res.prevYearKey, '2025/26');
+        // All 1Q 25/26 votes:
+        // Matematica: 8, 7, 7.5
+        // Italiano: 6.5, 7.5
+        // Disegno: 8.5
+        // Total = 6 votes, Sum = 45 -> Media = 7.50
+        assert.strictEqual(res.prevTermVotesCount, 6);
+        assert.strictEqual(res.prevTermMedia, 7.5);
+    });
+
+    await t.test('Subject with no votes in 2025/26 returns null media gracefully', () => {
+        const refDate = new Date(2026, 9, 25);
+        const res = getPreviousYearTermComparison({
+            subject: 'Fisica Quantistica',
+            refDate,
+            allVotes: historicalVotes
+        });
+
+        assert.strictEqual(res.prevTermVotesCount, 0);
+        assert.strictEqual(res.prevTermMedia, null);
+        assert.strictEqual(res.prevYearFullMedia, null);
+    });
+
+    await t.test('uiSandbox matches subject aliases and Italian grades in term comparison', () => {
+        const refDate = new Date(2026, 9, 25);
+        const res = uiSandbox.getPreviousYearTermComparison({
+            subject: 'Storia dell\'Arte',
+            refDate,
+            allVotes: historicalVotes
+        });
+
+        assert.strictEqual(res.prevTermVotesCount, 1);
+        assert.strictEqual(res.prevTermMedia, 8.5);
+    });
+});
+
