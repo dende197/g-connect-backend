@@ -3483,22 +3483,19 @@ function openTodayNotifications(initialTab) {
                     <i class="ph-bold ${item.icon}" style="font-size:20px;"></i>
                 </div>
                 <div style="min-width:0;flex:1;">
-                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-                        <span style="font-size:9.5px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:${item.iconColor};background:${item.iconBg};border:0.5px solid ${item.iconColor}35;padding:2px 7px;border-radius:999px;">
-                            ${item.categoryLabel}
-                        </span>
-                        ${formatItemDateBadge(item.dateISO, item.rawDate)}
-                    </div>
-                    <div style="font-size:14px;font-weight:700;color:#ffffff;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    <div style="font-size:14px;font-weight:700;color:#ffffff;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                         ${escapeHtml(item.title)}
                     </div>
                     ${item.desc ? `
-                    <div style="font-size:12px;font-weight:500;color:#c4c5d6;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">
+                    <div style="font-size:12px;font-weight:500;color:#8e909f;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">
                         ${escapeHtml(item.desc)}
                     </div>` : ''}
                 </div>
             </div>
-            ${valuePill}
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                ${formatItemDateBadge(item.dateISO, item.rawDate)}
+                ${valuePill}
+            </div>
             ${item.action ? `<i class="ph-bold ph-caret-right" style="font-size:15px;color:rgba(255,255,255,0.4);flex-shrink:0;"></i>` : ''}
         </div>`;
     }
@@ -4685,7 +4682,7 @@ function mostraAssenzeModal() {
     };
 
     const sheetHtml = `
-        <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:16px;">
+        <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:4px;">
             
             <!-- Summary Metrics Cards (3 Colonne) -->
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
@@ -4720,7 +4717,7 @@ function mostraAssenzeModal() {
             </div>
 
             <!-- List of Items -->
-            <div id="assenze-items-list" style="display:flex;flex-direction:column;gap:10px;height:45vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px;">
+            <div id="assenze-items-list" style="display:flex;flex-direction:column;gap:10px;max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px;">
                 ${all.length > 0 ? all.map(renderCardHtml).join('') : ''}
                 <!-- Empty State -->
                 <div id="assenze-empty-msg" style="display:${all.length === 0 ? 'flex' : 'none'};align-items:center;justify-content:center;flex:1;text-align:center;padding:32px 16px;color:rgba(255,255,255,0.5);font-size:14px;font-style:italic;">

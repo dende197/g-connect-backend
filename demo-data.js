@@ -87,7 +87,7 @@
                 subject: 'Filosofia',
                 due_date: todayIso,
                 text: 'Studio approfondito del mito della caverna di Platone e significato gnoseologico.',
-                done: true,
+                done: false,
                 source: 'argo'
             },
 
