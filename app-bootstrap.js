@@ -600,7 +600,18 @@
                     if (data.tasks) updateTasks(data.tasks, false);
                     purgeUserGeneratedTasksAndPlans(true);
 
-                    if (data.voti) { state.voti = data.voti; localStorage.setItem(lsKey('voti'), JSON.stringify(state.voti)); }
+                    if (Array.isArray(data.voti)) {
+                        const existing = Array.isArray(state.voti) ? state.voti : [];
+                        const incomingIds = new Set(data.voti.map(v => v.id || `${v.materia}-${v.valore}-${v.data}`));
+                        const activeYearKey = (typeof getCurrentSchoolYearKey === 'function') ? getCurrentSchoolYearKey() : '2026/27';
+                        const preservedPastVotes = existing.filter(v => {
+                            const sy = (typeof getSchoolYearFromDate === 'function') ? getSchoolYearFromDate(v.data || v.date) : null;
+                            const voteYearKey = sy ? sy.key : null;
+                            return voteYearKey && voteYearKey !== activeYearKey && !incomingIds.has(v.id || `${v.materia}-${v.valore}-${v.data}`);
+                        });
+                        state.voti = [...data.voti, ...preservedPastVotes];
+                        localStorage.setItem(lsKey('voti'), JSON.stringify(state.voti));
+                    }
                     if (data.circolari) state.circolari = data.circolari;
                     if (data.assenzeData) {
                         state.assenzeData = data.assenzeData;
@@ -1431,7 +1442,16 @@
             // 5. Data Hydration
             if (data.tasks) updateTasks(data.tasks, false);
             if (data.voti) {
-                state.voti = Array.isArray(data.voti) ? data.voti : [];
+                const incomingVotes = Array.isArray(data.voti) ? data.voti : [];
+                const existing = Array.isArray(state.voti) ? state.voti : [];
+                const incomingIds = new Set(incomingVotes.map(v => v.id || `${v.materia}-${v.valore}-${v.data}`));
+                const activeYearKey = (typeof getCurrentSchoolYearKey === 'function') ? getCurrentSchoolYearKey() : '2026/27';
+                const preservedPastVotes = existing.filter(v => {
+                    const sy = (typeof getSchoolYearFromDate === 'function') ? getSchoolYearFromDate(v.data || v.date) : null;
+                    const voteYearKey = sy ? sy.key : null;
+                    return voteYearKey && voteYearKey !== activeYearKey && !incomingIds.has(v.id || `${v.materia}-${v.valore}-${v.data}`);
+                });
+                state.voti = [...incomingVotes, ...preservedPastVotes];
                 localStorage.setItem(lsKey('voti'), JSON.stringify(state.voti));
             }
             if (Array.isArray(data.activities)) {

@@ -11639,12 +11639,19 @@ function renderGradesView() {
     // ── Per-subject stats ────────────────────────────────────────────────────
     const subjectsMap = {};
 
-    // 1. First populate all subjects from all known votes, tasks, or canonical subjects
-    const canonicalSubjects = [
+    // 1. First populate all subjects from all known votes, tasks, class activities, verifiche or canonical subjects
+    const isSA = (state.user?.specialization || '').toUpperCase().includes('SA') ||
+        ((typeof getEffectiveUserClass === 'function' ? getEffectiveUserClass() : (state.user?.class || '')).includes('SA'));
+    const canonicalSubjects = isSA ? [
         'Italiano', 'Matematica', 'Lingua e cultura inglese', 'Storia',
-        'Filosofia', 'Fisica', 'Scienze naturali', 'Disegno e storia dell\'arte',
-        'Scienze motorie e sportive', 'Religione cattolica'
+        'Filosofia', 'Fisica', 'Informatica', 'Scienze naturali',
+        'Disegno e storia dell\'arte', 'Scienze motorie e sportive', 'Religione cattolica'
+    ] : [
+        'Italiano', 'Latino', 'Matematica', 'Lingua e cultura inglese', 'Storia',
+        'Filosofia', 'Fisica', 'Scienze naturali',
+        'Disegno e storia dell\'arte', 'Scienze motorie e sportive', 'Religione cattolica'
     ];
+
     (allVoti || []).forEach(v => {
         const sub = v.materia || v.subject || '';
         if (!sub) return;
@@ -11655,6 +11662,22 @@ function renderGradesView() {
         state.tasks.forEach(t => {
             const sub = t.subject || t.materia || '';
             if (!sub || sub === 'QUEST' || sub === 'Generale') return;
+            const key = getSubjectGroupKey(sub);
+            if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
+        });
+    }
+    if (Array.isArray(state.classActivities)) {
+        state.classActivities.forEach(a => {
+            const sub = a.materia || a.subject || a.desMateria || '';
+            if (!sub) return;
+            const key = getSubjectGroupKey(sub);
+            if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
+        });
+    }
+    if (Array.isArray(state.verifiche)) {
+        state.verifiche.forEach(v => {
+            const sub = v.materia || v.subject || '';
+            if (!sub) return;
             const key = getSubjectGroupKey(sub);
             if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
         });
