@@ -62,7 +62,10 @@ const uiSandbox = new Function(`
     }
     ${extractFunctionCode(uiCode, 'normalizeSubjectName')}
     ${extractFunctionCode(uiCode, 'isArtDrawingSubjectNormalized')}
+    ${extractFunctionCode(uiCode, 'getSubjectCanonicalName')}
+    ${extractFunctionCode(uiCode, 'getSubjectGroupKey')}
     ${extractFunctionCode(uiCode, 'areSubjectsEquivalent')}
+    ${extractFunctionCode(uiCode, 'formatSubjectTitle')}
     ${extractFunctionCode(uiCode, 'isGiustifica')}
     ${extractFunctionCode(uiCode, 'getNumericGradeValue')}
     ${extractFunctionCode(uiCode, 'getVoteDate')}
@@ -85,7 +88,10 @@ const uiSandbox = new Function(`
         calcolaMedia,
         getPreviousYearTermComparison,
         areSubjectsEquivalent,
-        normalizeSubjectName
+        normalizeSubjectName,
+        getSubjectCanonicalName,
+        getSubjectGroupKey,
+        formatSubjectTitle
     };
 `)();
 
@@ -312,4 +318,61 @@ test('Previous School Year Term Comparison (A.S. 2025/26 Benchmark)', async (t) 
         assert.strictEqual(res.prevTermMedia, 8.5);
     });
 });
+
+test('Grades Carousel Subjects & Equivalence Mapping', async (t) => {
+    const expectedCanonical = [
+        'Italiano',
+        'Storia Triennio',
+        "Disegno e Storia Dell'arte Triennio",
+        'Filosofia',
+        'Educazione Civica',
+        'Inglese',
+        'Informatica',
+        'Scienze Naturali',
+        'Fisica',
+        'Matematica',
+        'Scienze Motorie e Sportive'
+    ];
+
+    await t.test('All 11 canonical subjects are recognized and formatted exactly as requested', () => {
+        expectedCanonical.forEach(name => {
+            const canonical = uiSandbox.getSubjectCanonicalName(name);
+            assert.strictEqual(canonical, name, `Subject ${name} should resolve canonically`);
+            const formatted = uiSandbox.formatSubjectTitle(name);
+            assert.strictEqual(formatted, name, `Subject ${name} should format accurately`);
+        });
+    });
+
+    await t.test('Scraped DidUP aliases map to accurate canonical names', () => {
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('LINGUA E LETTERATURA ITALIANA'), 'Italiano');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('STORIA'), 'Storia Triennio');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('DISEGNO E STORIA DELL\'ARTE'), "Disegno e Storia Dell'arte Triennio");
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('FILOSOFIA'), 'Filosofia');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('ED. CIVICA'), 'Educazione Civica');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('LINGUA E CULTURA INGLESE'), 'Inglese');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('LINGUA STRANIERA'), 'Inglese');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('INFORMATICA'), 'Informatica');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('SCIENZE NATURALI'), 'Scienze Naturali');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('SCIENZE'), 'Scienze Naturali');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('FISICA'), 'Fisica');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('MATEMATICA'), 'Matematica');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('SCIENZE MOTORIE'), 'Scienze Motorie e Sportive');
+        assert.strictEqual(uiSandbox.getSubjectCanonicalName('EDUCAZIONE FISICA'), 'Scienze Motorie e Sportive');
+    });
+
+    await t.test('areSubjectsEquivalent matches scraped variants with canonical widget names', () => {
+        assert.strictEqual(uiSandbox.areSubjectsEquivalent('Italiano', 'LINGUA E LETTERATURA ITALIANA'), true);
+        assert.strictEqual(uiSandbox.areSubjectsEquivalent('Storia Triennio', 'STORIA'), true);
+        assert.strictEqual(uiSandbox.areSubjectsEquivalent("Disegno e Storia Dell'arte Triennio", 'DISEGNO E STORIA DELL\'ARTE'), true);
+        assert.strictEqual(uiSandbox.areSubjectsEquivalent('Inglese', 'LINGUA E CULTURA INGLESE'), true);
+        assert.strictEqual(uiSandbox.areSubjectsEquivalent('Scienze Motorie e Sportive', 'SCIENZE MOTORIE'), true);
+        assert.strictEqual(uiSandbox.areSubjectsEquivalent('Scienze Naturali', 'SCIENZE'), true);
+        assert.strictEqual(uiSandbox.areSubjectsEquivalent('Fisica', 'FISICA'), true);
+        // Ensure distinct subjects do not collide
+        assert.strictEqual(uiSandbox.areSubjectsEquivalent('Fisica', 'SCIENZE MOTORIE'), false);
+        assert.strictEqual(uiSandbox.areSubjectsEquivalent('Scienze Naturali', 'SCIENZE MOTORIE'), false);
+        assert.strictEqual(uiSandbox.areSubjectsEquivalent('Storia Triennio', "Disegno e Storia Dell'arte Triennio"), false);
+    });
+});
+
 

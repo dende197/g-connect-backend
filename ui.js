@@ -139,20 +139,113 @@ function isArtDrawingSubjectNormalized(normalized) {
         || s.includes('arte triennio');
 }
 
+const CANONICAL_GRADES_SUBJECTS = [
+    'Italiano',
+    'Storia Triennio',
+    "Disegno e Storia Dell'arte Triennio",
+    'Filosofia',
+    'Educazione Civica',
+    'Inglese',
+    'Informatica',
+    'Scienze Naturali',
+    'Fisica',
+    'Matematica',
+    'Scienze Motorie e Sportive'
+];
+
+function getSubjectCanonicalName(subject) {
+    if (!subject) return '';
+    const norm = (typeof normalizeSubjectName === 'function')
+        ? normalizeSubjectName(subject)
+        : String(subject || '').toLowerCase().trim();
+    if (!norm) return '';
+
+    // 1. Disegno e Storia Dell'arte Triennio (before Storia)
+    if (typeof isArtDrawingSubjectNormalized === 'function' && isArtDrawingSubjectNormalized(norm)) {
+        return "Disegno e Storia Dell'arte Triennio";
+    }
+    if (norm.includes('disegn') || norm.includes('dellarte') || norm.includes('storia dell') || (norm.includes('arte') && !norm.includes('letterat'))) {
+        return "Disegno e Storia Dell'arte Triennio";
+    }
+
+    // 2. Educazione Civica (before Storia)
+    if (norm.includes('civic') || norm.includes('cittadin')) {
+        return 'Educazione Civica';
+    }
+
+    // 3. Storia Triennio
+    if (norm.includes('stori')) {
+        return 'Storia Triennio';
+    }
+
+    // 4. Italiano
+    if (norm.includes('ital') || norm.includes('letter') || norm.includes('narrat') || norm.includes('antol') || norm.includes('gramm')) {
+        return 'Italiano';
+    }
+
+    // 5. Filosofia
+    if (norm.includes('filos')) {
+        return 'Filosofia';
+    }
+
+    // 6. Inglese
+    if (norm.includes('ingl') || norm.includes('stranier')) {
+        return 'Inglese';
+    }
+
+    // 7. Informatica
+    if (norm.includes('inform')) {
+        return 'Informatica';
+    }
+
+    // 8. Scienze Motorie e Sportive (before Scienze and before Fisica)
+    if (norm.includes('motor') || norm.includes('sport') || norm.includes('ginnas') || (norm.includes('educazione') && norm.includes('fisic'))) {
+        return 'Scienze Motorie e Sportive';
+    }
+
+    // 9. Scienze Naturali
+    if (norm.includes('scienz') || norm.includes('chimic') || norm.includes('biol') || norm.includes('geol') || norm.includes('natura')) {
+        return 'Scienze Naturali';
+    }
+
+    // 10. Fisica
+    if (norm.includes('fisic')) {
+        return 'Fisica';
+    }
+
+    // 11. Matematica
+    if (norm.includes('matem') || norm.includes('algeb') || norm.includes('geom') || norm.includes('trigon')) {
+        return 'Matematica';
+    }
+
+    return '';
+}
+
+function getSubjectGroupKey(subject) {
+    if (typeof getSubjectCanonicalName === 'function') {
+        const canonical = getSubjectCanonicalName(subject);
+        if (canonical) return 'canonical_' + normalizeSubjectName(canonical);
+    }
+    const normalized = normalizeSubjectName(subject);
+    if (!normalized) return 'altro';
+    if (typeof isArtDrawingSubjectNormalized === 'function' && isArtDrawingSubjectNormalized(normalized)) {
+        return 'canonical_disegno e storia dellarte triennio';
+    }
+    return normalized;
+}
+
 function areSubjectsEquivalent(subjectA, subjectB) {
     const a = normalizeSubjectName(subjectA);
     const b = normalizeSubjectName(subjectB);
     if (!a || !b) return false;
     if (a === b) return true;
-    if (isArtDrawingSubjectNormalized(a) && isArtDrawingSubjectNormalized(b)) return true;
+    if (typeof isArtDrawingSubjectNormalized === 'function' && isArtDrawingSubjectNormalized(a) && isArtDrawingSubjectNormalized(b)) return true;
+    if (typeof getSubjectGroupKey === 'function') {
+        const keyA = getSubjectGroupKey(subjectA);
+        const keyB = getSubjectGroupKey(subjectB);
+        if (keyA && keyB && keyA !== 'altro' && keyA === keyB) return true;
+    }
     return false;
-}
-
-function getSubjectGroupKey(subject) {
-    const normalized = normalizeSubjectName(subject);
-    if (!normalized) return 'altro';
-    if (isArtDrawingSubjectNormalized(normalized)) return 'area_disegno_storia_arte';
-    return normalized;
 }
 
 function isUserGeneratedTaskId(id) {
@@ -1848,6 +1941,7 @@ function getSubjectAbbrev(subject) {
         'MATEM. CON INFORMATICA': 'MAT', 'MATEMATICA CON INFORMATICA': 'MAT',
         'SCIENZE NAT. CHIM. BIO.': 'SCI', 'SC. NATURALI': 'SCI',
         'DISEGNO E STORIA DELL\'ARTE': 'ART', 'STORIA DELL\'ARTE': 'ART',
+        'DISEGNO E STORIA DELL\'ARTE TRIENNIO': 'ART', 'STORIA TRIENNIO': 'STO',
         'SCIENZE MOTORIE E SPORTIVE': 'SCM', 'SC. MOTORIE E SPORTIVE': 'SCM',
         'GRECO': 'GRC', 'LATINO': 'LAT', 'LINGUA E CULTURA GRECA': 'GRC',
         'GEOSTORIA': 'STO', 'STORIA E GEOGRAFIA': 'STO',
@@ -8710,7 +8804,17 @@ function getSubjectTheme(rawSubject) {
             glow: 'rgba(239, 68, 68, 0.35)'
         };
     }
-    if (s.includes('storia') || s.includes('cittadin') || s.includes('civic') || s.includes('geogr')) {
+    if (s.includes('civic') || s.includes('cittadin')) {
+        return {
+            color: '#14b8a6',
+            gradient: 'linear-gradient(135deg, rgba(20, 184, 166, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
+            border: 'rgba(20, 184, 166, 0.32)',
+            icon: 'ph-scales',
+            iconBg: 'rgba(20, 184, 166, 0.22)',
+            glow: 'rgba(20, 184, 166, 0.35)'
+        };
+    }
+    if ((s.includes('storia') || s.includes('geogr')) && !s.includes('arte')) {
         return {
             color: '#fbbf24',
             gradient: 'linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(23, 31, 51, 0.92) 100%)',
@@ -11394,16 +11498,12 @@ function renderProfile() {
 
 function formatSubjectTitle(str) {
     if (!str) return 'Materia';
-    let s = str.trim();
-    if (s.toUpperCase() === 'STORIA TRIENNIO') return 'Storia Triennio';
-    if (s.toUpperCase().includes('LINGUA E LETTERATURA ITALIANA')) return 'Lingua e Lett. Italiana';
-    if (s.toUpperCase().includes('STRANIERA')) return 'Lingua Inglese';
-    if (s.toUpperCase().includes('SCIENZE NATURALI')) return 'Scienze Naturali';
-    if (s.toUpperCase().includes('MATEMATICA')) return 'Matematica';
-    if (s.toUpperCase().includes('FISICA')) return 'Fisica';
-    if (s.toUpperCase().includes('FILOSOFIA')) return 'Filosofia';
-    
+    if (typeof getSubjectCanonicalName === 'function') {
+        const canonical = getSubjectCanonicalName(str);
+        if (canonical) return canonical;
+    }
     // Sentence case capitalizer fallback
+    let s = str.trim();
     const lower = s.toLowerCase();
     return lower.replace(/(^|\s|-|\/)\S/g, l => l.toUpperCase())
                 .replace(/\b(e|ed|di|del|della|degli|in|con|su|per|tra|fra)\b/gi, w => w.toLowerCase())
@@ -11513,61 +11613,36 @@ function renderGradesView() {
     // ── Per-subject stats ────────────────────────────────────────────────────
     const subjectsMap = {};
 
-    // 1. First populate all subjects from all known votes, tasks, class activities, verifiche or canonical subjects
-    const isSA = (state.user?.specialization || '').toUpperCase().includes('SA') ||
-        ((typeof getEffectiveUserClass === 'function' ? getEffectiveUserClass() : (state.user?.class || '')).includes('SA'));
-    const canonicalSubjects = isSA ? [
-        'Italiano', 'Matematica', 'Lingua e cultura inglese', 'Storia',
-        'Filosofia', 'Fisica', 'Informatica', 'Scienze naturali',
-        'Disegno e storia dell\'arte', 'Scienze motorie e sportive', 'Religione cattolica'
-    ] : [
-        'Italiano', 'Latino', 'Matematica', 'Lingua e cultura inglese', 'Storia',
-        'Filosofia', 'Fisica', 'Scienze naturali',
-        'Disegno e storia dell\'arte', 'Scienze motorie e sportive', 'Religione cattolica'
-    ];
+    // 1. Always initialize all 11 canonical subjects so all widgets are present in the carousel
+    const canonicalSubjects = (typeof CANONICAL_GRADES_SUBJECTS !== 'undefined' && Array.isArray(CANONICAL_GRADES_SUBJECTS))
+        ? CANONICAL_GRADES_SUBJECTS
+        : [
+            'Italiano',
+            'Storia Triennio',
+            "Disegno e Storia Dell'arte Triennio",
+            'Filosofia',
+            'Educazione Civica',
+            'Inglese',
+            'Informatica',
+            'Scienze Naturali',
+            'Fisica',
+            'Matematica',
+            'Scienze Motorie e Sportive'
+        ];
 
-    (allVoti || []).forEach(v => {
-        const sub = v.materia || v.subject || '';
-        if (!sub) return;
+    canonicalSubjects.forEach(sub => {
         const key = getSubjectGroupKey(sub);
-        if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
+        subjectsMap[key] = { name: sub, list: [] };
     });
-    if (Array.isArray(state.tasks)) {
-        state.tasks.forEach(t => {
-            const sub = t.subject || t.materia || '';
-            if (!sub || sub === 'QUEST' || sub === 'Generale') return;
-            const key = getSubjectGroupKey(sub);
-            if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
-        });
-    }
-    if (Array.isArray(state.classActivities)) {
-        state.classActivities.forEach(a => {
-            const sub = a.materia || a.subject || a.desMateria || '';
-            if (!sub) return;
-            const key = getSubjectGroupKey(sub);
-            if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
-        });
-    }
-    if (Array.isArray(state.verifiche)) {
-        state.verifiche.forEach(v => {
-            const sub = v.materia || v.subject || '';
-            if (!sub) return;
-            const key = getSubjectGroupKey(sub);
-            if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
-        });
-    }
-    if (Object.keys(subjectsMap).length === 0) {
-        canonicalSubjects.forEach(sub => {
-            const key = getSubjectGroupKey(sub);
-            if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
-        });
-    }
 
     // 2. Populate votes for the active school year
     votiData.forEach(v => {
         const sub = v.materia || v.subject || 'Altro';
         const key = getSubjectGroupKey(sub);
-        if (!subjectsMap[key]) subjectsMap[key] = { name: sub, list: [] };
+        if (!subjectsMap[key]) {
+            const canonicalName = (typeof getSubjectCanonicalName === 'function') ? getSubjectCanonicalName(sub) : null;
+            subjectsMap[key] = { name: canonicalName || formatSubjectTitle(sub), list: [] };
+        }
         subjectsMap[key].list.push(v);
     });
 
@@ -11585,6 +11660,11 @@ function renderGradesView() {
         if (a.hasVotes && b.hasVotes) return b.media - a.media;
         if (a.hasVotes && !b.hasVotes) return -1;
         if (!a.hasVotes && b.hasVotes) return 1;
+        const idxA = canonicalSubjects.indexOf(a.name);
+        const idxB = canonicalSubjects.indexOf(b.name);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
         return a.name.localeCompare(b.name);
     });
 
