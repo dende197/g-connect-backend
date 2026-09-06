@@ -140,16 +140,19 @@ function isArtDrawingSubjectNormalized(normalized) {
 }
 
 const CANONICAL_GRADES_SUBJECTS = [
+    // Pagina 1 del carosello
     'Italiano',
+    'Matematica',
+    'Fisica',
+    'Inglese',
+    'Scienze Naturali',
+    // Pagina 2 del carosello
+    'Informatica',
+    'Filosofia',
     'Storia Triennio',
     "Disegno e Storia Dell'arte Triennio",
-    'Filosofia',
     'Educazione Civica',
-    'Inglese',
-    'Informatica',
-    'Scienze Naturali',
-    'Fisica',
-    'Matematica',
+    // Pagina 3 del carosello
     'Scienze Motorie e Sportive'
 ];
 
@@ -11529,8 +11532,10 @@ function formatFriendlyDate(dateStr) {
     const d = (typeof parseArgoDate === 'function') ? parseArgoDate(dateStr) : new Date(dateStr);
     if (!d || isNaN(d)) return dateStr;
     const now = new Date();
-    const diffDays = Math.floor((now - d) / 86400000);
-    if (diffDays <= 0) return 'oggi';
+    const dDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.round((nowDate - dDate) / 86400000);
+    if (diffDays === 0) return 'oggi';
     if (diffDays === 1) return 'ieri';
     if (diffDays > 1 && diffDays <= 7) return `${diffDays} giorni fa`;
     const MONTHS_SHORT = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
@@ -11605,22 +11610,8 @@ function renderGradesView() {
         <div style="display:flex;justify-content:space-between;margin-top:6px;padding:0 4px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.45);position:relative;z-index:1;">
             ${monthList.map((m, idx) => `<span style="${idx === monthList.length - 1 ? 'color:#30d158;font-weight:800;' : ''}">${m.label}</span>`).join('')}
         </div>`;
-    } else if (monthList.length === 1) {
-        const m = monthList[0];
-        graphHtml = `
-        <div style="height:56px;width:100%;position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.03);border:0.5px solid rgba(255,255,255,0.08);border-radius:14px;padding:0 16px;margin:6px 0;">
-            <div style="display:flex;align-items:center;gap:8px;">
-                <span style="width:8px;height:8px;border-radius:50%;background:#30d158;box-shadow:0 0 8px #30d158;"></span>
-                <span style="font-size:12px;font-weight:700;color:#ffffff;">Media ${m.label}</span>
-            </div>
-            <span style="font-size:18px;font-weight:800;color:#30d158;">${m.avg.toFixed(2)}</span>
-        </div>`;
     } else {
-        graphHtml = `
-        <div style="height:60px;width:100%;position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.1);border-radius:14px;padding:0 14px;margin:6px 0;box-sizing:border-box;text-align:center;">
-            <i class="ph-bold ph-chart-line" style="font-size:17px;color:#2997ff;"></i>
-            <span style="font-size:11.5px;font-weight:600;color:rgba(255,255,255,0.5);">Grafico dell'andamento attivo con le prime valutazioni</span>
-        </div>`;
+        graphHtml = '';
     }
 
     // ── Per-subject stats ────────────────────────────────────────────────────
@@ -11631,15 +11622,15 @@ function renderGradesView() {
         ? CANONICAL_GRADES_SUBJECTS
         : [
             'Italiano',
+            'Matematica',
+            'Fisica',
+            'Inglese',
+            'Scienze Naturali',
+            'Informatica',
+            'Filosofia',
             'Storia Triennio',
             "Disegno e Storia Dell'arte Triennio",
-            'Filosofia',
             'Educazione Civica',
-            'Inglese',
-            'Informatica',
-            'Scienze Naturali',
-            'Fisica',
-            'Matematica',
             'Scienze Motorie e Sportive'
         ];
 
@@ -11670,9 +11661,6 @@ function renderGradesView() {
         const lastDate = lastVote ? (lastVote.data || lastVote.date || '') : '';
         return { name, media: subMedia, hasVotes, lastVote: lastVal, lastVoteDate: lastDate };
     }).sort((a, b) => {
-        if (a.hasVotes && b.hasVotes) return b.media - a.media;
-        if (a.hasVotes && !b.hasVotes) return -1;
-        if (!a.hasVotes && b.hasVotes) return 1;
         const idxA = canonicalSubjects.indexOf(a.name);
         const idxB = canonicalSubjects.indexOf(b.name);
         if (idxA !== -1 && idxB !== -1) return idxA - idxB;
